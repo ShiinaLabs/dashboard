@@ -216,6 +216,7 @@ function ReleaseDownloadsChart({ releases, topAssets, visibleAssets, visibleRele
   });
 
   const chartHeight = Math.max(isMobile ? 140 : 200, visibleReleases.length * (isMobile ? 36 : 50));
+  const RELEASE_Y_AXIS_WIDTH = isMobile ? 48 : 72;
 
   return (
     <div role="img" aria-label={t("repoDetail.releasesDownloads")}>
@@ -223,7 +224,7 @@ function ReleaseDownloadsChart({ releases, topAssets, visibleAssets, visibleRele
         <BarChart data={chartData} layout="vertical" margin={{ left: 0, right: 10, top: 5, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
           <XAxis type="number" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} />
-          <YAxis type="category" dataKey="tag_name" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={isMobile ? 50 : 120} tickFormatter={(v: string) => v.length > (isMobile ? 6 : 15) ? v.slice(0, isMobile ? 6 : 15) + "..." : v} />
+          <YAxis type="category" dataKey="tag_name" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={RELEASE_Y_AXIS_WIDTH} tickFormatter={(v: string) => v.length > (isMobile ? 6 : 15) ? v.slice(0, isMobile ? 6 : 15) + "..." : v} />
           <Tooltip
             contentStyle={CHART_TOOLTIP_CONTENT_STYLE}
             itemStyle={CHART_TOOLTIP_ITEM_STYLE}

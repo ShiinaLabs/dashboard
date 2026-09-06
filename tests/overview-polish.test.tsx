@@ -215,6 +215,14 @@ describe("overview visual contracts", () => {
     expect(trafficList).not.toContain("flex h-60 flex-col");
   });
 
+  it("keeps the release asset chart y-axis compact", () => {
+    const repoDetail = readFileSync("app/(dashboard)/github/[accountId]/repos/[repoId]/page.tsx", "utf8");
+
+    expect(repoDetail).toContain("const RELEASE_Y_AXIS_WIDTH = isMobile ? 48 : 72;");
+    expect(repoDetail).toContain("width={RELEASE_Y_AXIS_WIDTH}");
+    expect(repoDetail).not.toContain("width={isMobile ? 50 : 120}");
+  });
+
   it("gives pinned repository controls explicit name and metric spacing", () => {
     const repoChip = readFileSync("components/ui/RepoChip.tsx", "utf8");
     const css = readFileSync("app/globals.css", "utf8");
