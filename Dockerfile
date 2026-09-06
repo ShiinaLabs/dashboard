@@ -1,5 +1,5 @@
 # ── Stage 1: Build ─────────────────────────────────────────────────
-FROM node:22-slim AS base
+FROM node:20-slim AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 # Keep every Node process on a tight heap so the memory-limited CI kaniko
@@ -26,7 +26,7 @@ COPY . .
 RUN pnpm build
 
 # ── Stage 2: Production runner ──────────────────────────────────────
-FROM node:22-slim AS runner
+FROM node:20-slim AS runner
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable

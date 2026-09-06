@@ -4,7 +4,7 @@ This project follows the dotagents convention. Read [AGENTS.md](AGENTS.md) first
 
 ## Key Facts
 
-- **Runtime** — Node.js 22 (no Bun). The old Hono standalone server and `bun:sqlite` are gone.
+- **Runtime** — Node.js 20 (no Bun). The old Hono standalone server and `bun:sqlite` are gone.
 - **Database** — PostgreSQL only. `bootstrap()` in `lib/setup.ts` creates missing tables and seeds `admin`; it is triggered lazily on the first request by `app/auth-middleware.server.ts` (once per process).
 - **Mock mode** — `MOCK_DATA=1` (plus `NEXT_PUBLIC_MOCK_DATA=1` for the client banner) serves fixtures from `lib/mock` and skips PostgreSQL/auth.
 - **Config** — env-only via `lib/config.ts`; `data/config.json` is a legacy artifact and is never read.

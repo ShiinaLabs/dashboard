@@ -39,7 +39,7 @@ build:
 
 test:
   stage: test
-  image: reg.mikumikumi.xyz/mirror/node:22
+  image: reg.mikumikumi.xyz/mirror/node:20
   <<: *build_template
   before_script:
     - npm install -g pnpm@10

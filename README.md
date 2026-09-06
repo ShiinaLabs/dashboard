@@ -44,7 +44,7 @@ The app starts on port 3000.
 
 | Layer | Technology |
 |-------|-----------|
-| **Runtime** | Node.js 22 + pnpm |
+| **Runtime** | Node.js 20 + pnpm |
 | **Backend** | React Router 7 route handlers (same process, under `app/api/`) |
 | **Frontend** | React 19 + React Router 7 Framework Mode + TypeScript |
 | **Build** | `react-router build` (client + server, memory-bounded passes) |
@@ -216,7 +216,7 @@ Each platform (x, github, gitlab, reddit) has dedicated endpoints for stats, tim
 
 ### Prerequisites
 
-- Node.js 22+
+- Node.js 20+
 - pnpm
 - PostgreSQL (or use `MOCK_DATA=1` / `pnpm run mock` for fixture mode)
 

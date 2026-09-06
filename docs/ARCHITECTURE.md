@@ -4,7 +4,7 @@
 
 | Layer | Technology |
 |-------|-----------|
-| **Runtime** | Node.js 22 + pnpm |
+| **Runtime** | Node.js 20 + pnpm |
 | **Framework** | React Router 7 (Framework Mode) |
 | **Backend** | React Router route handlers under `app/api/` (same process as frontend) |
 | **Frontend** | React 19 + TypeScript + Vite |

@@ -6,14 +6,14 @@
 
 **Architecture:** Mantine 成为所有通用 UI 控件、设计 token、反馈和覆盖层的唯一组件来源；Tailwind 保留为页面布局和少量非组件 utility，不再直接承担 Button/Input/Card/Dialog 等控件样式。第一阶段升级运行时、接入 Provider/主题桥并完成数据展示层；第二阶段迁移交互控件、表单、覆盖层和反馈系统，删除旧的本地 UI 实现。
 
-**Tech Stack:** Node.js 22, pnpm 10.34.5, React 19, React Router 7 Framework Mode/SSR, Mantine 9.6.0, Tailwind CSS v4, Recharts, Vitest, Playwright
+**Tech Stack:** Node.js 20, pnpm 10.34.5, React 19, React Router 7 Framework Mode/SSR, Mantine 9.6.0, Tailwind CSS v4, Recharts, Vitest, Playwright
 
 **Spec:** `docs/superpowers/specs/2026-08-29-frontend-engineering-design.md`（本计划对其中“shadcn/ui”组件层决策作 Mantine 替换）
 
 ## Global Constraints
 
 - Mantine packages pin to `9.6.0`; `@mantine/core` and `@mantine/hooks` must use the same version.
-- Node.js floor is `22.0.0`; update local engine declaration, Docker images, CI image and deployment documentation together.
+- Node.js floor is `20.0.0`; keep the existing local engine declaration, Docker images, CI image and deployment documentation aligned with the available registry images.
 - MantineProvider is rendered exactly once at the application root; SSR must include `ColorSchemeScript` and `mantineHtmlProps`.
 - Existing 12 `data-theme` themes remain user-visible; their token definitions move to one typed source and feed both page CSS variables and Mantine variables.
 - Tailwind remains for layout utilities, but Tailwind Preflight is disabled; Mantine package styles use `styles.layer.css` only when layer ordering is required, never together with `styles.css`.
@@ -33,8 +33,8 @@
 
 **Modify in Stage 1:**
 
-- `package.json`, `pnpm-lock.yaml` — Mantine dependencies and Node 22 engine.
-- `Dockerfile`, `Dockerfile.ci`, `.gitlab-ci.yml` — Node 22 build/runtime images.
+- `package.json`, `pnpm-lock.yaml` — Mantine dependencies and Node 20 engine.
+- `Dockerfile`, `Dockerfile.ci`, `.gitlab-ci.yml` — Node 20 build/runtime images.
 - `app/root.tsx`, `app/providers.tsx` — Mantine styles, root Provider and SSR color scheme setup.
 - `app/globals.css` — disable Tailwind Preflight, preserve dashboard tokens and define layer order.
 - `lib/client/themes.ts`, `components/ThemeProvider.tsx` — expose one theme state to both systems.
@@ -42,7 +42,7 @@
 - `components/ui/card.tsx`, `components/ui/BaseCard.tsx` — remove after all data-display consumers migrate.
 - `app/(dashboard)/overview/*.tsx` — migrate overview cards, chart containers and tables.
 - `app/(dashboard)/github/[accountId]/page.tsx`, `app/(dashboard)/gitlab/[accountId]/page.tsx`, `app/(dashboard)/reddit/[id]/page.tsx`, `app/(dashboard)/x/[id]/page.tsx` — migrate detail-page stat/chart cards.
-- `docs/FRONTEND.md`, `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md` — document Mantine and Node 22.
+- `docs/FRONTEND.md`, `docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md` — document Mantine and Node 20.
 
 **Modify in Stage 2:**
 
@@ -70,7 +70,7 @@
 **Interfaces:**
 
 - Consumes: current Node 20/pnpm build configuration.
-- Produces: Node 22 runtime and `@mantine/core@9.6.0` + `@mantine/hooks@9.6.0` available to all later tasks.
+- Produces: Node 20 runtime and `@mantine/core@9.6.0` + `@mantine/hooks@9.6.0` available to all later tasks.
 
 - [x] **Step 1: Add a failing compatibility check**
 
@@ -82,7 +82,7 @@ Expected: FAIL on the current Node 20 environment.
 
 - [x] **Step 2: Update runtime and dependencies**
 
-Set `engines.node` to `^22.0.0`, update all build/runtime images and CI image to Node 22, then run:
+Keep `engines.node` at `^20.0.0`, keep all build/runtime images and the CI image on Node 20, then run:
 
 ```bash
 pnpm add @mantine/core@9.6.0 @mantine/hooks@9.6.0
@@ -90,7 +90,7 @@ pnpm add @mantine/core@9.6.0 @mantine/hooks@9.6.0
 
 - [x] **Step 3: Verify dependency graph**
 
-Run `pnpm install --frozen-lockfile` and `pnpm exec tsc --noEmit` under Node 22. Expected: lockfile is reproducible and the existing typecheck still passes.
+Run `pnpm install --frozen-lockfile` and `pnpm exec tsc --noEmit` under Node 20. Expected: lockfile is reproducible and the existing typecheck still passes.
 
 - [ ] **Step 4: Commit**
 
@@ -451,11 +451,11 @@ pnpm exec playwright test
 pnpm run build
 ```
 
-Expected: all commands pass under Node 22; no hydration warnings, CSS order regressions, horizontal overflow or raw native application controls.
+Expected: all commands pass under Node 20; no hydration warnings, CSS order regressions, horizontal overflow or raw native application controls.
 
 - [x] **Step 4: Update documentation and long-term memory**
 
-Document Mantine as the UI system, Tailwind's reduced role, Node 22 requirement, theme bridge, migration boundaries and verification commands in the listed repo docs. Update `dashboard/Mantine 集成评估.md` and `dashboard/dashboard 索引.md` with completion status and any failed migration approaches.
+Document Mantine as the UI system, Tailwind's reduced role, Node 20 requirement, theme bridge, migration boundaries and verification commands in the listed repo docs. Update `dashboard/Mantine 集成评估.md` and `dashboard/dashboard 索引.md` with completion status and any failed migration approaches.
 
 - [ ] **Step 5: Commit final documentation and tests**
 
@@ -467,7 +467,7 @@ git commit -m "docs(ui): document Mantine migration and verification"
 ## Self-Review
 
 - [x] Two stages are independently testable: Stage 1 ends with all data-display cards migrated; Stage 2 ends with all application controls migrated.
-- [x] The Node 22 requirement is explicit because the current runtime and Docker images are Node 20.
+- [x] The Node 20 requirement is explicit because the available CI and Docker registry images are Node 20.
 - [x] Theme state, CSS reset/layer order, SSR and Tailwind coexistence are covered before component migration.
 - [x] Data cards have a single contract and matching skeleton instead of relying on Mantine Card alone.
 - [x] Recharts and backend behavior remain unchanged.
