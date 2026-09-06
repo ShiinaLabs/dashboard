@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChartCard } from "@/components/domain/shared/ChartCard";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -19,10 +19,8 @@ export function XFollowerGrowthChart({ data }: Props) {
   const hasTrend = data.length >= 2;
 
   return (
-    <Card>
-      <CardHeader><CardTitle>{t("xDetail.followerGrowth")}</CardTitle></CardHeader>
-      <CardContent>
-        {hasTrend ? (
+    <ChartCard title={t("xDetail.followerGrowth")}>
+      {hasTrend ? (
           <div role="img" aria-label={t("xDetail.followerGrowthA11y")}>
             <ResponsiveContainer width="100%" height={CHART_H}>
               <AreaChart data={data} margin={MARGIN}>
@@ -38,8 +36,7 @@ export function XFollowerGrowthChart({ data }: Props) {
           <div className="flex items-center justify-center text-xs text-[var(--muted-foreground)]" style={{ height: CHART_H }}>
             {t("xDetail.followerGrowthEmpty")}
           </div>
-        )}
-      </CardContent>
-    </Card>
+      )}
+    </ChartCard>
   );
 }

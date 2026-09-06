@@ -2,15 +2,18 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
+import { Card, Text } from "@mantine/core";
 import { api, type TimelineData, type PaginatedTweets, type Tweet } from "@/lib/api";
 import { formatDateTime, formatDate } from "@/lib/client/datetime";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
+import { MetricGrid } from "@/components/domain/shared/MetricGrid";
+import { ChartCard } from "@/components/domain/shared/ChartCard";
 import { calcYAxisWidth } from "@/lib/client/utils";
 import {
   ArrowLeft, Trash2, AlertCircle,
-  MessageSquare, Heart, Repeat2, Eye, ExternalLink,
+  MessageSquare, Heart, Repeat2, Eye, ExternalLink, Users, UserPlus,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -18,33 +21,20 @@ import {
 } from "recharts";
 import { useIsMobile } from "@/lib/client/useIsMobile";
 import { TriggerPanel } from "@/components/TriggerPanel";
-import { StatCardSkeleton, ChartCardSkeleton, Skeleton } from "@/components/Skeleton";
+import { ChartCardSkeleton, Skeleton } from "@/components/Skeleton";
 import { TimeRangeSelector } from "@/components/TimeRangeSelector";
 import { XFollowerGrowthChart } from "@/components/XFollowerGrowthChart";
 import { FetchRunHistory } from "@/components/FetchRunHistory";
 import { AccountActiveButton } from "@/components/AccountActiveButton";
-
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
-      <CardContent className="p-4 pt-4 sm:p-4 sm:pt-4 text-center">
-        <p className="text-2xl font-bold leading-tight font-mono tabular-nums">{value}</p>
-        <p className="mt-1 text-xs text-[var(--muted-foreground)]">{label}</p>
-      </CardContent>
-    </Card>
-  );
-}
+import { Button, Tabs } from "@/components/ui";
 
 function ChartEmptyCard({ title, message, height }: { title: string; message: string; height: number }) {
   return (
-    <Card>
-      <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-center text-sm text-[var(--muted-foreground)]" style={{ height }}>
-          {message}
-        </div>
-      </CardContent>
-    </Card>
+    <ChartCard title={title}>
+      <Text size="sm" c="dimmed" ta="center" style={{ height, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {message}
+      </Text>
+    </ChartCard>
   );
 }
 
@@ -54,7 +44,7 @@ function TweetListItem({ tweet, screenName }: { tweet: Tweet; screenName: string
       href={`https://x.com/${screenName}/status/${tweet.id}`}
       target="_blank"
       rel="noopener noreferrer"
-      className="block p-3 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] transition-colors space-y-2 group"
+      className="detail-list-row block rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] transition-colors space-y-2 group"
     >
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm whitespace-pre-wrap break-words">{tweet.full_text}</p>
@@ -124,9 +114,9 @@ export default function XDetail() {
             <div className="flex-1"><Skeleton className="h-6 w-32 mb-2" /><Skeleton className="h-3 w-48" /></div>
           </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-          {Array.from({ length: 3 }).map((_, i) => <StatCardSkeleton key={i} />)}
-        </div>
+        <MetricGrid columns="three">
+          {Array.from({ length: 3 }).map((_, i) => <MetricCardSkeleton key={i} />)}
+        </MetricGrid>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <ChartCardSkeleton /><ChartCardSkeleton />
         </div>
@@ -138,7 +128,7 @@ export default function XDetail() {
     return (
       <div className="text-center py-12">
         <p className="text-[var(--muted-foreground)]">{t("xDetail.notFound")}</p>
-        <button onClick={() => navigate("/x")} className="mt-4 text-sm text-[var(--primary)] hover:underline">{t("xDetail.backToX")}</button>
+        <Button onClick={() => navigate("/x")} variant="subtle" size="sm" mt="md">{t("xDetail.backToX")}</Button>
       </div>
     );
   }
@@ -147,9 +137,9 @@ export default function XDetail() {
     <div className="space-y-4 sm:space-y-6">
       <div className="detail-header">
         <div className="detail-header-body">
-        <button onClick={() => navigate("/x")} className="p-2.5 min-h-11 min-w-11 flex items-center justify-center rounded-lg hover:bg-[var(--muted)] transition-colors shrink-0 mt-0.5" title={t("xDetail.backToX")} aria-label={t("xDetail.backToX")}>
+        <Button onClick={() => navigate("/x")} variant="subtle" color="gray" size="lg" px="xs" title={t("xDetail.backToX")} aria-label={t("xDetail.backToX")}>
           <ArrowLeft size={20} />
-        </button>
+        </Button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-xl font-semibold">@{account.screen_name}</h2>
@@ -164,14 +154,14 @@ export default function XDetail() {
         <div className="detail-header-actions">
           <TriggerPanel accountId={accountId} platform="twitter" />
           <AccountActiveButton accountId={accountId} isActive={!!account.is_active} />
-          <button
+          <Button
             onClick={() => setShowDeleteDialog(true)}
-            className="p-2.5 min-h-11 min-w-11 flex items-center justify-center rounded-lg bg-[var(--muted)] hover:bg-[var(--danger)]/10 transition-colors text-[var(--danger)]"
+            variant="light" color="danger" size="sm" leftSection={<Trash2 size={14} />}
             title={t("xDetail.delete")}
             aria-label={t("xDetail.delete")}
           >
-            <Trash2 size={14} />
-          </button>
+            {t("xDetail.delete")}
+          </Button>
         </div>
       </div>
 
@@ -184,11 +174,11 @@ export default function XDetail() {
       <FetchRunHistory account={account} runs={account.recentFetchRuns} />
 
       {account.stats && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-          <MetricCard label={t("xDetail.followers")} value={account.stats.followers_count?.toLocaleString() || "0"} />
-          <MetricCard label={t("xDetail.following")} value={account.stats.following_count?.toLocaleString() || "0"} />
-          <MetricCard label={t("xDetail.tweets")} value={account.stats.tweet_count?.toLocaleString() || "0"} />
-        </div>
+        <MetricGrid columns="three">
+          <MetricCard label={t("xDetail.followers")} value={account.stats.followers_count ?? 0} icon={<Users size={20} />} />
+          <MetricCard label={t("xDetail.following")} value={account.stats.following_count ?? 0} icon={<UserPlus size={20} />} />
+          <MetricCard label={t("xDetail.tweets")} value={account.stats.tweet_count ?? 0} icon={<MessageSquare size={20} />} />
+        </MetricGrid>
       )}
 
       <div className="mobile-detail-controls">
@@ -199,9 +189,7 @@ export default function XDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <XFollowerGrowthChart data={timeline.followerGrowth} />
           {timeline.dailyTweets.length > 0 ? (
-            <Card>
-              <CardHeader><CardTitle>{t("xDetail.tweetActivity")}</CardTitle></CardHeader>
-              <CardContent>
+            <ChartCard title={t("xDetail.tweetActivity")}>
                 <div role="img" aria-label={t("xDetail.tweetActivity")}>
                 <ResponsiveContainer width="100%" height={CHART_H}>
                   <BarChart data={timeline.dailyTweets} margin={MARGIN}>
@@ -213,8 +201,7 @@ export default function XDetail() {
                   </BarChart>
                 </ResponsiveContainer>
                 </div>
-              </CardContent>
-            </Card>
+            </ChartCard>
           ) : (
             <ChartEmptyCard title={t("xDetail.tweetActivity")} message={t("xDetail.noTweetData")} height={CHART_H} />
           )}
@@ -222,9 +209,7 @@ export default function XDetail() {
       )}
       {timeline && timeline.dailyTweets.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader><CardTitle>{t("xDetail.views")}</CardTitle></CardHeader>
-            <CardContent>
+          <ChartCard title={t("xDetail.views")}>
               <div role="img" aria-label={t("xDetail.views")}>
               <ResponsiveContainer width="100%" height={CHART_H}>
                 <AreaChart data={timeline.dailyTweets} margin={MARGIN}>
@@ -236,11 +221,8 @@ export default function XDetail() {
                 </AreaChart>
               </ResponsiveContainer>
               </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle>{t("xDetail.engagement")}</CardTitle></CardHeader>
-            <CardContent>
+          </ChartCard>
+          <ChartCard title={t("xDetail.engagement")}>
               <div role="img" aria-label={t("xDetail.engagement")}>
               <ResponsiveContainer width="100%" height={CHART_H}>
                 <AreaChart data={timeline.dailyTweets} margin={MARGIN}>
@@ -253,50 +235,35 @@ export default function XDetail() {
                 </AreaChart>
               </ResponsiveContainer>
               </div>
-            </CardContent>
-          </Card>
+          </ChartCard>
         </div>
       )}
 
       {(tweets || replies) && (
-        <Card>
-          <CardHeader>
-            <div role="tablist" aria-label={t("xDetail.recentTweets")} className="flex items-center gap-4 border-b border-[var(--border)] pb-0">
-              <button
-                id="tab-tweets"
-                role="tab"
-                aria-selected={tab === "tweets"}
-                aria-controls="panel-tweets"
-                onClick={() => setTab("tweets")}
-                className={`min-h-11 border-b-2 pb-3 text-sm font-medium transition-colors ${tab === "tweets" ? "border-[var(--primary)] text-[var(--primary)]" : "border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}
-              >
-                {t("xDetail.recentTweets")}
-              </button>
-              <button
-                id="tab-replies"
-                role="tab"
-                aria-selected={tab === "replies"}
-                aria-controls="panel-replies"
-                onClick={() => setTab("replies")}
-                className={`min-h-11 border-b-2 pb-3 text-sm font-medium transition-colors ${tab === "replies" ? "border-[var(--primary)] text-[var(--primary)]" : "border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}
-              >
-                {t("xDetail.recentReplies")}
-              </button>
-            </div>
-          </CardHeader>
-          <CardContent
+        <Card className="detail-list-card" withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
+          <div className="detail-list-card-header">
+            <Tabs value={tab} onChange={(value) => { if (value === "tweets" || value === "replies") setTab(value); }}>
+              <Tabs.List aria-label={t("xDetail.recentTweets")}>
+                <Tabs.Tab value="tweets">{t("xDetail.recentTweets")}</Tabs.Tab>
+                <Tabs.Tab value="replies">{t("xDetail.recentReplies")}</Tabs.Tab>
+              </Tabs.List>
+            </Tabs>
+          </div>
+          <div
+            className="detail-list-card-body"
             role="tabpanel"
             id={tab === "tweets" ? "panel-tweets" : "panel-replies"}
             aria-labelledby={tab === "tweets" ? "tab-tweets" : "tab-replies"}
-            className="space-y-3"
           >
-            {tab === "tweets" && tweets && tweets.data.length > 0 && tweets.data.slice(0, 20).map((tweet: Tweet) => (
-              <TweetListItem key={tweet.id} tweet={tweet} screenName={account.screen_name} />
-            ))}
-            {tab === "replies" && replies && replies.data.length > 0 && replies.data.slice(0, 20).map((tweet: Tweet) => (
-              <TweetListItem key={tweet.id} tweet={tweet} screenName={account.screen_name} />
-            ))}
-          </CardContent>
+            <div className="detail-list">
+              {tab === "tweets" && tweets && tweets.data.length > 0 && tweets.data.slice(0, 20).map((tweet: Tweet) => (
+                <TweetListItem key={tweet.id} tweet={tweet} screenName={account.screen_name} />
+              ))}
+              {tab === "replies" && replies && replies.data.length > 0 && replies.data.slice(0, 20).map((tweet: Tweet) => (
+                <TweetListItem key={tweet.id} tweet={tweet} screenName={account.screen_name} />
+              ))}
+            </div>
+          </div>
         </Card>
       )}
       <ConfirmDialog

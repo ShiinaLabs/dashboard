@@ -2,7 +2,9 @@ import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { XIcon, GithubIcon, GitlabIcon, RedditIcon } from "@/components/BrandIcons";
-import { StatCardSkeleton, ChartCardSkeleton, Skeleton } from "@/components/Skeleton";
+import { ChartCardSkeleton, Skeleton } from "@/components/Skeleton";
+import { MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
+import { MetricGrid } from "@/components/domain/shared/MetricGrid";
 import { useOverviewData } from "./useOverviewData";
 import { FetchHealthSection } from "./FetchHealthSection";
 import { PulseSection } from "./PulseSection";
@@ -31,12 +33,12 @@ export default function Overview() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div><Skeleton className="h-6 w-32 mb-1" /></div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {Array.from({ length: 5 }).map((_, i) => <StatCardSkeleton key={i} />)}
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)}
-        </div>
+        <MetricGrid columns="five">
+          {Array.from({ length: 5 }).map((_, i) => <MetricCardSkeleton key={i} />)}
+        </MetricGrid>
+        <MetricGrid>
+          {Array.from({ length: 4 }).map((_, i) => <MetricCardSkeleton key={i} />)}
+        </MetricGrid>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <ChartCardSkeleton /><ChartCardSkeleton />
         </div>
@@ -58,21 +60,25 @@ export default function Overview() {
   const showSepGL_Reddit = (xAccounts.length > 0 || ghAccounts.length > 0 || glAccounts.length > 0) && redditAccounts.length > 0;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+    <div className="overview-page space-y-7">
+      <div className="overview-page-header">
         <div>
-          <h2 className="text-lg font-semibold">{t("overview.heading")}</h2>
+          <p className="overview-page-kicker">{t("common.dashboard")}</p>
+          <h2 className="overview-page-title">{t("overview.heading")}</h2>
           {monitoredAccounts.length === 0 && (
-            <p className="text-xs text-[var(--muted-foreground)]">{t("overview.description_addPrompt")}</p>
+            <p className="overview-page-description">{t("overview.description_addPrompt")}</p>
           )}
         </div>
         {monitoredAccounts.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 sm:justify-end">
+          <div className="overview-account-list">
             {monitoredAccounts.map((acc: { id: number; platform: string; screen_name: string; error_message?: string | null }) => (
-              <Badge key={acc.id} className="text-[11px] px-1.5 py-0.5 gap-0.5">
-                {acc.platform === "twitter" ? <XIcon /> : acc.platform === "github" ? <GithubIcon /> : acc.platform === "gitlab" ? <GitlabIcon /> : <RedditIcon />}
+              <Badge
+                key={acc.id}
+                className="overview-account-chip"
+                leftSection={acc.platform === "twitter" ? <XIcon /> : acc.platform === "github" ? <GithubIcon /> : acc.platform === "gitlab" ? <GitlabIcon /> : <RedditIcon />}
+                rightSection={acc.error_message ? <span className="overview-account-alert">!</span> : undefined}
+              >
                 {acc.platform === "twitter" ? `@${acc.screen_name}` : acc.screen_name}
-                {acc.error_message && <span className="text-[var(--danger)] ml-0.5">!</span>}
               </Badge>
             ))}
           </div>

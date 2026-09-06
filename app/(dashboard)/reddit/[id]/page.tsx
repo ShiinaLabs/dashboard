@@ -2,21 +2,24 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
+import { Card, Group, Stack, Text } from "@mantine/core";
 import { api, type RedditOverview, type RedditPost, type RedditComment } from "@/lib/api";
 import { formatDateTime, formatDate } from "@/lib/client/datetime";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { StatCard } from "@/components/StatCard";
+import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
+import { MetricGrid } from "@/components/domain/shared/MetricGrid";
+import { ChartCard } from "@/components/domain/shared/ChartCard";
 import { TriggerPanel } from "@/components/TriggerPanel";
 import { TimeRangeSelector } from "@/components/TimeRangeSelector";
 import { calcYAxisWidth } from "@/lib/client/utils";
 import { ArrowLeft, ArrowUpRight, Trash2, AlertCircle, ThumbsUp, MessageSquare, TrendingUp, FileText } from "lucide-react";
 import { useIsMobile } from "@/lib/client/useIsMobile";
 import { RedditIcon } from "@/components/BrandIcons";
-import { StatCardSkeleton, ChartCardSkeleton, Skeleton } from "@/components/Skeleton";
+import { ChartCardSkeleton, Skeleton } from "@/components/Skeleton";
 import { FetchRunHistory } from "@/components/FetchRunHistory";
 import { AccountActiveButton } from "@/components/AccountActiveButton";
+import { Button } from "@/components/ui";
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -98,9 +101,9 @@ export default function RedditDetail() {
             <div className="flex-1"><Skeleton className="h-6 w-32 mb-2" /><Skeleton className="h-3 w-48" /></div>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)}
-        </div>
+        <MetricGrid>
+          {Array.from({ length: 4 }).map((_, i) => <MetricCardSkeleton key={i} />)}
+        </MetricGrid>
         <ChartCardSkeleton />
       </div>
     );
@@ -110,7 +113,7 @@ export default function RedditDetail() {
     return (
       <div className="text-center py-12">
         <p className="text-[var(--muted-foreground)]">{t("redditDetail.notFound")}</p>
-        <button onClick={() => navigate("/reddit")} className="mt-4 text-sm text-[var(--primary)] hover:underline">{t("redditDetail.backToReddit")}</button>
+        <Button onClick={() => navigate("/reddit")} variant="subtle" size="sm" mt="md">{t("redditDetail.backToReddit")}</Button>
       </div>
     );
   }
@@ -119,9 +122,9 @@ export default function RedditDetail() {
     <div className="space-y-4 sm:space-y-6">
       <div className="detail-header">
         <div className="detail-header-body">
-        <button onClick={() => navigate("/reddit")} className="p-2.5 min-h-11 min-w-11 flex items-center justify-center rounded-lg hover:bg-[var(--muted)] transition-colors shrink-0 mt-0.5" title={t("redditDetail.backToReddit")} aria-label={t("redditDetail.backToReddit")}>
+        <Button onClick={() => navigate("/reddit")} variant="subtle" color="gray" size="lg" px="xs" title={t("redditDetail.backToReddit")} aria-label={t("redditDetail.backToReddit")}>
           <ArrowLeft size={20} />
-        </button>
+        </Button>
         <div className="flex items-start gap-2 min-w-0 flex-1">
           <RedditIcon size={18} className="shrink-0 mt-1" />
           <div className="min-w-0">
@@ -139,10 +142,7 @@ export default function RedditDetail() {
         <div className="detail-header-actions">
           <TriggerPanel accountId={accountId} platform="reddit" />
 <AccountActiveButton accountId={accountId} isActive={!!account.is_active} />
-          <button onClick={() => setShowDeleteDialog(true)}
-            className="p-2.5 min-h-11 min-w-11 flex items-center justify-center rounded-lg bg-[var(--muted)] hover:bg-[var(--danger)]/10 transition-colors text-[var(--danger)]" title={t("redditDetail.delete")} aria-label={t("redditDetail.delete")}>
-            <Trash2 size={14} />
-          </button>
+          <Button onClick={() => setShowDeleteDialog(true)} variant="light" color="danger" size="sm" leftSection={<Trash2 size={14} />} title={t("redditDetail.delete")} aria-label={t("redditDetail.delete")}>{t("redditDetail.delete")}</Button>
         </div>
       </div>
 
@@ -162,21 +162,20 @@ export default function RedditDetail() {
             <TimeRangeSelector value={days} onChange={setDays} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatCard title={t("redditDetail.postKarma")} value={overview.stats?.post_karma ?? 0} icon={<ThumbsUp size={20} />} />
-            <StatCard title={t("redditDetail.commentKarma")} value={overview.stats?.comment_karma ?? 0} icon={<MessageSquare size={20} />} />
-            <StatCard title={t("redditDetail.totalPosts")} value={overview.totalPosts} icon={<FileText size={20} />} />
-            <StatCard title={t("redditDetail.totalScore")} value={overview.totalScore.toLocaleString()} icon={<TrendingUp size={20} />} />
-          </div>
+          <MetricGrid>
+            <MetricCard label={t("redditDetail.postKarma")} value={overview.stats?.post_karma ?? 0} icon={<ThumbsUp size={20} />} />
+            <MetricCard label={t("redditDetail.commentKarma")} value={overview.stats?.comment_karma ?? 0} icon={<MessageSquare size={20} />} />
+            <MetricCard label={t("redditDetail.totalPosts")} value={overview.totalPosts} icon={<FileText size={20} />} />
+            <MetricCard label={t("redditDetail.totalScore")} value={overview.totalScore} icon={<TrendingUp size={20} />} />
+          </MetricGrid>
 
           {/* ── Karma Timeline ── */}
           {timeline && timeline.length > 1 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><TrendingUp size={18} /> {t("redditDetail.karmaTimeline")}</CardTitle>
-                <CardDescription>{t("redditDetail.karmaTimelineDesc")}</CardDescription>
-              </CardHeader>
-              <CardContent>
+            <ChartCard
+              title={t("redditDetail.karmaTimeline")}
+              description={t("redditDetail.karmaTimelineDesc")}
+              icon={<TrendingUp size={18} />}
+            >
                 <div role="img" aria-label={t("redditDetail.karmaTimeline")}>
                 <div className={`flex flex-wrap gap-x-3 gap-y-0.5 mb-2 ${isMobile ? "text-[11px]" : "text-xs"}`}>
                   {legendPayload.map((e) => (
@@ -197,19 +196,17 @@ export default function RedditDetail() {
                   </LineChart>
                 </ResponsiveContainer>
                 </div>
-              </CardContent>
-            </Card>
+            </ChartCard>
           )}
 
           {/* ── Daily Activity + Subreddit Pie ── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {activity && (activity.posts.length > 0 || activity.comments.length > 0) && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><FileText size={18} /> {t("redditDetail.dailyActivity")}</CardTitle>
-                  <CardDescription>{t("redditDetail.dailyActivityDesc")}</CardDescription>
-                </CardHeader>
-                <CardContent>
+              <ChartCard
+                title={t("redditDetail.dailyActivity")}
+                description={t("redditDetail.dailyActivityDesc")}
+                icon={<FileText size={18} />}
+              >
                   <div role="img" aria-label={t("redditDetail.dailyActivity")}>
                   <div className={`flex flex-wrap gap-x-3 gap-y-0.5 mb-2 ${isMobile ? "text-[11px]" : "text-xs"}`}>
                     <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: "var(--chart-4)" }} /><span className="text-[var(--muted-foreground)]">{t("redditDetail.totalPosts")}</span></span>
@@ -242,16 +239,14 @@ export default function RedditDetail() {
                     </BarChart>
                   </ResponsiveContainer>
                   </div>
-                </CardContent>
-              </Card>
+              </ChartCard>
             )}
             {subreddits && subreddits.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><ThumbsUp size={18} /> {t("redditDetail.topSubreddits")}</CardTitle>
-                  <CardDescription>{t("redditDetail.topSubredditsDesc")}</CardDescription>
-                </CardHeader>
-                <CardContent>
+              <ChartCard
+                title={t("redditDetail.topSubreddits")}
+                description={t("redditDetail.topSubredditsDesc")}
+                icon={<ThumbsUp size={18} />}
+              >
                   <div role="img" aria-label={t("redditDetail.topSubreddits")}>
                   <ResponsiveContainer width="100%" height={CHART_H}>
                     <PieChart>
@@ -264,21 +259,22 @@ export default function RedditDetail() {
                     </PieChart>
                   </ResponsiveContainer>
                   </div>
-                </CardContent>
-              </Card>
+              </ChartCard>
             )}
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><TrendingUp size={18} /> {t("redditDetail.topPosts")}</CardTitle>
-              <CardDescription>{t("redditDetail.topPostsDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <Card className="detail-list-card" withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
+            <div className="detail-list-card-header">
+              <Stack gap={4}>
+                <Group gap="xs"><TrendingUp size={18} /><Text component="h3" fz="lg" fw={600}>{t("redditDetail.topPosts")}</Text></Group>
+                <Text size="sm" c="dimmed">{t("redditDetail.topPostsDesc")}</Text>
+              </Stack>
+            </div>
+            <div className="detail-list-card-body">
               {postsData?.data && postsData.data.length > 0 ? (
-                <div className="space-y-2">
+                <div className="detail-list">
                   {postsData.data.slice(0, 10).map((post: RedditPost) => (
-                    <div key={post.id} className="flex items-start gap-3 p-3 rounded-lg bg-[var(--muted)]">
+                    <div key={post.id} className="detail-list-row flex items-start gap-3 rounded-lg bg-[var(--muted)]">
                       <ThumbsUp size={16} className="text-[var(--chart-4)] mt-1 shrink-0" />
                       <div className="min-w-0 flex-1">
                         <a href={`https://reddit.com${post.permalink}`} target="_blank" rel="noopener noreferrer" className="min-h-11 text-sm font-medium hover:underline line-clamp-2">{post.title}</a>
@@ -294,21 +290,23 @@ export default function RedditDetail() {
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-[var(--muted-foreground)] text-center py-8">{t("redditDetail.noPosts")}</p>
+                <Text size="sm" c="dimmed" ta="center" py="xl">{t("redditDetail.noPosts")}</Text>
               )}
-            </CardContent>
+            </div>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><MessageSquare size={18} /> {t("redditDetail.recentComments")}</CardTitle>
-              <CardDescription>{t("redditDetail.recentCommentsDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <Card className="detail-list-card" withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
+            <div className="detail-list-card-header">
+              <Stack gap={4}>
+                <Group gap="xs"><MessageSquare size={18} /><Text component="h3" fz="lg" fw={600}>{t("redditDetail.recentComments")}</Text></Group>
+                <Text size="sm" c="dimmed">{t("redditDetail.recentCommentsDesc")}</Text>
+              </Stack>
+            </div>
+            <div className="detail-list-card-body">
               {commentsData?.data && commentsData.data.length > 0 ? (
-                <div className="space-y-2">
+                <div className="detail-list">
                   {commentsData.data.slice(0, 10).map((comment: RedditComment) => (
-                    <div key={comment.id} className="flex items-start gap-3 p-3 rounded-lg bg-[var(--muted)]">
+                    <div key={comment.id} className="detail-list-row flex items-start gap-3 rounded-lg bg-[var(--muted)]">
                       <MessageSquare size={16} className="text-[var(--chart-1)] mt-1 shrink-0" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm line-clamp-3">{comment.body}</p>
@@ -322,17 +320,17 @@ export default function RedditDetail() {
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-[var(--muted-foreground)] text-center py-8">{t("redditDetail.noComments")}</p>
+                <Text size="sm" c="dimmed" ta="center" py="xl">{t("redditDetail.noComments")}</Text>
               )}
-            </CardContent>
+            </div>
           </Card>
         </>
       ) : (
-        <Card>
-          <CardHeader><CardTitle>{t("redditDetail.noData")}</CardTitle></CardHeader>
-          <CardContent>
-            <p className="text-sm text-[var(--muted-foreground)]">{t("redditDetail.noDataDesc")}</p>
-          </CardContent>
+        <Card withBorder radius="md" p={{ base: "md", sm: "lg" }} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
+          <Stack gap="xs">
+            <Text component="h3" fz="lg" fw={600}>{t("redditDetail.noData")}</Text>
+            <Text size="sm" c="dimmed">{t("redditDetail.noDataDesc")}</Text>
+          </Stack>
         </Card>
       )}
       <ConfirmDialog

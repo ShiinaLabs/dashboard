@@ -1,9 +1,9 @@
 import { useTranslation } from "react-i18next";
+import { Card, Text } from "@mantine/core";
 import { type OverviewStats, type TimelineData, type Tweet, type Account } from "@/lib/api";
-import { StatCard } from "@/components/StatCard";
+import { MetricCard } from "@/components/domain/shared/MetricCard";
+import { MetricGrid } from "@/components/domain/shared/MetricGrid";
 import { SectionShell } from "@/components/domain/shared/SectionShell";
-import { StatGrid } from "@/components/domain/shared/StatGrid";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { XIcon } from "@/components/BrandIcons";
 import { MessageSquare, Heart, Repeat2, Eye, TrendingUp } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
@@ -27,24 +27,24 @@ export function XSection({ stats, timeline, topLiked, xAccounts }: Props) {
   return (
     <SectionShell icon={<XIcon />} title={t("overview.xHeading")}>
 
-      <StatGrid cols="2-5">
-        <StatCard title={t("overview.stats.tweetCount")} value={stats?.tweet_count ?? 0} icon={<MessageSquare size={16} />} description={stats ? t("overview.stats.today", { count: stats.todayTweets }) : undefined} />
-        <StatCard title={t("overview.stats.tweetLikes")} value={(stats?.tweet_likes ?? 0).toLocaleString()} icon={<Heart size={16} />} />
-        <StatCard title={t("overview.stats.tweetRetweets")} value={(stats?.tweet_retweets ?? 0).toLocaleString()} icon={<Repeat2 size={16} />} />
-        <StatCard title={t("overview.stats.tweetViews")} value={(stats?.tweet_views ?? 0).toLocaleString()} icon={<Eye size={16} />} />
-        <StatCard title={t("overview.stats.followers")} value={stats?.followersCount ?? 0} icon={<TrendingUp size={16} />} description={stats ? t("overview.stats.following", { count: stats.followingCount }) : undefined} />
-      </StatGrid>
-      <StatGrid>
-        <StatCard title={t("overview.stats.replyCount")} value={stats?.reply_count ?? 0} icon={<MessageSquare size={16} />} />
-        <StatCard title={t("overview.stats.replyLikes")} value={(stats?.reply_likes ?? 0).toLocaleString()} icon={<Heart size={16} />} />
-        <StatCard title={t("overview.stats.replyRetweets")} value={(stats?.reply_retweets ?? 0).toLocaleString()} icon={<Repeat2 size={16} />} />
-        <StatCard title={t("overview.stats.replyViews")} value={(stats?.reply_views ?? 0).toLocaleString()} icon={<Eye size={16} />} />
-      </StatGrid>
+      <MetricGrid columns="five">
+        <MetricCard label={t("overview.stats.tweetCount")} value={stats?.tweet_count ?? 0} icon={<MessageSquare size={16} />} hint={stats ? t("overview.stats.today", { count: stats.todayTweets }) : undefined} />
+        <MetricCard label={t("overview.stats.tweetLikes")} value={stats?.tweet_likes ?? 0} icon={<Heart size={16} />} />
+        <MetricCard label={t("overview.stats.tweetRetweets")} value={stats?.tweet_retweets ?? 0} icon={<Repeat2 size={16} />} />
+        <MetricCard label={t("overview.stats.tweetViews")} value={stats?.tweet_views ?? 0} icon={<Eye size={16} />} />
+        <MetricCard label={t("overview.stats.followers")} value={stats?.followersCount ?? 0} icon={<TrendingUp size={16} />} hint={stats ? t("overview.stats.following", { count: stats.followingCount }) : undefined} />
+      </MetricGrid>
+      <MetricGrid>
+        <MetricCard label={t("overview.stats.replyCount")} value={stats?.reply_count ?? 0} icon={<MessageSquare size={16} />} />
+        <MetricCard label={t("overview.stats.replyLikes")} value={stats?.reply_likes ?? 0} icon={<Heart size={16} />} />
+        <MetricCard label={t("overview.stats.replyRetweets")} value={stats?.reply_retweets ?? 0} icon={<Repeat2 size={16} />} />
+        <MetricCard label={t("overview.stats.replyViews")} value={stats?.reply_views ?? 0} icon={<Eye size={16} />} />
+      </MetricGrid>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs font-semibold text-[var(--muted-foreground)]">{t("overview.charts.tweetActivity")}</CardTitle></CardHeader>
-          <CardContent className="p-0 pb-2">
+        <Card withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
+          <div className="overview-chart-title"><Text size="xs" fw={600} c="dimmed">{t("overview.charts.tweetActivity")}</Text></div>
+          <div className="overview-chart-body">
             {timeline?.dailyTweets && timeline.dailyTweets.length > 0 ? (
               <div role="img" aria-label={t("overview.charts.tweetActivity")}>
               <ResponsiveContainer width="100%" height={CHART_H}>
@@ -60,11 +60,11 @@ export function XSection({ stats, timeline, topLiked, xAccounts }: Props) {
             ) : (
               <div className="flex items-center justify-center text-xs text-[var(--muted-foreground)]" style={{ height: CHART_H }}>{t("overview.charts.noTweetData")}</div>
             )}
-          </CardContent>
+          </div>
         </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs font-semibold text-[var(--muted-foreground)]">{t("overview.charts.dailyEngagement")}</CardTitle></CardHeader>
-          <CardContent className="p-0 pb-2">
+        <Card withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
+          <div className="overview-chart-title"><Text size="xs" fw={600} c="dimmed">{t("overview.charts.dailyEngagement")}</Text></div>
+          <div className="overview-chart-body">
             {timeline?.dailyTweets && timeline.dailyTweets.length > 0 ? (
               <div role="img" aria-label={t("overview.charts.dailyEngagement")}>
               <ResponsiveContainer width="100%" height={CHART_H}>
@@ -81,13 +81,13 @@ export function XSection({ stats, timeline, topLiked, xAccounts }: Props) {
             ) : (
               <div className="flex items-center justify-center text-xs text-[var(--muted-foreground)]" style={{ height: CHART_H }}>{t("overview.charts.noEngagementData")}</div>
             )}
-          </CardContent>
+          </div>
         </Card>
       </div>
       <div className="grid grid-cols-1 gap-3">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs font-semibold text-[var(--muted-foreground)]">{t("overview.charts.dailyViews")}</CardTitle></CardHeader>
-          <CardContent className="p-0 pb-2">
+        <Card withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
+          <div className="overview-chart-title"><Text size="xs" fw={600} c="dimmed">{t("overview.charts.dailyViews")}</Text></div>
+          <div className="overview-chart-body">
             {timeline?.dailyTweets && timeline.dailyTweets.length > 0 ? (
               <div role="img" aria-label={t("overview.charts.dailyViews")}>
               <ResponsiveContainer width="100%" height={CHART_H}>
@@ -103,7 +103,7 @@ export function XSection({ stats, timeline, topLiked, xAccounts }: Props) {
             ) : (
               <div className="flex items-center justify-center text-xs text-[var(--muted-foreground)]" style={{ height: CHART_H }}>{t("overview.charts.noTweetData")}</div>
             )}
-          </CardContent>
+          </div>
         </Card>
       </div>
 

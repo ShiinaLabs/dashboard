@@ -2,7 +2,7 @@
   "name": "dashboard",
   "type": "module",
   "engines": {
-    "node": "^20.0.0"
+    "node": "^22.0.0"
   },
   "license": "Apache-2.0",
   "packageManager": "pnpm@10.34.5",
@@ -14,12 +14,15 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "build:client": "RR_SKIP_SSR=1 NODE_OPTIONS=\"--max-old-space-size=330 --max-semi-space-size=8\" react-router build",
+    "build:client": "RR_SKIP_SSR=1 NODE_OPTIONS=\"--max-old-space-size=512 --max-semi-space-size=8\" react-router build",
     "build:server": "RR_SKIP_CLIENT=1 NODE_OPTIONS=\"--max-old-space-size=160 --max-semi-space-size=8\" react-router build"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.46",
     "@chenglou/pretext": "^0.0.8",
+    "@mantine/core": "9.6.0",
+    "@mantine/hooks": "9.6.0",
+    "@mantine/notifications": "9.6.0",
     "@react-router/node": "^7.18.2",
     "@tanstack/react-query": "^5.101.2",
     "ai": "^7.0.77",

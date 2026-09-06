@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
@@ -11,6 +11,7 @@ import { FloatingAiChat } from "./FloatingAiChat";
 import { api } from "@/lib/api";
 import { useBingWallpaper } from "@/lib/client/useBingWallpaper";
 import { useIsMobile } from "@/lib/client/useIsMobile";
+import { ActionIcon, Button, Drawer } from "@/components/ui";
 
 const SIDEBAR_KEY = "sidebar-state";
 const SIDEBAR_WIDTH = 240;
@@ -66,7 +67,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   });
   const [loggingOut, setLoggingOut] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
-  const drawerRef = useRef<HTMLElement | null>(null);
 
   // Keep the sidebar state in sync when crossing the mobile breakpoint
   const handleBreakpointChange = useCallback((mobile: boolean) => {
@@ -114,46 +114,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       saveVisible(false);
     }
   }, [isMobile]);
-
-  // Close the mobile drawer with Escape and trap Tab focus inside it
-  useEffect(() => {
-    if (!isMobile || !isOpen) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        closeMobile();
-        toggleRef.current?.focus();
-        return;
-      }
-      if (e.key !== "Tab") return;
-      const drawer = drawerRef.current;
-      if (!drawer) return;
-      const focusables = Array.from(
-        drawer.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        )
-      );
-      if (focusables.length === 0) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      const active = document.activeElement;
-      if (e.shiftKey && (active === first || !drawer.contains(active))) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && (active === last || !drawer.contains(active))) {
-        e.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [isMobile, isOpen, closeMobile]);
-
-  // Move focus into the drawer when it opens (and out of it when closed)
-  useEffect(() => {
-    if (isMobile && isOpen) {
-      drawerRef.current?.querySelector<HTMLElement>("a, button")?.focus();
-    }
-  }, [isMobile, isOpen]);
 
   const isActive = (path: string) => {
     if (path === "/") return pathname === "/";
@@ -211,14 +171,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           isActive={isActive("/settings")}
           onClick={onNavClick}
         />
-        <button
+        <Button
           onClick={handleLogout}
           disabled={loggingOut}
-          className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-[var(--muted-foreground)] transition-colors hover:bg-[var(--danger)]/5 hover:text-[var(--danger)] disabled:opacity-40"
+          variant="subtle"
+          color="danger"
+          justify="flex-start"
+          fullWidth
+          leftSection={<LogOut size={18} />}
         >
-          <LogOut size={18} />
           {loggingOut ? "…" : t("nav.logout")}
-        </button>
+        </Button>
         <p className="text-xs text-[var(--muted-foreground)] px-3">{t("common.copyright")}</p>
       </div>
     </>
@@ -247,36 +210,29 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile sidebar overlay */}
       {isMobile && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/50 z-30"
-            style={{
-              opacity: isOpen ? 1 : 0,
-              pointerEvents: isOpen ? "auto" : "none",
-              transition: "opacity 0.3s ease",
-            }}
-            onClick={() => {
-              closeMobile();
-              toggleRef.current?.focus();
-            }}
-          />
-          <aside
-            ref={drawerRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label={t("common.dashboard")}
-            aria-hidden={!isOpen}
-            inert={!isOpen}
-            className="fixed inset-y-0 left-0 z-40 border-r border-[var(--border)] bg-[var(--card)]/95 backdrop-blur-xl flex flex-col overflow-y-auto overscroll-contain touch-pan-y pb-[env(safe-area-inset-bottom)] shadow-2xl"
-            style={{
-              width: SIDEBAR_WIDTH,
-              transform: isOpen ? "translateX(0)" : "translateX(-100%)",
-              transition: "transform 0.3s ease",
-            }}
-          >
+        <Drawer
+          opened={isOpen}
+          onClose={() => {
+            closeMobile();
+            toggleRef.current?.focus();
+          }}
+          position="left"
+          size={SIDEBAR_WIDTH}
+          withCloseButton={false}
+          title={t("common.dashboard")}
+          styles={{
+            header: { display: "none" },
+            content: {
+              background: "var(--card)",
+              borderRight: "1px solid var(--border)",
+            },
+            body: { padding: 0 },
+          }}
+        >
+          <div className="flex h-full flex-col overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)]">
             {sidebarContent(closeMobile)}
-          </aside>
-        </>
+          </div>
+        </Drawer>
       )}
 
       {/* Floating AI chat — desktop only, hidden on /ai page */}
@@ -290,18 +246,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           alt=""
           className="fixed inset-0 w-full h-full object-cover pointer-events-none"
         />
-        <div className="fixed inset-0 bg-[var(--background)]/85" />
+        <div className="fixed inset-0 bg-[var(--background)]/92" />
 
         {/* Title bar */}
         <div
           className="relative z-10 shrink-0 flex items-center gap-3 border-b border-[var(--border)] bg-[var(--card)]/80 backdrop-blur-sm pt-[env(safe-area-inset-top)]"
           style={{ minHeight: `calc(${TITLEBAR_H}px + env(safe-area-inset-top))` }}
         >
-          <button
+          <ActionIcon
             ref={toggleRef}
             onClick={toggle}
             aria-expanded={isOpen}
-            className="p-2.5 ml-2 min-h-11 min-w-11 flex items-center justify-center rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
+            variant="subtle"
+            color="gray"
+            size="lg"
+            ml="sm"
             title={isOpen ? t("common.collapseSidebar") : t("common.expandSidebar")}
             aria-label={isOpen ? t("common.collapseSidebar") : t("common.expandSidebar")}
           >
@@ -311,7 +270,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             >
               {isMobile ? <Menu size={20} /> : <PanelLeftClose size={20} />}
             </span>
-          </button>
+          </ActionIcon>
           <div className="flex items-center gap-2 shrink-0">
             <LayoutDashboard size={18} className="text-[var(--primary)]" />
             <span className="hidden min-[360px]:inline text-sm font-semibold">{t("common.dashboard")}</span>

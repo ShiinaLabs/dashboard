@@ -1,5 +1,5 @@
 # ── Stage 1: Build ─────────────────────────────────────────────────
-FROM reg.mikumikumi.xyz/mirror/node:20 AS base
+FROM reg.mikumikumi.xyz/mirror/node:22 AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 # Keep every Node process on a tight heap so the memory-limited CI kaniko
@@ -26,7 +26,7 @@ COPY . .
 RUN pnpm build
 
 # ── Stage 2: Production runner ──────────────────────────────────────
-FROM reg.mikumikumi.xyz/mirror/node:20 AS runner
+FROM reg.mikumikumi.xyz/mirror/node:22 AS runner
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable

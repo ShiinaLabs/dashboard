@@ -1,5 +1,5 @@
-import { cn } from "@/lib/client/utils";
+import { Divider } from "@mantine/core";
 
 export function Separator({ className }: { className?: string }) {
-  return <hr className={cn("border-t border-[var(--border)]", className)} />;
+  return <Divider className={className} color="var(--border)" />;
 }

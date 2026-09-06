@@ -1,19 +1,14 @@
-import { Sun, Moon, Monitor, Key, Clock } from "lucide-react";
+import { Key, Clock } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "@/components/useTheme";
-import { themes, type Theme } from "@/lib/client/themes";
+import { themes, type Theme, type ThemeSettings } from "@/lib/client/themes";
 import { api } from "@/lib/api";
 import { getTimezone, setTimezone } from "@/lib/client/datetime";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { validatePassword } from "@/lib/client/validatePassword";
 import { PasswordHints } from "@/components/ui/PasswordHints";
-
-const MODE_ICONS = {
-  system: Monitor,
-  light: Sun,
-  dark: Moon,
-} as const;
+import { Alert, Button, PasswordInput, SegmentedControl, Select, TextInput } from "@/components/ui";
 
 const MODE_OPTIONS = [
   { value: "system" as const },
@@ -118,36 +113,19 @@ export default function Settings() {
       <section className="space-y-4">
         <h3 className="text-sm font-semibold">{t("settings.language")}</h3>
         <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--card)]">
-          <div className="flex rounded-lg bg-[var(--muted)] p-0.5 gap-0.5">
-            {LANG_OPTIONS.map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => i18n.changeLanguage(value)}
-                className={`min-h-11 flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                  i18n.language === value
-                    ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
-                    : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl value={i18n.language} onChange={(value) => void i18n.changeLanguage(value)} data={LANG_OPTIONS} fullWidth />
         </div>
       </section>
 
       <section className="space-y-4">
         <h3 className="text-sm font-semibold flex items-center gap-1.5"><Clock size={14} /> {t("settings.timezone")}</h3>
         <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--card)]">
-          <select
+          <Select
             value={tz}
-            onChange={(e) => setTimezone(e.target.value)}
-            className="min-h-11 w-full rounded-lg border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-          >
-            {COMMON_TIMEZONES.map((zone) => (
-              <option key={zone} value={zone}>{zone.replace(/_/g, " ")}</option>
-            ))}
-          </select>
+            onChange={(value) => { if (value) setTimezone(value); }}
+            data={COMMON_TIMEZONES.map((zone) => ({ value: zone, label: zone.replace(/_/g, " ") }))}
+            searchable
+          />
           <p className="text-xs text-[var(--muted-foreground)] mt-2">{t("settings.timezoneHint")}</p>
         </div>
       </section>
@@ -158,37 +136,33 @@ export default function Settings() {
           <form onSubmit={handleChangePassword} className="flex flex-col gap-3">
             <div>
               <label className="block text-xs font-medium mb-1 text-[var(--muted-foreground)]">{t("settings.currentPassword")}</label>
-              <input
-                name="currentPassword" type="password" autoComplete="current-password"
-                className="min-h-11 w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-              />
+              <PasswordInput name="currentPassword" autoComplete="current-password" />
             </div>
             <div>
               <label className="block text-xs font-medium mb-1 text-[var(--muted-foreground)]">{t("settings.newPassword")}</label>
-              <input
-                name="newPassword" type="password" autoComplete="new-password"
+              <PasswordInput
+                name="newPassword" autoComplete="new-password"
                 value={newPw} onChange={(e) => { setNewPw(e.target.value); setPwError(""); }}
-                className="min-h-11 w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
               />
               {newPw && <div className="mt-2"><PasswordHints rules={pwRules} t={t} namespace="settings" /></div>}
             </div>
             <div>
               <label className="block text-xs font-medium mb-1 text-[var(--muted-foreground)]">{t("settings.confirmPassword")}</label>
-              <input
-                name="confirmPassword" type="password" autoComplete="new-password"
+              <PasswordInput
+                name="confirmPassword" autoComplete="new-password"
                 value={confirmPw} onChange={(e) => { setConfirmPw(e.target.value); setPwError(""); }}
-                className="min-h-11 w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
               />
               {pwMismatch && <p className="text-xs text-[var(--danger)] mt-1">{t("settings.passwordsDontMatch")}</p>}
             </div>
-            {pwError && <p className="text-xs text-[var(--danger)]">{pwError}</p>}
-            {pwSuccess && <p className="text-xs text-[var(--success)]">{pwSuccess}</p>}
-            <button
+            {pwError && <Alert color="danger" variant="light">{pwError}</Alert>}
+            {pwSuccess && <Alert color="success" variant="light">{pwSuccess}</Alert>}
+            <Button
               type="submit" disabled={pwLoading}
-              className="min-h-11 w-full rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40 sm:w-auto sm:self-start"
+              loading={pwLoading}
+              className="sm:self-start"
             >
-              {pwLoading ? t("settings.saving") : t("settings.changePassword")}
-            </button>
+              {t("settings.changePassword")}
+            </Button>
           </form>
         </div>
       </section>
@@ -199,26 +173,7 @@ export default function Settings() {
         <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--card)] space-y-4">
           <div className="space-y-2">
             <p className="text-sm font-medium">{t("settings.mode")}</p>
-            <div className="flex rounded-lg bg-[var(--muted)] p-0.5 gap-0.5">
-              {MODE_OPTIONS.map(({ value }) => {
-                const Icon = MODE_ICONS[value];
-                const active = settings.mode === value;
-                return (
-                  <button
-                    key={value}
-                    onClick={() => setSettings({ ...settings, mode: value })}
-                    className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                      active
-                        ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
-                        : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                    }`}
-                  >
-                    <Icon size={16} />
-                    {MODE_LABELS[value]}
-                  </button>
-                );
-              })}
-            </div>
+            <SegmentedControl value={settings.mode} onChange={(value) => setSettings({ ...settings, mode: value as ThemeSettings["mode"] })} data={MODE_OPTIONS.map(({ value }) => ({ value, label: MODE_LABELS[value] }))} fullWidth />
           </div>
 
           <div className="space-y-3">
@@ -282,31 +237,28 @@ function AiSettingsSection() {
       <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--card)] space-y-4">
         <div className="space-y-2">
           <label className="text-sm font-medium">Endpoint URL</label>
-          <input
+          <TextInput
             type="text"
             defaultValue={settings.ai.baseUrl}
             onBlur={(e) => mutation.mutate({ baseUrl: e.target.value })}
             placeholder="https://api.openai.com/v1"
-            className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--muted)]"
           />
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">API Key</label>
-          <input
+          <PasswordInput
             type="password"
             defaultValue={settings.ai.apiKey === "••••••••" ? "" : settings.ai.apiKey}
             onBlur={(e) => { if (e.target.value) mutation.mutate({ apiKey: e.target.value }); }}
             placeholder="••••••••"
-            className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--muted)]"
           />
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">Model</label>
-          <input
+          <TextInput
             type="text"
             defaultValue={settings.ai.model}
             onBlur={(e) => mutation.mutate({ model: e.target.value })}
-            className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--muted)]"
           />
         </div>
         {saved && <p className="text-sm text-[var(--success)]">{t("aiAgent.saved")}</p>}
@@ -329,15 +281,12 @@ function ThemeSelect({
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
       <span className="text-sm text-[var(--muted-foreground)] sm:w-24 sm:shrink-0">{label}</span>
-      <select
+      <Select
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="min-h-11 w-full flex-1 rounded-lg border border-[var(--border)] bg-[var(--muted)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-      >
-        {options.map((t) => (
-          <option key={t.id} value={t.id}>{t.name}</option>
-        ))}
-      </select>
+        onChange={(next) => { if (next) onChange(next); }}
+        data={options.map((theme) => ({ value: theme.id, label: theme.name }))}
+        className="flex-1"
+      />
     </div>
   );
 }

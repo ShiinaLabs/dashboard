@@ -4,7 +4,8 @@ import { useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { api, type Account } from "@/lib/api";
 import { formatDate } from "@/lib/client/datetime";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { ChartCard } from "@/components/domain/shared/ChartCard";
 import { calcYAxisWidth } from "@/lib/client/utils";
 import { Badge } from "@/components/ui/badge";
 import { TimeRangeSelector } from "@/components/TimeRangeSelector";
@@ -14,6 +15,7 @@ import {
 } from "recharts";
 import { ArrowLeft, Star, GitFork, Download, ExternalLink, TrendingUp, Activity } from "lucide-react";
 import { useIsMobile } from "@/lib/client/useIsMobile";
+import { Button } from "@/components/ui";
 
 export default function ProjectDetail() {
   const { t } = useTranslation();
@@ -58,7 +60,7 @@ export default function ProjectDetail() {
     return (
       <div className="text-center py-12">
         <p className="text-[var(--muted-foreground)]">{t("projectDetail.notFound")}</p>
-        <button onClick={() => navigate(`/gitlab/${aid}`)} className="mt-4 text-sm text-[var(--primary)] hover:underline">{t("projectDetail.backToAccount")}</button>
+        <Button onClick={() => navigate(`/gitlab/${aid}`)} variant="subtle" size="sm" mt="md">{t("projectDetail.backToAccount")}</Button>
       </div>
     );
   }
@@ -67,9 +69,9 @@ export default function ProjectDetail() {
     <div className="space-y-4 sm:space-y-6">
       <div className="detail-header">
         <div className="detail-header-body">
-        <button onClick={() => navigate(`/gitlab/${aid}`)} className="p-2.5 min-h-11 min-w-11 flex items-center justify-center rounded-lg hover:bg-[var(--muted)] transition-colors shrink-0 mt-0.5" title={t("projectDetail.backToAccount")} aria-label={t("projectDetail.backToAccount")}>
+        <Button onClick={() => navigate(`/gitlab/${aid}`)} variant="subtle" color="gray" size="lg" px="xs" title={t("projectDetail.backToAccount")} aria-label={t("projectDetail.backToAccount")}>
           <ArrowLeft size={20} />
-        </button>
+        </Button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-xl font-semibold">{project.path_with_namespace}</h2>
@@ -96,12 +98,11 @@ export default function ProjectDetail() {
         <Card><CardContent className="p-4 pt-4 sm:p-4 sm:pt-4 text-center"><Activity size={16} className="inline mb-1 text-[var(--muted-foreground)]" /><p className="text-2xl font-bold font-mono tabular-nums">{project.open_issues.toLocaleString()}</p><p className="text-xs text-[var(--muted-foreground)]">{t("projectDetail.openIssues")}</p></CardContent></Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><TrendingUp size={18} /> {t("projectDetail.starHistory")}</CardTitle>
-          <CardDescription>{t("projectDetail.starHistoryDesc")}</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <ChartCard
+        title={t("projectDetail.starHistory")}
+        description={t("projectDetail.starHistoryDesc")}
+        icon={<TrendingUp size={18} />}
+      >
           {snapshots && snapshots.length > 1 ? (
             <div role="img" aria-label={t("projectDetail.starHistory")}>
             <ResponsiveContainer width="100%" height={CHART_H}>
@@ -119,15 +120,13 @@ export default function ProjectDetail() {
               {snapshots?.length === 1 ? t("projectDetail.onlyOneDataPoint") : t("projectDetail.noStarHistory")}
             </div>
           )}
-        </CardContent>
-      </Card>
+      </ChartCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Download size={18} /> {t("projectDetail.releasesDownloads")}</CardTitle>
-          <CardDescription>{t("projectDetail.releasesDownloadsDesc")}</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <ChartCard
+        title={t("projectDetail.releasesDownloads")}
+        description={t("projectDetail.releasesDownloadsDesc")}
+        icon={<Download size={18} />}
+      >
           {releases && releases.length > 0 ? (
             <div role="img" aria-label={t("projectDetail.releasesDownloads")}>
             <ResponsiveContainer width="100%" height={Math.max(isMobile ? 140 : 200, releases.length * (isMobile ? 36 : 60))}>
@@ -151,8 +150,7 @@ export default function ProjectDetail() {
               {t("projectDetail.noReleases")}
             </p>
           )}
-        </CardContent>
-      </Card>
+      </ChartCard>
     </div>
   );
 }

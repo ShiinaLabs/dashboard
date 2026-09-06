@@ -44,11 +44,11 @@ The app starts on port 3000.
 
 | Layer | Technology |
 |-------|-----------|
-| **Runtime** | Node.js 20 + pnpm |
+| **Runtime** | Node.js 22 + pnpm |
 | **Backend** | React Router 7 route handlers (same process, under `app/api/`) |
 | **Frontend** | React 19 + React Router 7 Framework Mode + TypeScript |
 | **Build** | `react-router build` (client + server, memory-bounded passes) |
-| **Styling** | Tailwind CSS v4 + shadcn/ui |
+| **Styling** | Mantine 9.6 + Tailwind CSS v4 layout utilities |
 | **Charts** | Recharts |
 | **Icons** | lucide-react |
 | **Data Fetching** | @tanstack/react-query |
@@ -216,9 +216,11 @@ Each platform (x, github, gitlab, reddit) has dedicated endpoints for stats, tim
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 22+
 - pnpm
 - PostgreSQL (or use `MOCK_DATA=1` / `pnpm run mock` for fixture mode)
+
+The UI uses one Mantine provider/theme bridge for components, tokens, overlays and notifications. Tailwind is limited to layout and responsive utilities; its preflight reset is intentionally disabled to avoid overriding Mantine controls. Data cards use the shared `MetricCard`/`MetricGrid` contracts.
 
 ### Setup
 

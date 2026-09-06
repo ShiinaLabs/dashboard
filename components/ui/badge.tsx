@@ -1,17 +1,10 @@
-import type { HTMLAttributes, ReactNode } from "react";
-import { cn } from "@/lib/client/utils";
+import type { ReactNode } from "react";
+import { Badge as MantineBadge, type BadgeProps } from "@mantine/core";
 
-export function Badge({ className, children, ...props }: HTMLAttributes<HTMLSpanElement> & { children?: ReactNode }) {
+export function Badge({ className, children, ...props }: BadgeProps & { children?: ReactNode }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors",
-        "border-[var(--border)] bg-[var(--muted)] text-[var(--muted-foreground)]",
-        className
-      )}
-      {...props}
-    >
+    <MantineBadge size="sm" radius="xl" variant="light" color="primary" className={className} {...props}>
       {children}
-    </span>
+    </MantineBadge>
   );
 }

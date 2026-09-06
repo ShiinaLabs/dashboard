@@ -3,13 +3,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
+import { Card, Group, Stack, Text } from "@mantine/core";
 import { api, type GithubOverview, type GithubContribution, type GithubRepo } from "@/lib/api";
 import { formatDateTime } from "@/lib/client/datetime";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { Portal } from "@/components/ui/Portal";
-import { StatCard } from "@/components/StatCard";
+import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
+import { MetricGrid } from "@/components/domain/shared/MetricGrid";
+import { ChartCard } from "@/components/domain/shared/ChartCard";
 import { TriggerPanel } from "@/components/TriggerPanel";
 import { Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import {
@@ -17,9 +18,10 @@ import {
 } from "lucide-react";
 import { useIsMobile } from "@/lib/client/useIsMobile";
 import { GithubIcon } from "@/components/BrandIcons";
-import { StatCardSkeleton, ChartCardSkeleton, Skeleton } from "@/components/Skeleton";
+import { ChartCardSkeleton, Skeleton } from "@/components/Skeleton";
 import { FetchRunHistory } from "@/components/FetchRunHistory";
 import { AccountActiveButton } from "@/components/AccountActiveButton";
+import { Button, Checkbox, Modal } from "@/components/ui";
 
 function GithubHeatmap({ data }: { data: GithubContribution[] }) {
   const { t } = useTranslation();
@@ -155,9 +157,9 @@ export default function GitHubDetail() {
             <div className="flex-1"><Skeleton className="h-6 w-32 mb-2" /><Skeleton className="h-3 w-48" /></div>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)}
-        </div>
+        <MetricGrid>
+          {Array.from({ length: 4 }).map((_, i) => <MetricCardSkeleton key={i} />)}
+        </MetricGrid>
         <ChartCardSkeleton />
       </div>
     );
@@ -167,7 +169,7 @@ export default function GitHubDetail() {
     return (
       <div className="text-center py-12">
         <p className="text-[var(--muted-foreground)]">{t("githubDetail.notFound")}</p>
-        <button onClick={() => navigate("/github")} className="mt-4 text-sm text-[var(--primary)] hover:underline">{t("githubDetail.backToGitHub")}</button>
+        <Button onClick={() => navigate("/github")} variant="subtle" size="sm" mt="md">{t("githubDetail.backToGitHub")}</Button>
       </div>
     );
   }
@@ -176,9 +178,9 @@ export default function GitHubDetail() {
     <div className="space-y-4 sm:space-y-6">
       <div className="detail-header">
         <div className="detail-header-body">
-        <button onClick={() => navigate("/github")} className="p-2.5 min-h-11 min-w-11 flex items-center justify-center rounded-lg hover:bg-[var(--muted)] transition-colors shrink-0 mt-0.5" title={t("githubDetail.backToGitHub")} aria-label={t("githubDetail.backToGitHub")}>
+        <Button onClick={() => navigate("/github")} variant="subtle" color="gray" size="lg" px="xs" title={t("githubDetail.backToGitHub")} aria-label={t("githubDetail.backToGitHub")}>
           <ArrowLeft size={20} />
-        </button>
+        </Button>
         <div className="flex items-start gap-2 min-w-0 flex-1">
           <GithubIcon size={18} className="shrink-0 mt-1" />
           <div className="min-w-0">
@@ -196,10 +198,7 @@ export default function GitHubDetail() {
         <div className="detail-header-actions">
           <TriggerPanel accountId={accountId} platform="github" />
 <AccountActiveButton accountId={accountId} isActive={!!account.is_active} />
-          <button onClick={() => setShowDeleteDialog(true)}
-            className="p-2.5 min-h-11 min-w-11 flex items-center justify-center rounded-lg bg-[var(--muted)] hover:bg-[var(--danger)]/10 transition-colors text-[var(--danger)]" title={t("githubDetail.delete")} aria-label={t("githubDetail.delete")}>
-            <Trash2 size={14} />
-          </button>
+          <Button onClick={() => setShowDeleteDialog(true)} variant="light" color="danger" size="sm" leftSection={<Trash2 size={14} />} title={t("githubDetail.delete")} aria-label={t("githubDetail.delete")}>{t("githubDetail.delete")}</Button>
         </div>
       </div>
 
@@ -215,37 +214,39 @@ export default function GitHubDetail() {
         <div className="text-center py-12 text-[var(--muted-foreground)]">{t("githubDetail.loadingGitHubData")}</div>
       ) : overview && overview.stats ? (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatCard title={t("githubDetail.repositories")} value={overview.totalRepos} icon={<BookOpen size={20} />} />
-            <StatCard title={t("githubDetail.totalStars")} value={overview.totalStars} icon={<Star size={20} />} />
-            <StatCard title={t("githubDetail.totalForks")} value={overview.totalForks} icon={<GitFork size={20} />} />
-            <StatCard title={t("githubDetail.followers")} value={overview.stats.followers} icon={<Users size={20} />} />
-          </div>
+          <MetricGrid>
+            <MetricCard label={t("githubDetail.repositories")} value={overview.totalRepos} icon={<BookOpen size={20} />} />
+            <MetricCard label={t("githubDetail.totalStars")} value={overview.totalStars} icon={<Star size={20} />} />
+            <MetricCard label={t("githubDetail.totalForks")} value={overview.totalForks} icon={<GitFork size={20} />} />
+            <MetricCard label={t("githubDetail.followers")} value={overview.stats.followers} icon={<Users size={20} />} />
+          </MetricGrid>
 
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2"><BookOpen size={18} /> {t("githubDetail.reposHeading")}</CardTitle>
-                <button
+          <Card className="detail-list-card" withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
+            <div className="detail-list-card-header">
+              <Stack gap={4}>
+                <Group justify="space-between" gap="sm">
+                  <Group gap="xs"><BookOpen size={18} /><Text component="h3" fz="lg" fw={600}>{t("githubDetail.reposHeading")}</Text></Group>
+                <Button
                   onClick={openPinDialog}
-                  className="flex items-center gap-1.5 px-3 py-2.5 min-h-11 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] transition-colors text-xs font-medium"
+                  variant="light" color="gray" size="sm" leftSection={<Settings2 size={14} />}
                 >
-                  <Settings2 size={14} /> {t("githubDetail.managePins")}
-                </button>
-              </div>
-              <CardDescription>
+                  {t("githubDetail.managePins")}
+                </Button>
+                </Group>
+              <Text size="sm" c="dimmed">
                 {overview.allRepos && overview.allRepos.some(r => r.pinned)
                   ? t("githubDetail.reposDescPinned")
                   : t("githubDetail.reposDesc")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </Text>
+              </Stack>
+            </div>
+            <div className="detail-list-card-body">
               {overview.repos.length > 0 ? (
-                <div className="space-y-2">
+                <div className="detail-list">
                   {overview.repos.map((repo: GithubRepo) => (
                     <Link key={repo.id}
                       to={`/github/${accountId}/repos/${repo.repo_id}`}
-                      className="flex items-center gap-3 p-3 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] cursor-pointer transition-colors"
+                      className="detail-list-row flex items-center gap-3 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] cursor-pointer transition-colors"
                     >
                       <BookOpen size={16} className="text-[var(--muted-foreground)] shrink-0" />
                       <div className="min-w-0 flex-1">
@@ -269,60 +270,25 @@ export default function GitHubDetail() {
                   <p>{t("githubDetail.noPinnedRepos")}</p>
                 </div>
               )}
-            </CardContent>
+            </div>
           </Card>
 
-          {showPinDialog && (
-            <Portal>
-              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowPinDialog(false)}>
-                <div role="dialog" aria-modal="true" aria-label={t("githubDetail.managePins")} className="bg-[var(--card)] rounded-xl p-6 w-full max-w-lg mx-4 shadow-lg border border-[var(--border)] max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold">{t("githubDetail.managePins")}</h2>
-                    <button onClick={() => setShowPinDialog(false)} className="text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)]">{t("common.cancel")}</button>
-                  </div>
-                  <div className="space-y-1 overflow-y-auto flex-1">
-                    {overview.allRepos?.map((repo: GithubRepo) => (
-                      <label key={repo.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-[var(--muted)] cursor-pointer transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={pinnedIds.has(repo.repo_id)}
-                          onChange={(e) => {
-                            setPinnedIds(prev => {
-                              const next = new Set(prev);
-                              if (e.target.checked) next.add(repo.repo_id);
-                              else next.delete(repo.repo_id);
-                              return next;
-                            });
-                          }}
-                          className="w-4 h-4 rounded accent-[var(--primary)] shrink-0"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <span className="text-sm">{repo.full_name}</span>
-                          {repo.language && <span className="text-xs text-[var(--muted-foreground)] ml-2">{repo.language}</span>}
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-[var(--muted-foreground)]">
-                          <span className="flex items-center gap-1"><Star size={12} /> {repo.stars}</span>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                  <button
-                    onClick={handlePinSave}
-                    className="mt-4 w-full px-4 py-2 rounded-lg bg-[var(--primary)] text-white font-medium hover:opacity-90 transition-opacity"
-                  >
-                    {t("common.save")}
-                  </button>
-                </div>
-              </div>
-            </Portal>
-          )}
+          <Modal opened={showPinDialog} onClose={() => setShowPinDialog(false)} title={t("githubDetail.managePins")} centered>
+            <Stack gap="xs">
+              {overview.allRepos?.map((repo: GithubRepo) => (
+                <Checkbox key={repo.id} checked={pinnedIds.has(repo.repo_id)} onChange={(e) => {
+                  setPinnedIds(prev => { const next = new Set(prev); if (e.currentTarget.checked) next.add(repo.repo_id); else next.delete(repo.repo_id); return next; });
+                }} label={<span>{repo.full_name}{repo.language ? ` · ${repo.language}` : ""}</span>} />
+              ))}
+              <Button onClick={handlePinSave} mt="md">{t("common.save")}</Button>
+            </Stack>
+          </Modal>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><GithubIcon size={18} /> {t("githubDetail.readmeStats")}</CardTitle>
-              <CardDescription>{t("githubDetail.readmeStatsDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <ChartCard
+            title={t("githubDetail.readmeStats")}
+            description={t("githubDetail.readmeStatsDesc")}
+            icon={<GithubIcon size={18} />}
+          >
               <div className="flex flex-wrap justify-center gap-6">
                 {/* external SVG source; rendered as a plain img */}
                 <img
@@ -339,27 +305,23 @@ export default function GitHubDetail() {
                   loading="lazy"
                 />
               </div>
-            </CardContent>
-          </Card>
+          </ChartCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><GithubIcon size={18} /> {t("githubDetail.contributionCalendar")}</CardTitle>
-              <CardDescription>{t("githubDetail.contributionDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {contributions && contributions.length > 0 ? <GithubHeatmap data={contributions} />
-                : <p className="text-sm text-[var(--muted-foreground)] text-center py-8">{t("githubDetail.noContributionData")}</p>}
-            </CardContent>
-          </Card>
+          <ChartCard
+            title={t("githubDetail.contributionCalendar")}
+            description={t("githubDetail.contributionDesc")}
+            icon={<GithubIcon size={18} />}
+          >
+            {contributions && contributions.length > 0 ? <GithubHeatmap data={contributions} />
+              : <p className="text-sm text-[var(--muted-foreground)] text-center py-8">{t("githubDetail.noContributionData")}</p>}
+          </ChartCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Code size={18} /> {t("githubDetail.languages")}</CardTitle>
-              <CardDescription>{t("githubDetail.languagesDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {Object.keys(overview.languages).length > 0 ? (
+          <ChartCard
+            title={t("githubDetail.languages")}
+            description={t("githubDetail.languagesDesc")}
+            icon={<Code size={18} />}
+          >
+            {Object.keys(overview.languages).length > 0 ? (
                 <div role="img" aria-label={t("githubDetail.languages")}>
                 <ResponsiveContainer width="100%" height={PIE_H}>
                   <PieChart>
@@ -373,15 +335,14 @@ export default function GitHubDetail() {
               ) : (
                 <p className="text-sm text-[var(--muted-foreground)] text-center py-12">{t("githubDetail.noLanguageData")}</p>
               )}
-            </CardContent>
-          </Card>
+          </ChartCard>
         </>
       ) : (
-        <Card>
-          <CardHeader><CardTitle>{t("githubDetail.noData")}</CardTitle></CardHeader>
-          <CardContent>
-            <p className="text-sm text-[var(--muted-foreground)]">{t("githubDetail.noDataDesc")}</p>
-          </CardContent>
+        <Card withBorder radius="md" p={{ base: "md", sm: "lg" }} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
+          <Stack gap="xs">
+            <Text component="h3" fz="lg" fw={600}>{t("githubDetail.noData")}</Text>
+            <Text size="sm" c="dimmed">{t("githubDetail.noDataDesc")}</Text>
+          </Stack>
         </Card>
       )}
       <ConfirmDialog

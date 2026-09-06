@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
-import { StatCard } from "@/components/StatCard";
+import { Card, Text } from "@mantine/core";
+import { MetricCard } from "@/components/domain/shared/MetricCard";
+import { MetricGrid } from "@/components/domain/shared/MetricGrid";
 import { SectionShell } from "@/components/domain/shared/SectionShell";
-import { StatGrid } from "@/components/domain/shared/StatGrid";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RedditIcon } from "@/components/BrandIcons";
 import { MessageSquare, ThumbsUp } from "lucide-react";
 import {
@@ -33,17 +33,17 @@ export function RedditSection({ postKarma, commentKarma, totalPosts, totalCommen
 
   return (
     <SectionShell icon={<RedditIcon />} title={t("overview.redditHeading")}>
-      <StatGrid>
-        <StatCard title={t("overview.stats.postKarma")} value={postKarma} icon={<ThumbsUp size={16} />} />
-        <StatCard title={t("overview.stats.commentKarma")} value={commentKarma} icon={<MessageSquare size={16} />} />
-        <StatCard title={t("overview.stats.redditPosts")} value={totalPosts} icon={<MessageSquare size={16} />} />
-        <StatCard title={t("overview.stats.redditComments")} value={totalComments} icon={<MessageSquare size={16} />} />
-      </StatGrid>
+      <MetricGrid>
+        <MetricCard label={t("overview.stats.postKarma")} value={postKarma} icon={<ThumbsUp size={16} />} />
+        <MetricCard label={t("overview.stats.commentKarma")} value={commentKarma} icon={<MessageSquare size={16} />} />
+        <MetricCard label={t("overview.stats.redditPosts")} value={totalPosts} icon={<MessageSquare size={16} />} />
+        <MetricCard label={t("overview.stats.redditComments")} value={totalComments} icon={<MessageSquare size={16} />} />
+      </MetricGrid>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs font-semibold text-[var(--muted-foreground)]">{t("overview.charts.redditKarma")}</CardTitle></CardHeader>
-          <CardContent className="pt-0 pb-2">
+        <Card withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
+          <div className="overview-chart-title"><Text size="xs" fw={600} c="dimmed">{t("overview.charts.redditKarma")}</Text></div>
+          <div className="overview-chart-body">
             {karmaTimeline.length > 0 ? (
               <div role="img" aria-label={t("overview.charts.redditKarma")}>
               <div className={`flex flex-wrap gap-x-3 gap-y-0.5 mb-1 ${isMobile ? "text-[11px]" : "text-xs"}`}>
@@ -64,12 +64,12 @@ export function RedditSection({ postKarma, commentKarma, totalPosts, totalCommen
             ) : (
               <div className="flex items-center justify-center text-xs text-[var(--muted-foreground)]" style={{ height: CHART_H }}>{t("redditDetail.noData")}</div>
             )}
-          </CardContent>
+          </div>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs font-semibold text-[var(--muted-foreground)]">{t("overview.charts.redditActivity")}</CardTitle></CardHeader>
-          <CardContent className="p-0 pb-2">
+        <Card withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
+          <div className="overview-chart-title"><Text size="xs" fw={600} c="dimmed">{t("overview.charts.redditActivity")}</Text></div>
+          <div className="overview-chart-body">
             {dailyActivity.length > 0 ? (
               <div role="img" aria-label={t("overview.charts.redditActivity")}>
               <ResponsiveContainer width="100%" height={CHART_H}>
@@ -86,14 +86,14 @@ export function RedditSection({ postKarma, commentKarma, totalPosts, totalCommen
             ) : (
               <div className="flex items-center justify-center text-xs text-[var(--muted-foreground)]" style={{ height: CHART_H }}>{t("redditDetail.noData")}</div>
             )}
-          </CardContent>
+          </div>
         </Card>
       </div>
 
       {mergedSubreddits.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs font-semibold text-[var(--muted-foreground)]">{t("overview.charts.redditSubreddits")}</CardTitle></CardHeader>
-          <CardContent className="p-0 pb-2">
+        <Card withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
+          <div className="overview-chart-title"><Text size="xs" fw={600} c="dimmed">{t("overview.charts.redditSubreddits")}</Text></div>
+          <div className="overview-chart-body">
             <div role="img" aria-label={t("overview.charts.redditSubreddits")}>
             <ResponsiveContainer width="100%" height={PIE_H}>
               <PieChart>
@@ -106,7 +106,7 @@ export function RedditSection({ postKarma, commentKarma, totalPosts, totalCommen
               </PieChart>
             </ResponsiveContainer>
             </div>
-          </CardContent>
+          </div>
         </Card>
       )}
     </SectionShell>

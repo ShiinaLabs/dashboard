@@ -6,11 +6,11 @@ import {
   Clock,
   KeyRound,
 } from "lucide-react";
+import { Card, Text } from "@mantine/core";
 import { api } from "@/lib/api";
-import { Card, CardContent } from "@/components/ui/card";
-import { CompactCard } from "@/components/domain/shared/OverviewCards";
-import { StatCard } from "@/components/StatCard";
-import { StatCardSkeleton } from "@/components/Skeleton";
+import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
+import { MetricGrid } from "@/components/domain/shared/MetricGrid";
+import { SectionShell } from "@/components/domain/shared/SectionShell";
 import { getPlatformLabelKey } from "@/lib/platforms";
 
 export function FetchHealthSection() {
@@ -23,63 +23,62 @@ export function FetchHealthSection() {
 
   if (isLoading) {
     return (
-      <section className="space-y-3">
-        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-[var(--muted-foreground)]">
-          <CheckCircle2 size={16} /> {t("overview.health.heading")}
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {Array.from({ length: 4 }).map((_, index) => <StatCardSkeleton key={index} />)}
-        </div>
-      </section>
+      <SectionShell icon={<CheckCircle2 size={16} />} title={t("overview.health.heading")}>
+        <MetricGrid>
+          {Array.from({ length: 4 }).map((_, index) => <MetricCardSkeleton key={index} />)}
+        </MetricGrid>
+      </SectionShell>
     );
   }
 
   if (isError || !data) {
     return (
-      <Card>
-        <CardContent className="p-4 pt-4 sm:p-6 sm:pt-6 text-sm text-[var(--muted-foreground)]">
-          {t("overview.health.unavailable")}
-        </CardContent>
-      </Card>
+      <SectionShell icon={<CheckCircle2 size={16} />} title={t("overview.health.heading")}>
+        <Card withBorder radius="lg" p={{ base: "md", sm: "lg" }} style={{ background: "var(--card)" }}>
+          <Text size="sm" c="dimmed">
+            {t("overview.health.unavailable")}
+          </Text>
+        </Card>
+      </SectionShell>
     );
   }
 
   const cards = [
     {
       icon: <CheckCircle2 size={16} />,
-      title: t("overview.health.healthy"),
-      value: data.summary.healthy.toLocaleString(),
-      description: t("overview.health.activeCount", { count: data.summary.activeAccounts }),
+      label: t("overview.health.healthy"),
+      value: data.summary.healthy,
+      hint: t("overview.health.activeCount", { count: data.summary.activeAccounts }),
+      tone: "success" as const,
     },
     {
       icon: <Clock size={16} />,
-      title: t("overview.health.stale"),
-      value: data.summary.stale.toLocaleString(),
-      description: t("overview.health.beyondInterval"),
+      label: t("overview.health.stale"),
+      value: data.summary.stale,
+      hint: t("overview.health.beyondInterval"),
+      tone: "warn" as const,
     },
     {
       icon: <AlertTriangle size={16} />,
-      title: t("overview.health.failed"),
-      value: (data.summary.failed + data.summary.partial).toLocaleString(),
-      description: t("overview.health.failedHint"),
+      label: t("overview.health.failed"),
+      value: data.summary.failed + data.summary.partial,
+      hint: t("overview.health.failedHint"),
+      tone: "danger" as const,
     },
     {
       icon: <KeyRound size={16} />,
-      title: t("overview.health.capabilityGap"),
-      value: data.summary.capabilityGap.toLocaleString(),
-      description: t("overview.health.capabilityHint"),
+      label: t("overview.health.capabilityGap"),
+      value: data.summary.capabilityGap,
+      hint: t("overview.health.capabilityHint"),
+      tone: "warn" as const,
     },
   ];
 
   return (
-    <section className="space-y-3">
-      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-[var(--muted-foreground)]">
-        <CheckCircle2 size={16} /> {t("overview.health.heading")}
-      </h3>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {cards.map((card) => <StatCard key={card.title} {...card} />)}
-      </div>
+    <SectionShell icon={<CheckCircle2 size={16} />} title={t("overview.health.heading")}>
+      <MetricGrid>
+        {cards.map((card) => <MetricCard key={card.label} {...card} />)}
+      </MetricGrid>
 
       {data.unsupportedAccounts.length > 0 && (
         <div className="flex items-start gap-2 p-3 rounded-lg bg-[var(--warn)]/5 text-[var(--warn)] text-xs">
@@ -94,10 +93,16 @@ export function FetchHealthSection() {
       )}
 
       {data.issues.length > 0 && (
-        <CompactCard>
-            <div className="space-y-0.5 -mx-2">
+        <Card
+          withBorder
+          radius="md"
+          p={0}
+          className="overview-health-issues"
+          style={{ background: "var(--card)", color: "var(--card-foreground)" }}
+        >
+            <div className="overview-health-issue-list">
               {data.issues.slice(0, 5).map((issue) => (
-                <div key={issue.accountId} className="rounded-md p-2 transition-colors hover:bg-[var(--muted)] active:bg-[var(--border)]/50">
+                <div key={issue.accountId} className="overview-health-issue-row transition-colors hover:bg-[var(--muted)] active:bg-[var(--border)]/50">
                   <div className="flex items-start justify-between gap-3">
                     <p className="min-h-5 min-w-0 truncate text-sm leading-5 font-medium">
                       {issue.screenName}
@@ -120,12 +125,12 @@ export function FetchHealthSection() {
               ))}
             </div>
             {data.issues.length > 5 && (
-              <p className="mt-2 text-[11px] text-[var(--muted-foreground)]">
+              <p className="overview-health-more text-[11px] text-[var(--muted-foreground)]">
                 {t("overview.health.moreIssues", { count: data.issues.length - 5 })}
               </p>
             )}
-        </CompactCard>
+        </Card>
       )}
-    </section>
+    </SectionShell>
   );
 }

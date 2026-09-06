@@ -129,10 +129,10 @@ export default function AccountListPage({
                     borderLeftColor: "transparent",
                   } as React.CSSProperties}
                 >
-                  <CardContent className="p-5 pt-5 sm:p-5 sm:pt-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
+                   <div className="account-card-content">
+                    <div className="mobile-account-card gap-4">
+                      <div className="account-card-main">
+                        <div className="account-card-header">
                           <span className="font-semibold text-base">
                             {formatUsername ? formatUsername(account) : account.screen_name}
                           </span>
@@ -150,7 +150,7 @@ export default function AccountListPage({
                             </Badge>
                           ) : null}
                         </div>
-                        <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-[var(--muted-foreground)]">
+                        <div className="account-card-meta text-sm text-[var(--muted-foreground)]">
                           <span>{t("settings.autoSchedule")}</span>
                           {lastFetched && (
                             <span>{t(`${i18nKey}.accountCard.last`, { date: formatDateTime(lastFetched) })}</span>
@@ -158,14 +158,14 @@ export default function AccountListPage({
                           {renderMeta?.(account)}
                         </div>
                         {account.error_message && (
-                          <div className="flex items-center gap-1.5 mt-2 text-xs text-[var(--danger)]">
+                          <div className="account-card-error text-xs text-[var(--danger)]">
                             <AlertCircle size={12} /> {account.error_message}
                           </div>
                         )}
                       </div>
                       {/* No action buttons — management is only on /accounts page */}
                     </div>
-                  </CardContent>
+                   </div>
                 </Card>
                 </Link>
               );

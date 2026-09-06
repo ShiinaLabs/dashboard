@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import type { Account, FetchRun } from "@/shared/types";
-import { Card, CardContent } from "./ui/card";
+import { Card } from "./ui/card";
+import { Badge } from "./ui/badge";
 import { formatDateTime } from "@/lib/client/datetime";
 
 interface FetchRunHistoryProps {
@@ -20,21 +21,21 @@ export function FetchRunHistory({ account, runs }: FetchRunHistoryProps) {
 
   return (
     <Card>
-      <CardContent className="p-3 pt-3 sm:p-3 sm:pt-3">
-        <div className="mb-2 flex items-center justify-between gap-3">
+      <div className="fetch-history-content">
+        <div className="fetch-history-header">
           <p className="text-xs font-semibold leading-4 text-[var(--muted-foreground)]">
             {t("fetchHistory.title")}
           </p>
-          <p className="truncate text-[11px] leading-4 text-[var(--muted-foreground)]">
+          <p className="fetch-history-due text-[11px] leading-4 text-[var(--muted-foreground)]">
             {latest.status === "running"
               ? t("fetchHistory.runningNow")
               : t("fetchHistory.nextDue", { date: nextDueAt ? formatDateTime(nextDueAt) : t("fetchHistory.unknown") })}
           </p>
         </div>
 
-        <div className="-mx-2 space-y-0.5">
+        <div className="fetch-history-list">
           {runs.slice(0, 5).map((run) => (
-            <div key={run.id} className="rounded-md p-2 transition-colors hover:bg-[var(--muted)]">
+            <div key={run.id} className="fetch-history-row transition-colors hover:bg-[var(--muted)]">
               <div className="flex min-w-0 items-center justify-between gap-3">
                 <p className="min-w-0 truncate text-sm leading-5">
                   {formatDateTime(run.started_at)}
@@ -42,17 +43,22 @@ export function FetchRunHistory({ account, runs }: FetchRunHistoryProps) {
                     {run.trigger === "scheduler" ? t("fetchHistory.scheduler") : t("fetchHistory.manual")}
                   </span>
                 </p>
-                <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium ${
-                  run.status === "success"
-                    ? "bg-[var(--success)]/10 text-[var(--success)]"
-                    : run.status === "failed"
-                      ? "bg-[var(--danger)]/10 text-[var(--danger)]"
-                      : run.status === "partial"
-                        ? "bg-[var(--warn)]/10 text-[var(--warn)]"
-                        : "bg-[var(--muted)] text-[var(--muted-foreground)]"
-                }`}>
+                <Badge
+                  size="xs"
+                  color={
+                    run.status === "success"
+                      ? "success"
+                      : run.status === "failed"
+                        ? "danger"
+                        : run.status === "partial"
+                          ? "warning"
+                          : "gray"
+                  }
+                  variant="light"
+                  className="shrink-0"
+                >
                   {t(`fetchHistory.status.${run.status}`)}
-                </span>
+                </Badge>
               </div>
               {(run.error_message || run.capability_gaps.length > 0) && (
                 <div className="mt-1 space-y-0.5">
@@ -69,7 +75,7 @@ export function FetchRunHistory({ account, runs }: FetchRunHistoryProps) {
             </div>
           ))}
         </div>
-      </CardContent>
+      </div>
     </Card>
   );
 }

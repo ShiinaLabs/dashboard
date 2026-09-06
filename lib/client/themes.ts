@@ -1,3 +1,10 @@
+import {
+  applyDashboardCssVariables,
+  dashboardThemeIds,
+  isDashboardThemeId,
+  resolveColorScheme,
+} from "./mantine-theme";
+
 export interface Theme {
   id: string;
   name: string;
@@ -9,23 +16,25 @@ export interface ThemeSettings {
   darkTheme: string;
 }
 
-export const themes: Theme[] = [
-  { id: "default-light", name: "Default Light" },
-  { id: "default-dark", name: "Default Dark" },
-  { id: "sepia-light", name: "Sepia Light" },
-  { id: "sepia-dark", name: "Sepia Dark" },
-  { id: "cyber-light", name: "Cyber Light" },
-  { id: "cyber-dark", name: "Cyber Dark" },
-  { id: "forest-light", name: "Forest Light" },
-  { id: "forest-dark", name: "Forest Dark" },
-  { id: "sky-light", name: "Sky Light" },
-  { id: "sky-dark", name: "Sky Dark" },
-  { id: "rose-light", name: "Rose Light" },
-  { id: "rose-dark", name: "Rose Dark" },
-];
+const themeNames = {
+  "default-light": "Default Light",
+  "default-dark": "Default Dark",
+  "sepia-light": "Sepia Light",
+  "sepia-dark": "Sepia Dark",
+  "cyber-light": "Cyber Light",
+  "cyber-dark": "Cyber Dark",
+  "forest-light": "Forest Light",
+  "forest-dark": "Forest Dark",
+  "sky-light": "Sky Light",
+  "sky-dark": "Sky Dark",
+  "rose-light": "Rose Light",
+  "rose-dark": "Rose Dark",
+} as const;
 
-// Themes whose name ends with "-dark" are dark variants.
-const isDarkId = (id: string) => id.endsWith("-dark");
+export const themes: Theme[] = dashboardThemeIds.map((id) => ({
+  id,
+  name: themeNames[id],
+}));
 
 export const DEFAULT_SETTINGS: ThemeSettings = {
   mode: "system",
@@ -52,17 +61,28 @@ export function saveSettings(settings: ThemeSettings) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 }
 
-export function resolveTheme(settings: ThemeSettings): string {
-  if (settings.mode === "light") return settings.lightTheme;
-  if (settings.mode === "dark") return settings.darkTheme;
-  if (!isBrowser) return settings.lightTheme;
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  return prefersDark ? settings.darkTheme : settings.lightTheme;
+export function resolveTheme(settings: ThemeSettings, systemColorScheme?: "light" | "dark"): string {
+  if (settings.mode === "light") {
+    return isDashboardThemeId(settings.lightTheme) ? settings.lightTheme : DEFAULT_SETTINGS.lightTheme;
+  }
+  if (settings.mode === "dark") {
+    return isDashboardThemeId(settings.darkTheme) ? settings.darkTheme : DEFAULT_SETTINGS.darkTheme;
+  }
+  if (!isBrowser && !systemColorScheme) return settings.lightTheme;
+  const prefersDark =
+    systemColorScheme !== undefined
+      ? systemColorScheme === "dark"
+      : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const themeId = prefersDark ? settings.darkTheme : settings.lightTheme;
+  const fallbackThemeId = prefersDark ? DEFAULT_SETTINGS.darkTheme : DEFAULT_SETTINGS.lightTheme;
+  return isDashboardThemeId(themeId) ? themeId : fallbackThemeId;
 }
 
 export function applyTheme(themeId: string) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  root.setAttribute("data-theme", themeId);
-  root.classList.toggle("dark", isDarkId(themeId));
+  const resolvedThemeId = applyDashboardCssVariables(root, themeId);
+  root.setAttribute("data-theme", resolvedThemeId);
+  root.setAttribute("data-mantine-color-scheme", resolveColorScheme(resolvedThemeId));
+  root.classList.toggle("dark", resolveColorScheme(resolvedThemeId) === "dark");
 }

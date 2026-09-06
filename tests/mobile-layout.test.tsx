@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { MantineProvider } from "@mantine/core";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -15,15 +16,11 @@ function readProjectFile(path: string) {
 describe("mobile layout contracts", () => {
   it("makes the time range selector fill narrow screens with touch-sized options", () => {
     const html = renderToStaticMarkup(
-      <TimeRangeSelector value={30} onChange={() => undefined} />,
+      <MantineProvider><TimeRangeSelector value={30} onChange={() => undefined} /></MantineProvider>,
     );
 
-    expect(html).toContain("w-full");
-    expect(html).toContain("sm:w-auto");
-    expect(html).toContain("min-h-11");
-    expect(html).toContain("min-w-11");
-    expect(html).toContain("flex-1");
-    expect(html).toContain("sm:flex-none");
+    expect(html).toContain("mantine-SegmentedControl-root");
+    expect(html).toContain("data-full-width=\"true\"");
   });
 
   it("keeps sidebar navigation items touch-sized", () => {
@@ -89,8 +86,11 @@ describe("mobile layout contracts", () => {
     ].map(readProjectFile);
 
     for (const source of accountDetails) {
-      expect(source).toContain("grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4");
+      expect(source).toContain("<MetricGrid>");
     }
+
+    const metricGrid = readProjectFile("components/domain/shared/MetricGrid.tsx");
+    expect(metricGrid).toContain("four: { base: 2, sm: 4 }");
   });
 
   it("separates account information from mobile card actions", () => {
@@ -98,15 +98,15 @@ describe("mobile layout contracts", () => {
 
     expect(source).toContain("mobile-tab-strip");
     expect(source).toContain("mobile-account-card");
-    expect(source).toContain("mobile-account-actions");
+    expect(source).toContain("account-card-actions");
   });
 
   it("stacks admin and settings controls on narrow screens", () => {
     const admin = readProjectFile("app/(dashboard)/admin/page.tsx");
     const settings = readProjectFile("app/(dashboard)/settings/page.tsx");
 
-    expect(admin).toContain("grid grid-cols-1 gap-2 sm:grid-cols-3");
-    expect(admin).toContain("w-full sm:w-auto");
+    expect(admin).toContain("grid grid-cols-1 gap-4 sm:grid-cols-2");
+    expect(admin).toContain('className="sm:self-start"');
     expect(settings).toContain("flex flex-col gap-2 sm:flex-row sm:items-center");
   });
 
@@ -114,8 +114,8 @@ describe("mobile layout contracts", () => {
     const admin = readProjectFile("app/(dashboard)/admin/page.tsx");
     const settings = readProjectFile("app/(dashboard)/settings/page.tsx");
 
-    expect(admin.match(/min-h-11/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
-    expect(settings.match(/min-h-11/g)?.length ?? 0).toBeGreaterThanOrEqual(8);
+    expect(admin.match(/<(TextInput|PasswordInput|Select|Button)\b/g)?.length ?? 0).toBeGreaterThanOrEqual(5);
+    expect(settings.match(/<(TextInput|PasswordInput|Select|SegmentedControl|Button)\b/g)?.length ?? 0).toBeGreaterThanOrEqual(8);
   });
 
   it("keeps login and confirmation actions usable on narrow screens", () => {
@@ -123,14 +123,14 @@ describe("mobile layout contracts", () => {
     const confirmDialog = readProjectFile("components/ui/ConfirmDialog.tsx");
 
     expect(login).toContain("p-5 sm:p-8");
-    expect(login.match(/min-h-11/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
-    expect(confirmDialog).toContain("p-4 sm:p-6");
-    expect(confirmDialog.match(/min-h-11/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    expect(login.match(/<(TextInput|PasswordInput|Button|Alert)\b/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
+    expect(confirmDialog).toContain("<Modal");
+    expect(confirmDialog).toContain("<TextInput");
   });
 
   it("keeps account editor fields and cookie controls touch-sized", () => {
     const accounts = readProjectFile("app/(dashboard)/accounts/page.tsx");
 
-    expect(accounts.match(/min-h-11/g)?.length ?? 0).toBeGreaterThanOrEqual(15);
+    expect(accounts.match(/<(TextInput|PasswordInput|Button|ActionIcon)\b/g)?.length ?? 0).toBeGreaterThanOrEqual(15);
   });
 });

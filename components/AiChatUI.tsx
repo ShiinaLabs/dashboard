@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Bot, Send, AlertCircle, Trash2 } from "lucide-react";
 import { renderMarkdown } from "@/lib/client/markdown";
+import { ActionIcon, Alert, Button, TextInput } from "@/components/ui";
 import type { Message } from "@/app/(dashboard)/overview/useAiChat";
 
 interface AiChatUIProps {
@@ -80,9 +81,7 @@ export function AiChatUI({
 
       {/* Error */}
       {error && (
-        <div className="flex items-center gap-2 px-4 py-2 text-sm text-[var(--danger)]">
-          <AlertCircle size={14} /> {error}
-        </div>
+        <Alert color="danger" icon={<AlertCircle size={14} />} variant="light" mx="md" mb="xs">{error}</Alert>
       )}
 
       {/* Quota */}
@@ -96,36 +95,35 @@ export function AiChatUI({
       <div className="border-t border-[var(--border)] p-3">
         <form onSubmit={handleSubmit} className="flex gap-2">
           {messages.length > 0 && onClear && (
-            <button
+            <ActionIcon
               type="button"
               onClick={onClear}
-              className="p-2 rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted)] transition-colors"
+              variant="subtle"
+              color="gray"
+              size="lg"
               title={t("overview.aiAgent.clear") || "Clear chat"}
               aria-label={t("overview.aiAgent.clear") || "Clear chat"}
             >
               <Trash2 size={16} />
-            </button>
+            </ActionIcon>
           )}
-          <input
+          <TextInput
             ref={inputRef}
-            type="text"
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => setInput(e.currentTarget.value)}
             placeholder={t("overview.aiAgent.placeholder")}
-            className="flex-1 px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--background)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
             disabled={isStreaming}
+            style={{ flex: 1 }}
           />
-          <button
+          <Button
             type="submit"
             disabled={!input.trim() || isStreaming}
-            className="px-3 py-2 rounded-lg bg-[var(--primary)] text-[var(--primary-foreground)] disabled:opacity-50"
+            loading={isStreaming}
+            px="sm"
+            aria-label={t("overview.aiAgent.send") || "Send"}
           >
-            {isStreaming ? (
-              <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Send size={16} />
-            )}
-          </button>
+            <Send size={16} />
+          </Button>
         </form>
       </div>
     </div>

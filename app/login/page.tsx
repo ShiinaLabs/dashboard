@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LayoutDashboard, LogIn, Eye, EyeOff } from "lucide-react";
+import { Alert, Button, PasswordInput, TextInput } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useBingWallpaper } from "@/lib/client/useBingWallpaper";
 
@@ -39,7 +40,6 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,63 +100,45 @@ export default function Login() {
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <div className="space-y-1.5">
               <label className="block text-xs font-medium text-white/60">{t("login.username")}</label>
-              <input
-                type="text"
+              <TextInput
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => setUsername(e.currentTarget.value)}
                 placeholder="admin"
-                className="min-h-11 w-full px-3.5 py-2.5 rounded-lg border border-white/20 bg-white/10 text-white text-sm
-                  placeholder:text-white/30
-                  focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-transparent
-                  transition-shadow"
+                aria-label={t("login.username")}
+                styles={{ input: { background: "rgba(255,255,255,.1)", borderColor: "rgba(255,255,255,.2)", color: "white" } }}
               />
             </div>
 
             <div className="space-y-1.5">
               <label className="block text-xs font-medium text-white/60">{t("login.password")}</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoFocus
-                  className="min-h-11 w-full px-3.5 py-2.5 pr-10 rounded-lg border border-white/20 bg-white/10 text-white text-sm
-                    placeholder:text-white/30
-                    focus:outline-none focus:ring-2 focus:ring-white/40 focus:border-transparent
-                    transition-shadow"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 p-2.5 min-h-11 min-w-11 flex items-center justify-center rounded text-white/50 hover:text-white/80 transition-colors"
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
+              <PasswordInput
+                value={password}
+                onChange={(e) => setPassword(e.currentTarget.value)}
+                autoFocus
+                aria-label={t("login.password")}
+                visibilityToggleIcon={({ reveal }) => reveal ? <EyeOff size={16} /> : <Eye size={16} />}
+                styles={{ input: { background: "rgba(255,255,255,.1)", borderColor: "rgba(255,255,255,.2)", color: "white" } }}
+              />
             </div>
 
             {isMock && (
-              <p className="text-xs bg-amber-500/15 text-amber-600 dark:text-amber-400 px-3 py-2 rounded-lg">
-                {t("login.mockHint")}
-              </p>
+              <Alert color="yellow" variant="light" p="xs">{t("login.mockHint")}</Alert>
             )}
 
             {error && (
-              <p className="text-xs bg-[var(--danger)]/20 text-[var(--danger)] px-3 py-2 rounded-lg">{error}</p>
+              <Alert color="danger" variant="light" p="xs">{error}</Alert>
             )}
 
-            <button
+            <Button
               type="submit"
               disabled={loading || (!password && !isMock)}
-              className="min-h-11 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg
-                bg-white/90 text-gray-900 font-medium text-sm
-                hover:bg-white active:scale-[0.98]
-                transition-all disabled:opacity-40 disabled:pointer-events-none"
+              loading={loading}
+              fullWidth
+              color="gray"
+              leftSection={<LogIn size={16} />}
             >
-              <LogIn size={16} />
-              {loading ? t("login.loggingIn") : t("login.login")}
-            </button>
+              {t("login.login")}
+            </Button>
           </form>
         </div>
       </div>

@@ -624,6 +624,7 @@
     "username": "Username",
     "password": "Password",
     "confirmPassword": "Confirm password",
+    "role": "Role",
     "roleUser": "User",
     "roleAdmin": "Admin",
     "userList": "User List",

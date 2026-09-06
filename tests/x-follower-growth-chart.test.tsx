@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
+import { MantineProvider } from "@mantine/core";
 import { renderToStaticMarkup } from "react-dom/server";
 
 vi.mock("react-i18next", () => ({
@@ -32,9 +33,17 @@ const SNAPSHOTS = [
   { date: "2026-08-02", followers_count: 980, following_count: 52, tweet_count: 205 },
 ];
 
+function renderChart(data: typeof SNAPSHOTS) {
+  return renderToStaticMarkup(
+    <MantineProvider>
+      <XFollowerGrowthChart data={data} />
+    </MantineProvider>,
+  );
+}
+
 describe("XFollowerGrowthChart", () => {
   it("renders a follower curve when at least two snapshots exist", () => {
-    const html = renderToStaticMarkup(<XFollowerGrowthChart data={SNAPSHOTS} />);
+    const html = renderChart(SNAPSHOTS);
 
     expect(html).toContain("xDetail.followerGrowth");
     expect(html).toContain('role="img"');
@@ -44,7 +53,7 @@ describe("XFollowerGrowthChart", () => {
   });
 
   it("shows an explicit insufficient-history state for zero snapshots", () => {
-    const html = renderToStaticMarkup(<XFollowerGrowthChart data={[]} />);
+    const html = renderChart([]);
 
     expect(html).toContain("xDetail.followerGrowthEmpty");
     expect(html).not.toContain("recharts-responsive-container");
@@ -52,7 +61,7 @@ describe("XFollowerGrowthChart", () => {
   });
 
   it("shows an explicit insufficient-history state for a single snapshot", () => {
-    const html = renderToStaticMarkup(<XFollowerGrowthChart data={[SNAPSHOTS[0]]} />);
+    const html = renderChart([SNAPSHOTS[0]]);
 
     expect(html).toContain("xDetail.followerGrowthEmpty");
     expect(html).not.toContain("recharts-responsive-container");

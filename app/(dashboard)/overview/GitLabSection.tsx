@@ -1,10 +1,10 @@
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import { type Account } from "@/lib/api";
-import { StatCard } from "@/components/StatCard";
+import { MetricCard } from "@/components/domain/shared/MetricCard";
+import { MetricGrid } from "@/components/domain/shared/MetricGrid";
 import { RepoChip } from "@/components/ui/RepoChip";
 import { SectionShell } from "@/components/domain/shared/SectionShell";
-import { StatGrid } from "@/components/domain/shared/StatGrid";
 import { PinnedGrid } from "@/components/domain/shared/PinnedGrid";
 import { GitlabIcon } from "@/components/BrandIcons";
 import { Star, GitFork, TrendingUp } from "lucide-react";
@@ -37,12 +37,12 @@ export function GitLabSection({ glAllProjects, glPinned, glTotalStars, glTotalFo
 
   return (
     <SectionShell icon={<GitlabIcon />} title={t("overview.gitlabHeading")}>
-      <StatGrid>
-        <StatCard title={t("overview.stats.projects")} value={glAllProjects.length} icon={<GitlabIcon />} />
-        <StatCard title={t("overview.stats.totalStars")} value={glTotalStars} icon={<Star size={16} />} />
-        <StatCard title={t("overview.stats.totalForks")} value={glTotalForks} icon={<GitFork size={16} />} />
-        <StatCard title={t("overview.stats.followers")} value={glFollowers} icon={<TrendingUp size={16} />} />
-      </StatGrid>
+      <MetricGrid>
+        <MetricCard label={t("overview.stats.projects")} value={glAllProjects.length} icon={<GitlabIcon />} />
+        <MetricCard label={t("overview.stats.totalStars")} value={glTotalStars} icon={<Star size={16} />} />
+        <MetricCard label={t("overview.stats.totalForks")} value={glTotalForks} icon={<GitFork size={16} />} />
+        <MetricCard label={t("overview.stats.followers")} value={glFollowers} icon={<TrendingUp size={16} />} />
+      </MetricGrid>
 
       {glPinned.length > 0 && (
         <PinnedGrid title={t("overview.pinnedProjects")}>

@@ -2,13 +2,11 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { Card, Table, Text } from "@mantine/core";
 import { BarChart3, TrendingUp } from "lucide-react";
 import { api } from "@/lib/api";
 import { SectionShell } from "@/components/domain/shared/SectionShell";
 import type { TopContentItem } from "@/shared/types";
-// Card removed — BaseCard used via OverviewCards
-import { BaseCard } from "@/components/ui/BaseCard";
-import { TableCard } from "@/components/domain/shared/OverviewCards";
 import { TimeRangeSelector } from "@/components/TimeRangeSelector";
 import { ChartCardSkeleton } from "@/components/Skeleton";
 import { GithubIcon, GitlabIcon, RedditIcon, XIcon } from "@/components/BrandIcons";
@@ -43,31 +41,38 @@ export function TopContentSection() {
       {isLoading ? (
         <ChartCardSkeleton />
       ) : isError || !data ? (
-        <BaseCard variant="default">
-          <p className="text-sm text-[var(--muted-foreground)]">{t("overview.topContent.unavailable")}</p>
-        </BaseCard>
+        <Card withBorder radius="md" p={{ base: "md", sm: "lg" }} style={{ background: "var(--card)" }}>
+          <Text size="sm" c="dimmed">{t("overview.topContent.unavailable")}</Text>
+        </Card>
       ) : items.length === 0 ? (
-        <BaseCard variant="default">
-          <p className="text-sm text-[var(--muted-foreground)]">{t("overview.topContent.noData")}</p>
-        </BaseCard>
+        <Card withBorder radius="md" p={{ base: "md", sm: "lg" }} style={{ background: "var(--card)" }}>
+          <Text size="sm" c="dimmed">{t("overview.topContent.noData")}</Text>
+        </Card>
       ) : (
-        <TableCard>
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-[11px] uppercase tracking-wide text-[var(--muted-foreground)]">
-                  <th className="px-4 py-2.5 font-medium w-full">{t("overview.topContent.colContent")}</th>
-                  <th className="whitespace-nowrap px-2 py-2.5 font-medium">{t("overview.topContent.colPlatform")}</th>
-                  <th className="whitespace-nowrap px-2 py-2.5 text-right font-medium">{t("overview.topContent.colMetric")}</th>
-                  <th className="whitespace-nowrap px-4 py-2.5 text-right font-medium">{t("overview.topContent.colGrowth")}</th>
-                </tr>
-              </thead>
-              <tbody>
+        <Card
+          withBorder
+          radius="md"
+          p={0}
+          style={{ background: "var(--card)", color: "var(--card-foreground)" }}
+        >
+          <Table.ScrollContainer minWidth={680}>
+            <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
+              <Table.Thead>
+                <Table.Tr className="text-[11px] uppercase tracking-wide text-[var(--muted-foreground)]">
+                  <Table.Th className="w-full font-medium">{t("overview.topContent.colContent")}</Table.Th>
+                  <Table.Th className="whitespace-nowrap font-medium">{t("overview.topContent.colPlatform")}</Table.Th>
+                  <Table.Th className="whitespace-nowrap text-right font-medium">{t("overview.topContent.colMetric")}</Table.Th>
+                  <Table.Th className="whitespace-nowrap text-right font-medium">{t("overview.topContent.colGrowth")}</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
                 {items.slice(0, 15).map((item) => (
                   <TopContentRow key={item.id} item={item} />
                 ))}
-              </tbody>
-            </table>
-        </TableCard>
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
+        </Card>
       )}
     </SectionShell>
   );
@@ -81,11 +86,11 @@ function TopContentRow({ item }: { item: TopContentItem }) {
     : null;
 
   return (
-    <tr className="border-b border-[var(--border)] transition-colors last:border-0 hover:bg-[var(--muted)] active:bg-[var(--border)]/50">
-      <td className="px-4 py-2.5" style={{ width: "100%" }}>
-        <div className="flex items-center gap-1.5">
-          <span className="shrink-0"><PlatformIcon platform={item.platform} /></span>
-          <div className="min-w-0 flex-1">
+    <Table.Tr className="transition-colors active:bg-[var(--border)]/50">
+      <Table.Td style={{ width: "100%" }}>
+        <div className="top-content-row">
+          <span className="top-content-icon" aria-hidden="true"><PlatformIcon platform={item.platform} /></span>
+          <div className="top-content-primary">
             {item.route ? (
               <Link to={item.route} className="block line-clamp-1 text-sm leading-5 hover:underline">{item.title}</Link>
             ) : (
@@ -99,16 +104,16 @@ function TopContentRow({ item }: { item: TopContentItem }) {
             </p>
           </div>
         </div>
-      </td>
-      <td className="whitespace-nowrap px-2 py-2.5 text-[11px] text-[var(--muted-foreground)]">
+      </Table.Td>
+      <Table.Td className="whitespace-nowrap text-[11px] text-[var(--muted-foreground)]">
         {t(`nav.${item.platform === "twitter" ? "x" : item.platform}`)}
-      </td>
-      <td className="whitespace-nowrap px-2 py-2.5 text-right tabular-nums">
+      </Table.Td>
+      <Table.Td className="whitespace-nowrap text-right tabular-nums">
         <span className="text-sm font-semibold">{item.metricValue.toLocaleString()}</span>
         {" "}
         <span className="text-[11px] text-[var(--muted-foreground)]">{metricLabel}</span>
-      </td>
-      <td className="whitespace-nowrap px-4 py-2.5 text-right tabular-nums">
+      </Table.Td>
+      <Table.Td className="whitespace-nowrap text-right tabular-nums">
         {item.growthRate !== null ? (
           <span className={`inline-flex items-center gap-0.5 text-sm font-semibold ${
             item.growthRate > 0
@@ -123,7 +128,7 @@ function TopContentRow({ item }: { item: TopContentItem }) {
         ) : (
           <span className="text-[11px] text-[var(--muted-foreground)]">—</span>
         )}
-      </td>
-    </tr>
+      </Table.Td>
+    </Table.Tr>
   );
 }

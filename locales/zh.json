@@ -624,6 +624,7 @@
     "username": "用户名",
     "password": "密码",
     "confirmPassword": "确认密码",
+    "role": "角色",
     "roleUser": "普通用户",
     "roleAdmin": "管理员",
     "userList": "用户列表",

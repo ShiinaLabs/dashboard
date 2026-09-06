@@ -1,18 +1,20 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { Card, Text } from "@mantine/core";
 import {
   Activity, GitFork, Layers, MessageSquare,
   Star, TrendingUp,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { PulseContentItem } from "@/shared/types";
-// Card imports removed — BaseCard is now used
-import { StatCompactCard, HighlightCard } from "@/components/domain/shared/OverviewCards";
-import { BaseCard } from "@/components/ui/BaseCard";
+import { HighlightCard } from "@/components/domain/shared/OverviewCards";
+import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
+import { MetricGrid } from "@/components/domain/shared/MetricGrid";
+import { SectionShell } from "@/components/domain/shared/SectionShell";
 import { TimeRangeSelector } from "@/components/TimeRangeSelector";
-import { ChartCardSkeleton, StatCardSkeleton } from "@/components/Skeleton";
+import { ChartCardSkeleton } from "@/components/Skeleton";
 import { GithubIcon, GitlabIcon, RedditIcon, XIcon } from "@/components/BrandIcons";
 
 const TIME_OPTIONS = [
@@ -64,57 +66,75 @@ export function PulseSection() {
   });
 
   return (
-    <section className="space-y-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-[var(--muted-foreground)]">
-          <Activity size={16} /> {t("overview.pulse.heading")}
-        </h3>
-        <TimeRangeSelector value={days} onChange={setDays} options={TIME_OPTIONS} />
-      </div>
-
+    <SectionShell
+      icon={<Activity size={16} />}
+      title={t("overview.pulse.heading")}
+      action={<TimeRangeSelector value={days} onChange={setDays} options={TIME_OPTIONS} />}
+    >
       {isLoading ? (
         <div className="space-y-2">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {Array.from({ length: 4 }).map((_, index) => <StatCardSkeleton key={index} />)}
-          </div>
+          <MetricGrid>
+            {Array.from({ length: 4 }).map((_, index) => <MetricCardSkeleton density="compact" key={index} />)}
+          </MetricGrid>
           <ChartCardSkeleton />
         </div>
       ) : isError || !data ? (
-        <BaseCard variant="default"><p className="text-sm text-[var(--muted-foreground)]">{t("overview.pulse.unavailable")}</p></BaseCard>
+        <Card withBorder radius="md" p={{ base: "md", sm: "lg" }} style={{ background: "var(--card)" }}>
+          <Text size="sm" c="dimmed">{t("overview.pulse.unavailable")}</Text>
+        </Card>
       ) : data.platforms.length === 0 ? (
-        <BaseCard variant="default"><p className="text-sm text-[var(--muted-foreground)]">{t("overview.pulse.noData")}</p></BaseCard>
+        <Card withBorder radius="md" p={{ base: "md", sm: "lg" }} style={{ background: "var(--card)" }}>
+          <Text size="sm" c="dimmed">{t("overview.pulse.noData")}</Text>
+        </Card>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCompactCard
+          <MetricGrid>
+            <MetricCard
+              density="compact"
               icon={<Layers size={16} />}
-              title={t("overview.pulse.activePlatforms")}
-              value={data.platforms.length.toLocaleString()}
-              description={t("overview.pulse.rangeDays", { count: data.range.days })}
+              label={t("overview.pulse.activePlatforms")}
+              value={data.platforms.length}
+              hint={t("overview.pulse.rangeDays", { count: data.range.days })}
             />
-            <StatCompactCard
+            <MetricCard
+              density="compact"
               icon={<Activity size={16} />}
-              title={t("overview.pulse.activity")}
-              value={signed(data.totals.activity.change)}
-              description={deltaDescription(data.totals.activity.previous, data.totals.activity.current)}
+              label={t("overview.pulse.activity")}
+              value={data.totals.activity.change}
+              valuePrefix={data.totals.activity.change > 0 ? "+" : undefined}
+              hint={deltaDescription(data.totals.activity.previous, data.totals.activity.current)}
+              tone={data.totals.activity.change < 0 ? "danger" : data.totals.activity.change > 0 ? "success" : "primary"}
             />
-            <StatCompactCard
+            <MetricCard
+              density="compact"
               icon={<Star size={16} />}
-              title={t("overview.pulse.stars")}
-              value={signed(data.totals.traction.stars.change)}
-              description={deltaDescription(data.totals.traction.stars.previous, data.totals.traction.stars.current)}
+              label={t("overview.pulse.stars")}
+              value={data.totals.traction.stars.change}
+              valuePrefix={data.totals.traction.stars.change > 0 ? "+" : undefined}
+              hint={deltaDescription(data.totals.traction.stars.previous, data.totals.traction.stars.current)}
+              tone={data.totals.traction.stars.change < 0 ? "danger" : data.totals.traction.stars.change > 0 ? "success" : "primary"}
             />
-            <StatCompactCard
+            <MetricCard
+              density="compact"
               icon={<GitFork size={16} />}
-              title={t("overview.pulse.forks")}
-              value={signed(data.totals.traction.forks.change)}
-              description={deltaDescription(data.totals.traction.forks.previous, data.totals.traction.forks.current)}
+              label={t("overview.pulse.forks")}
+              value={data.totals.traction.forks.change}
+              valuePrefix={data.totals.traction.forks.change > 0 ? "+" : undefined}
+              hint={deltaDescription(data.totals.traction.forks.previous, data.totals.traction.forks.current)}
+              tone={data.totals.traction.forks.change < 0 ? "danger" : data.totals.traction.forks.change > 0 ? "success" : "primary"}
             />
-          </div>
+          </MetricGrid>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
             {data.platforms.map((platform) => (
-              <BaseCard key={platform.platform} variant="compact" contentClassName="flex flex-col justify-center">
+              <Card
+                key={platform.platform}
+                withBorder
+                radius="md"
+                p="md"
+                className="flex flex-col justify-center"
+                style={{ background: "var(--card)", color: "var(--card-foreground)" }}
+              >
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
                       <PlatformIcon platform={platform.platform} />
@@ -137,16 +157,19 @@ export function PulseSection() {
                     {" · "}
                     {t("overview.pulse.activityShort", { count: platform.activity.current })}
                   </p>
-                </BaseCard>
+              </Card>
             ))}
           </div>
 
-          <div className="grid grid-cols-1 gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(
+          <div
+            className="overview-highlight-grid"
+            style={{ "--highlight-columns": Math.min(
             (data.content.tweets.length > 0 ? 1 : 0) +
             (data.content.redditPosts.length > 0 || data.content.redditComments.length > 0 ? 1 : 0) +
             (data.repositories.length > 0 ? 1 : 0),
             3
-          )}, minmax(0, 1fr))` }}>
+          ) } as CSSProperties}
+          >
             {data.content.tweets.length > 0 && (
               <HighlightCard title={t("overview.pulse.topTweets")} icon={<MessageSquare size={16} />}>
                 {data.content.tweets.map((item) => (
@@ -198,6 +221,6 @@ export function PulseSection() {
           </div>
         </>
       )}
-    </section>
+    </SectionShell>
   );
 }

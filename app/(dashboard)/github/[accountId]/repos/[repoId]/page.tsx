@@ -4,7 +4,7 @@ import { useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { api, type GithubRepo, type GithubRelease } from "@/lib/api";
 import { formatDate } from "@/lib/client/datetime";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TimeRangeSelector } from "@/components/TimeRangeSelector";
 import { TrafficMetricList } from "@/components/TrafficMetricList";
@@ -16,6 +16,8 @@ import { ArrowLeft, Star, GitFork, Download, ExternalLink, Globe, TrendingUp, Ey
 import { useIsMobile } from "@/lib/client/useIsMobile";
 import { calcYAxisWidth } from "@/lib/client/utils";
 import { sumSelectedAssetDownloads } from "@/lib/utils/download-growth";
+import { ActionIcon, Button, Checkbox, TextInput } from "@/components/ui";
+import { ChartCard } from "@/components/domain/shared/ChartCard";
 
 const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#10b981", "#6366f1"];
 
@@ -74,9 +76,9 @@ function MultiSelectDropdown({ items, selected, onToggle, onSelectAll, onShowLat
     <div ref={ref} className="relative">
       <div className="mb-2 flex flex-wrap items-center gap-1">
         <span className="text-xs text-[var(--muted-foreground)] font-medium">{label}</span>
-        <button onClick={onSelectAll} className="min-h-11 min-w-11 rounded-md px-2.5 text-xs text-[var(--primary)] hover:bg-[var(--muted)]">{t("repoDetail.selectAll")}</button>
-        <button onClick={onShowLatest} className="min-h-11 min-w-11 rounded-md px-2.5 text-xs text-[var(--primary)] hover:bg-[var(--muted)]">{latestLabel}</button>
-        <button onClick={onDeselectAll} className="min-h-11 min-w-11 rounded-md px-2.5 text-xs text-[var(--primary)] hover:bg-[var(--muted)]">{t("repoDetail.hideAll")}</button>
+        <Button onClick={onSelectAll} variant="subtle" size="compact-xs">{t("repoDetail.selectAll")}</Button>
+        <Button onClick={onShowLatest} variant="subtle" size="compact-xs">{latestLabel}</Button>
+        <Button onClick={onDeselectAll} variant="subtle" size="compact-xs">{t("repoDetail.hideAll")}</Button>
       </div>
 
       {selectedItems.length > 0 && (
@@ -84,31 +86,29 @@ function MultiSelectDropdown({ items, selected, onToggle, onSelectAll, onShowLat
           {selectedItems.map((item) => (
             <span key={item.id} className="inline-flex items-center gap-1 px-2 py-1 bg-[var(--secondary)] rounded-md text-xs text-[var(--secondary-foreground)]">
               {item.label.length > (isMobile ? 8 : 15) ? item.label.slice(0, isMobile ? 8 : 15) + "..." : item.label}
-              <button onClick={() => onToggle(item.id)} className="ml-0.5 flex min-h-11 min-w-11 items-center justify-center rounded text-sm leading-none hover:bg-[var(--border)] hover:text-[var(--foreground)]">&times;</button>
+              <ActionIcon onClick={() => onToggle(item.id)} variant="subtle" color="gray" size="xs" aria-label={`Remove ${item.label}`}>&times;</ActionIcon>
             </span>
           ))}
         </div>
       )}
 
-      <button
+      <Button
         onClick={() => setOpen(!open)}
-        className="flex min-h-11 w-full items-center justify-between rounded-md border border-[var(--border)] px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--accent)]"
+        variant="default" color="gray" fullWidth justify="space-between"
       >
         <span className="text-[var(--muted-foreground)]">
           {selected.size === items.length ? t("repoDetail.allSelected") : t("repoDetail.nSelected", { count: selected.size })}
         </span>
         <span className="text-[var(--muted-foreground)] text-xs">{open ? "\u25B2" : "\u25BC"}</span>
-      </button>
+      </Button>
 
       {open && (
         <div className="absolute z-50 mt-1 w-full bg-[var(--card)] border border-[var(--border)] rounded-md shadow-lg max-h-64 overflow-hidden">
           <div className="p-2 border-b border-[var(--border)]">
-            <input
-              type="text"
+            <TextInput
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.currentTarget.value)}
               placeholder={t("repoDetail.searchVersions")}
-              className="min-h-11 w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-sm outline-none focus:border-[var(--primary)]"
             />
           </div>
           <div className="overflow-y-auto max-h-48">
@@ -117,11 +117,9 @@ function MultiSelectDropdown({ items, selected, onToggle, onSelectAll, onShowLat
             ) : (
               filtered.map((item) => (
                 <label key={item.id} className="flex min-h-11 cursor-pointer select-none items-center gap-2 px-3 py-2 text-sm hover:bg-[var(--accent)]">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={selected.has(item.id)}
                     onChange={() => onToggle(item.id)}
-                    className="accent-[var(--chart-1)] w-4 h-4"
                   />
                   <span className="text-[var(--foreground)] truncate">{item.label}</span>
                 </label>
@@ -180,15 +178,13 @@ function ReleaseChartControls({ releases, topAssets, hiddenAssets, hiddenRelease
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-3">
         <span className="text-xs text-[var(--muted-foreground)] font-medium">{t("repoDetail.assets")}</span>
-        <button onClick={onSelectAllAssets} className="min-h-11 min-w-11 rounded-md px-2.5 text-xs text-[var(--primary)] hover:bg-[var(--muted)]">{t("repoDetail.selectAll")}</button>
-        <button onClick={onHideAllAssets} className="min-h-11 min-w-11 rounded-md px-2.5 text-xs text-[var(--primary)] hover:bg-[var(--muted)]">{t("repoDetail.hideAll")}</button>
+        <Button onClick={onSelectAllAssets} variant="subtle" size="compact-xs">{t("repoDetail.selectAll")}</Button>
+        <Button onClick={onHideAllAssets} variant="subtle" size="compact-xs">{t("repoDetail.hideAll")}</Button>
         {topAssets.map((name, i) => (
           <label key={name} className="flex min-h-11 cursor-pointer select-none items-center gap-1.5 text-xs">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={!hiddenAssets.has(name)}
               onChange={() => onToggleAsset(name)}
-              className="accent-[var(--chart-1)] w-4 h-4"
             />
             <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
             <span className="text-[var(--muted-foreground)] truncate max-w-[120px]" title={name}>
@@ -463,7 +459,7 @@ export default function RepoDetail() {
     return (
       <div className="text-center py-12">
         <p className="text-[var(--muted-foreground)]">{t("repoDetail.notFound")}</p>
-        <button onClick={() => navigate(`/github/${aid}`)} className="mt-4 text-sm text-[var(--primary)] hover:underline">{t("repoDetail.backToAccount")}</button>
+        <Button onClick={() => navigate(`/github/${aid}`)} variant="subtle" size="sm" mt="md">{t("repoDetail.backToAccount")}</Button>
       </div>
     );
   }
@@ -514,9 +510,9 @@ export default function RepoDetail() {
     <div className="space-y-4 sm:space-y-6">
       <div className="detail-header">
         <div className="detail-header-body">
-        <button onClick={() => navigate(`/github/${aid}`)} className="p-2.5 min-h-11 min-w-11 flex items-center justify-center rounded-lg hover:bg-[var(--muted)] transition-colors shrink-0 mt-0.5" title={t("repoDetail.backToAccount")} aria-label={t("repoDetail.backToAccount")}>
+        <Button onClick={() => navigate(`/github/${aid}`)} variant="subtle" color="gray" size="lg" px="xs" title={t("repoDetail.backToAccount")} aria-label={t("repoDetail.backToAccount")}>
           <ArrowLeft size={20} />
-        </button>
+        </Button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-xl font-semibold leading-tight">{repo.full_name}</h2>
@@ -555,12 +551,11 @@ export default function RepoDetail() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><TrendingUp size={18} /> {t("repoDetail.starHistory")}</CardTitle>
-          <CardDescription>{t("repoDetail.starHistoryDesc")}</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <ChartCard
+        title={t("repoDetail.starHistory")}
+        description={t("repoDetail.starHistoryDesc")}
+        icon={<TrendingUp size={18} />}
+      >
           {snapshots && snapshots.length > 1 ? (
             <div role="img" aria-label={t("repoDetail.starHistory")}>
             <ResponsiveContainer width="100%" height={CHART_H}>
@@ -578,16 +573,14 @@ export default function RepoDetail() {
               {snapshots?.length === 1 ? t("repoDetail.onlyOneDataPoint") : t("repoDetail.noStarHistory")}
             </div>
           )}
-        </CardContent>
-      </Card>
+      </ChartCard>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Download size={18} /> {t("repoDetail.gitClones")}</CardTitle>
-            <CardDescription>{t("repoDetail.gitClonesDesc")}</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <ChartCard
+          title={t("repoDetail.gitClones")}
+          description={t("repoDetail.gitClonesDesc")}
+          icon={<Download size={18} />}
+        >
             {clones && clones.length > 0 ? (
               <div role="img" aria-label={t("repoDetail.gitClones")}>
               <ResponsiveContainer width="100%" height={CHART_H}>
@@ -606,15 +599,13 @@ export default function RepoDetail() {
                 {t("repoDetail.noCloneData")}
               </div>
             )}
-          </CardContent>
-        </Card>
+        </ChartCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Eye size={18} /> {t("repoDetail.visitors")}</CardTitle>
-            <CardDescription>{t("repoDetail.visitorsDesc")}</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <ChartCard
+          title={t("repoDetail.visitors")}
+          description={t("repoDetail.visitorsDesc")}
+          icon={<Eye size={18} />}
+        >
             {views && views.length > 0 ? (
               <div role="img" aria-label={t("repoDetail.visitors")}>
               <ResponsiveContainer width="100%" height={CHART_H}>
@@ -633,17 +624,15 @@ export default function RepoDetail() {
                 {t("repoDetail.noTrafficData")}
               </div>
             )}
-          </CardContent>
-        </Card>
+        </ChartCard>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Globe size={18} /> {t("repoDetail.referringSites")}</CardTitle>
-            <CardDescription>{t("repoDetail.referringSitesDesc")}</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <ChartCard
+          title={t("repoDetail.referringSites")}
+          description={t("repoDetail.referringSitesDesc")}
+          icon={<Globe size={18} />}
+        >
             {referrers && referrers.length > 0 ? (
               <div className="space-y-4">
                 <TrafficMetricList
@@ -689,15 +678,13 @@ export default function RepoDetail() {
             ) : (
               <p className="text-sm text-[var(--muted-foreground)] text-center py-12">{t("repoDetail.noReferrerData")}</p>
             )}
-          </CardContent>
-        </Card>
+        </ChartCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><FileText size={18} /> {t("repoDetail.popularContent")}</CardTitle>
-            <CardDescription>{t("repoDetail.popularContentDesc")}</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <ChartCard
+          title={t("repoDetail.popularContent")}
+          description={t("repoDetail.popularContentDesc")}
+          icon={<FileText size={18} />}
+        >
             {paths && paths.length > 0 ? (
               <div className="space-y-4">
                 <TrafficMetricList
@@ -743,16 +730,14 @@ export default function RepoDetail() {
             ) : (
               <p className="text-sm text-[var(--muted-foreground)] text-center py-12">{t("repoDetail.noPopularContent")}</p>
             )}
-          </CardContent>
-        </Card>
+        </ChartCard>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Download size={18} /> {t("repoDetail.releasesDownloads")}</CardTitle>
-          <CardDescription>{t("repoDetail.releasesDownloadsDesc")}</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <ChartCard
+        title={t("repoDetail.releasesDownloads")}
+        description={t("repoDetail.releasesDownloadsDesc")}
+        icon={<Download size={18} />}
+      >
           {releases && releases.length > 0 ? (
             <>
               <ReleaseChartControls
@@ -804,8 +789,7 @@ export default function RepoDetail() {
               {t("repoDetail.noReleases")}
             </p>
           )}
-        </CardContent>
-      </Card>
+      </ChartCard>
     </div>
   );
 }

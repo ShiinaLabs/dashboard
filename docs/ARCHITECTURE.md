@@ -4,11 +4,11 @@
 
 | Layer | Technology |
 |-------|-----------|
-| **Runtime** | Node.js 20 + pnpm |
+| **Runtime** | Node.js 22 + pnpm |
 | **Framework** | React Router 7 (Framework Mode) |
 | **Backend** | React Router route handlers under `app/api/` (same process as frontend) |
 | **Frontend** | React 19 + TypeScript + Vite |
-| **Styling** | Tailwind CSS v4 + shadcn/ui-style components |
+| **Styling** | Mantine 9.6 theme/components + Tailwind CSS v4 layout utilities |
 | **Charts** | Recharts |
 | **Icons** | lucide-react |
 | **Data Fetching** | @tanstack/react-query |
@@ -26,8 +26,8 @@ dashboard/
 │   ├── root.tsx                # Root layout: html shell, globals.css, Providers
 │   ├── routes.ts               # Declarative route table (pages + API)
 │   ├── auth-middleware.server.ts  # Session/auth middleware + lazy DB bootstrap
-│   ├── providers.tsx           # QueryClientProvider + ThemeProvider + i18n init
-│   ├── globals.css             # Tailwind import + theme CSS variables + animations
+│   ├── providers.tsx           # QueryClientProvider + single MantineProvider + ThemeProvider
+│   ├── globals.css             # Mantine layered styles + Tailwind theme/utilities + animations
 │   ├── (dashboard)/            # Dashboard layout + pages (overview, accounts, x, github, gitlab, reddit, settings, admin)
 │   ├── login/                  # Login page
 │   ├── api/                    # API route handlers, one file per endpoint
@@ -36,13 +36,13 @@ dashboard/
 │   ├── Layout.tsx              # Sidebar + title bar + content shell (responsive)
 │   ├── AccountListPage.tsx     # Reusable account list component
 │   ├── BrandIcons.tsx          # Platform brand icons
-│   ├── StatCard.tsx            # Reusable stat display card
+│   ├── domain/shared/          # MetricCard, MetricGrid and data-display components
 │   ├── Skeleton.tsx            # Skeleton loading primitives
 │   ├── NavigationProgress.tsx  # Top progress bar on route changes
 │   ├── NavigatingOverlay.tsx   # Full-screen loading overlay
 │   ├── ThemeProvider.tsx       # Theme context provider
 │   ├── MockModeBanner.tsx      # MOCK MODE indicator when running on fixtures
-│   └── ui/                     # Card, Badge, ConfirmDialog, Portal, etc.
+│   └── ui/                     # Mantine-backed wrappers and compatibility facades
 ├── db/
 │   ├── schema/                 # Drizzle ORM schema files
 │   │   ├── index.ts            # Re-exports all schemas
@@ -135,3 +135,4 @@ Browser requests flow through `app/auth-middleware.server.ts` (session check + l
 - **Per-platform fetchers** — Each platform has an independent fetcher module (X in `lib/fetcher.ts`, GitHub/GitLab/Reddit in `lib/fetchers/`). The scheduler dispatches per-platform with per-platform cooldowns (X 5 min, others 2 min) and a 60s cycle with jitter.
 - **Multi-user isolation** — `owner_id` on accounts links to `users.id`. Non-admin users only see their own accounts.
 - **Memory-constrained build** — Client and server bundles are built in separate passes (`build:client` with `RR_SKIP_SSR=1`, `build:server` with `RR_SKIP_CLIENT=1`), each with bounded Node heaps, to keep CI memory usage low.
+- **Mantine UI system** — `app/providers.tsx` mounts exactly one `MantineProvider` and one `Notifications` host. `lib/client/mantine-theme.ts` bridges all 12 dashboard themes into Mantine tokens while preserving `data-theme` for legacy CSS during migration. Tailwind preflight is disabled; Tailwind remains a layout utility layer.

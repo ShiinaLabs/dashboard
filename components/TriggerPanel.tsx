@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Play } from "lucide-react";
 import { api } from "@/lib/api";
 import { getPlatformFetchLevels } from "@/lib/application/scheduler/fetchPolicy";
+import { Button, Select } from "@/components/ui";
 
 // Which trigger levels a platform supports. Sourced from the shared
 // fetchPolicy table so the UI can never offer a level the backend cannot run.
@@ -33,23 +34,23 @@ export function TriggerPanel({ accountId, platform = "github" }: { accountId: nu
   return (
     // stopPropagation so a trigger click doesn't bubble into a parent card's navigation
     <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-      <select
+      <Select
         value={level}
-        onChange={(e) => setLevel(e.target.value)}
-        className="h-11 min-h-11 px-2.5 text-xs rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] transition-colors border-0 outline-none cursor-pointer"
+        onChange={(next) => setLevel(next ?? "all")}
+        data={levels.map((l) => ({ value: l, label: t(`fetchLevel.${l}.label`) }))}
+        size="sm"
         aria-label={t("fetchLevel.select")}
-      >
-        {levels.map((l) => (
-          <option key={l} value={l}>{t(`fetchLevel.${l}.label`)}</option>
-        ))}
-      </select>
-      <button
+      />
+      <Button
         onClick={() => trigger.mutate()}
         disabled={trigger.isPending}
-        className="flex items-center gap-1.5 px-3 py-2.5 min-h-11 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] transition-colors text-xs disabled:opacity-40"
+        variant="light"
+        color="gray"
+        size="sm"
+        leftSection={<Play size={12} />}
       >
-        <Play size={12} /> {trigger.isPending ? t(`${ns}.fetching`) : t(`${ns}.fetchNow`)}
-      </button>
+        {trigger.isPending ? t(`${ns}.fetching`) : t(`${ns}.fetchNow`)}
+      </Button>
     </div>
   );
 }

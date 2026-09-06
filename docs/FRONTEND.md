@@ -1,13 +1,14 @@
 # Frontend Architecture
 
-React Router 7 (Framework Mode) + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui-style components.
+React Router 7 (Framework Mode) + React 19 + TypeScript + Mantine 9.6 + Tailwind CSS v4.
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | Framework | React Router 7 (Framework Mode) + React 19 |
-| Styling | Tailwind CSS v4 + shadcn/ui-style primitives |
+| UI components | Mantine 9.6 (`@mantine/core`, `@mantine/notifications`) |
+| Styling | Mantine theme bridge + Tailwind CSS v4 layout utilities |
 | Charts | Recharts |
 | Icons | lucide-react |
 | Data Fetching | @tanstack/react-query |
@@ -40,13 +41,13 @@ components/
 ├── Layout.tsx          # Sidebar + title bar + content shell (responsive)
 ├── AccountListPage.tsx # Reusable account list component
 ├── BrandIcons.tsx      # Platform brand icons
-├── StatCard.tsx        # Reusable stat display card
+├── domain/shared/      # Canonical MetricCard, MetricGrid and data-display components
 ├── Skeleton.tsx        # Skeleton loading primitives
 ├── NavigationProgress.tsx # Top progress bar on route changes
 ├── NavigatingOverlay.tsx  # Full-screen spinner overlay during navigation
 ├── ThemeProvider.tsx   # Theme context provider
 ├── MockModeBanner.tsx  # MOCK MODE indicator when running on fixtures
-└── ui/                 # Card, Badge, ConfirmDialog, Portal, etc.
+└── ui/                 # Mantine-backed project wrappers and compatibility facades
 lib/
 ├── api.ts              # API client functions + TypeScript interfaces
 ├── client/             # i18n, themes, useIsMobile, datetime, utils
@@ -111,10 +112,12 @@ The main layout (`components/Layout.tsx`) provides:
 
 ## Theming
 
-- Theme definitions in `lib/client/themes.ts`
-- CSS variables in `app/globals.css` (`:root` and `[data-theme="…"]`, light + dark variants)
-- `ThemeProvider` context + `useTheme` hook
-- Multiple light and dark themes available (default, sepia, cyber, forest, sky, rose)
+- `app/providers.tsx` owns the single `MantineProvider` and `Notifications` mount.
+- `lib/client/mantine-theme.ts` maps all 12 dashboard themes to typed tokens and ten-shade Mantine palettes.
+- `ThemeProvider` remains the dashboard settings context; `data-theme` and legacy CSS variables remain as a migration bridge.
+- `app/globals.css` imports Mantine's layered styles, Tailwind theme/utilities only, and intentionally omits Tailwind preflight.
+- `components/domain/shared/MetricCard.tsx` and `MetricGrid.tsx` are the canonical metric-card contracts; numeric values are formatted inside the card. `ChartCard.tsx` is the canonical standalone chart container, with explicit title/description and padded plot body slots.
+- Tailwind is retained for page layout and responsive utilities, not as the source of component tokens or interactive controls.
 
 ## Responsive Design
 
@@ -134,5 +137,5 @@ Multi-layered loading strategy for smooth UX on slow networks:
 2. **Auth check** — non-blocking; the layout renders immediately
 3. **Navigating overlay** — semi-transparent backdrop + spinner during route transitions
 4. **Progress bar** — animated gradient bar at top of page on navigation
-5. **Skeleton loading** — `StatCardSkeleton` / `ChartCardSkeleton` replace "Loading…" text
+5. **Skeleton loading** — `MetricCardSkeleton` / `ChartCardSkeleton` replace "Loading…" text
 6. **Fade-in animation** — `page-enter` class on route content for smooth appearance; disabled under `prefers-reduced-motion`

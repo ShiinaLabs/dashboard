@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { SegmentedControl } from "@/components/ui";
 
 const OPTIONS: { value: number; labelKey: string }[] = [
   { value: 7, labelKey: "timeRange.7d" },
@@ -17,27 +18,14 @@ interface Props {
 export function TimeRangeSelector({ value, onChange, options = OPTIONS }: Props) {
   const { t } = useTranslation();
   return (
-    <div
-      role="group"
+    <SegmentedControl
       aria-label={t("timeRange.label")}
-      className="flex w-full items-center gap-0.5 rounded-lg bg-[var(--muted)] p-1 sm:w-auto"
-    >
-      {options.map((o) => {
-        const active = o.value === value;
-        return (
-          <button
-            key={o.value}
-            type="button"
-            onClick={() => onChange(o.value)}
-            aria-pressed={active}
-            className={`min-h-11 min-w-11 flex-1 rounded-md px-1.5 py-1 text-xs font-medium transition-colors sm:flex-none sm:px-2.5 ${active
-              ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
-              : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}
-          >
-            {t(o.labelKey)}
-          </button>
-        );
-      })}
-    </div>
+      value={String(value)}
+      onChange={(next) => onChange(Number(next))}
+      data={options.map((o) => ({ value: String(o.value), label: t(o.labelKey) }))}
+      fullWidth
+      radius="md"
+      size="sm"
+    />
   );
 }

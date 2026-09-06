@@ -12,6 +12,7 @@ import { useNow } from "@/lib/client/use-now";
 import { Pencil, Plus, PlayCircle, PauseCircle, Trash2, AlertCircle, ArrowUpRight } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TriggerPanel } from "@/components/TriggerPanel";
+import { ActionIcon, Button, PasswordInput, TextInput } from "@/components/ui";
 
 const TABS = [
   { key: "twitter", headingKey: "nav.x", basePath: "/x", Icon: XIcon, formatUsername: (a: Account) => `@${a.screen_name}` },
@@ -75,22 +76,21 @@ export default function AccountsPage() {
           <h2 className="text-xl font-semibold">{t("settings.accounts")}</h2>
           <p className="text-sm text-[var(--muted-foreground)]">{t("settings.accountsDesc")}</p>
         </div>
-        <button
+        <Button
           onClick={() => { setEditing(null); setAdding(true); }}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 min-h-11 rounded-lg bg-[var(--primary)] text-white font-medium hover:opacity-90 transition-opacity shrink-0"
+          leftSection={<Plus size={16} />}
         >
-          <Plus size={16} /> {t("settings.addAccount")}
-        </button>
+          {t("settings.addAccount")}
+        </Button>
       </div>
 
       {/* platform tabs */}
       <div className="mobile-tab-strip -mx-4 flex snap-x gap-1 overflow-x-auto border-b border-[var(--border)] px-4">
         {TABS.map(({ key, headingKey, Icon }) => (
-          <button key={key} onClick={() => { setTab(key); setAdding(false); setEditing(null); }}
-            className={`-mb-px flex min-h-11 shrink-0 snap-start items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${tab === key ? "border-[var(--primary)] text-[var(--primary)]" : "border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}
-          >
-            <Icon size={14} /> {t(headingKey)}
-          </button>
+          <Button key={key} onClick={() => { setTab(key); setAdding(false); setEditing(null); }}
+            variant={tab === key ? "light" : "subtle"} color={tab === key ? "primary" : "gray"} size="sm"
+            leftSection={<Icon size={14} />} className="shrink-0"
+          >{t(headingKey)}</Button>
         ))}
       </div>
 
@@ -124,10 +124,10 @@ export default function AccountsPage() {
                   className={`group ${!account.is_active ? "opacity-60 " : ""}cursor-pointer hover:border-[var(--primary)]/50 transition-colors`}
                   onClick={() => navigate(`${currentTab.basePath}/${account.id}`)}
                 >
-                  <CardContent className="p-4 pt-4 sm:p-5 sm:pt-5">
+                  <CardContent className="account-card-content">
                     <div className="mobile-account-card justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-1 flex min-w-0 flex-wrap items-center gap-2">
+                      <div className="account-card-main">
+                        <div className="account-card-header">
                           <span className="min-w-0 break-all text-base font-semibold">{currentTab.formatUsername(account)}</span>
                           <ArrowUpRight size={14} className="text-[var(--muted-foreground)] hover-reveal-icon" />
                           {!account.is_active && <Badge>{t("badge.inactive")}</Badge>}
@@ -138,35 +138,35 @@ export default function AccountsPage() {
                             <Badge className="bg-[var(--warn)]/10 text-[var(--warn)]">{t("badge.stale")}</Badge>
                           )}
                         </div>
-                        <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-[var(--muted-foreground)]">
+                        <div className="account-card-meta text-sm text-[var(--muted-foreground)]">
                           <span>{t("settings.autoSchedule")}</span>
                           {lastFetched && <span>{t("settings.lastFetched", { date: formatDateTime(lastFetched) })}</span>}
                         </div>
                         {account.error_message && (
-                          <div className="flex items-center gap-1.5 mt-2 text-xs text-[var(--danger)]">
+                          <div className="account-card-error text-xs text-[var(--danger)]">
                             <AlertCircle size={12} /> {account.error_message}
                           </div>
                         )}
                       </div>
-                      <div className="mobile-account-actions shrink-0 items-center gap-2">
-                        <button
+                      <div className="account-card-actions shrink-0">
+                        <ActionIcon
                           onClick={(e) => { e.stopPropagation(); setEditing(account); setAdding(false); }}
-                          className="p-2.5 min-h-11 min-w-11 flex items-center justify-center rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] transition-colors"
+                          variant="light" color="gray"
                           title={t("settings.edit")}
-                        ><Pencil size={16} /></button>
+                        ><Pencil size={16} /></ActionIcon>
                         <TriggerPanel accountId={account.id} platform={account.platform} />
-                        <button
+                        <ActionIcon
                           onClick={(e) => { e.stopPropagation(); toggleActiveMutation.mutate({ id: account.id, isActive: !account.is_active }); }}
                           disabled={toggleActiveMutation.isPending}
-                          className="p-2.5 min-h-11 min-w-11 flex items-center justify-center rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] transition-colors"
+                          variant="light" color="gray"
                           title={account.is_active ? t("settings.disable") : t("settings.enable")}
-                        >{account.is_active ? <PauseCircle size={16} /> : <PlayCircle size={16} />}</button>
-                        <button
+                        >{account.is_active ? <PauseCircle size={16} /> : <PlayCircle size={16} />}</ActionIcon>
+                        <ActionIcon
                           onClick={(e) => { e.stopPropagation(); setDeleteTarget(account); }}
                           disabled={deleteMutation.isPending}
-                          className="p-2.5 min-h-11 min-w-11 flex items-center justify-center rounded-lg bg-[var(--muted)] hover:bg-[var(--danger)]/10 text-[var(--danger)] transition-colors"
+                          variant="light" color="danger"
                           title={t("settings.delete")}
-                        ><Trash2 size={16} /></button>
+                        ><Trash2 size={16} /></ActionIcon>
                       </div>
                     </div>
                   </CardContent>
@@ -178,12 +178,12 @@ export default function AccountsPage() {
           <Card>
             <CardContent className="p-8 pt-8 text-center">
               <p className="text-sm text-[var(--muted-foreground)] mb-4">{t("settings.noAccountsDesc")}</p>
-              <button
+              <Button
                 onClick={() => setAdding(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--primary)] text-white text-sm font-medium hover:opacity-90 transition-opacity"
+                leftSection={<Plus size={14} />}
               >
-                <Plus size={14} /> {t("settings.addFirstAccount")}
-              </button>
+                {t("settings.addFirstAccount")}
+              </Button>
             </CardContent>
           </Card>
         )}
@@ -292,9 +292,9 @@ function AccountFormPanel({
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">{editing ? t("editAccountForm.title") : t("addAccountForm.title")}</h3>
-        <button onClick={onClose} className="min-h-11 rounded-md px-2 text-sm text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]">
+        <Button onClick={onClose} variant="subtle" color="gray" size="sm">
           {t("addAccountForm.cancel")}
-        </button>
+        </Button>
       </div>
       {error && <div className="p-3 rounded-lg bg-[var(--danger)]/5 text-[var(--danger)] text-sm">{error}</div>}
 
@@ -302,11 +302,10 @@ function AccountFormPanel({
       {!editing && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {TABS.map(({ key, Icon }) => (
-            <button key={key} type="button" onClick={() => setPlatform(key)}
-              className={`flex min-h-11 items-center justify-center gap-1.5 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${platform === key ? "border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]" : "border-[var(--border)] hover:bg-[var(--muted)]"}`}
-            >
-              <Icon size={16} /> {t(`nav.${key === "twitter" ? "x" : key}`)}
-            </button>
+            <Button key={key} type="button" onClick={() => setPlatform(key)}
+              variant={platform === key ? "light" : "default"} color={platform === key ? "primary" : "gray"}
+              leftSection={<Icon size={16} />} size="sm"
+            >{t(`nav.${key === "twitter" ? "x" : key}`)}</Button>
           ))}
         </div>
       )}
@@ -317,9 +316,9 @@ function AccountFormPanel({
         {/* username */}
         <fieldset>
           <legend className="text-sm font-medium mb-1.5">{t("addAccountForm.username")}</legend>
-          <input type="text" value={screenName} onChange={(e) => setScreenName(e.target.value)}
+          <TextInput value={screenName} onChange={(e) => setScreenName(e.currentTarget.value)}
             placeholder={platform === "github" ? "octocat" : platform === "gitlab" ? "your-username" : platform === "reddit" ? "spez" : "elonmusk"}
-            className="min-h-11 w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]" />
+            />
           <p className="text-[12px] text-[var(--muted-foreground)] mt-1">
             {platform === "github" ? t("addAccountForm.helpGithubUsername")
               : platform === "gitlab" ? t("addAccountForm.helpGitlabUsername")
@@ -333,12 +332,8 @@ function AccountFormPanel({
           <fieldset>
             <legend className="text-sm font-medium mb-1.5">{t("addAccountForm.redditAuthType")}</legend>
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => setAuthType(null)}
-                className={`min-h-11 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${authType !== "reddit_public" ? "border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]" : "border-[var(--border)] hover:bg-[var(--muted)]"}`}
-              >{t("addAccountForm.redditOAuth")}</button>
-              <button type="button" onClick={() => setAuthType("reddit_public")}
-                className={`min-h-11 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${authType === "reddit_public" ? "border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]" : "border-[var(--border)] hover:bg-[var(--muted)]"}`}
-              >{t("addAccountForm.redditPublic")}</button>
+              <Button type="button" onClick={() => setAuthType(null)} variant={authType !== "reddit_public" ? "light" : "default"} color={authType !== "reddit_public" ? "primary" : "gray"}>{t("addAccountForm.redditOAuth")}</Button>
+              <Button type="button" onClick={() => setAuthType("reddit_public")} variant={authType === "reddit_public" ? "light" : "default"} color={authType === "reddit_public" ? "primary" : "gray"}>{t("addAccountForm.redditPublic")}</Button>
             </div>
             <p className="text-[12px] text-[var(--muted-foreground)] mt-1">
               {isRedditPublic ? t("addAccountForm.helpRedditPublicMode") : t("addAccountForm.helpRedditOAuthMode")}
@@ -360,12 +355,12 @@ function AccountFormPanel({
             <CookieTable entries={cookieEntries} onChange={syncCookieToken} t={t} />
           ) : (
             <div>
-              <input
+              <PasswordInput
                 type="password"
                 value={authToken}
-                onChange={(e) => setAuthToken(e.target.value)}
+                onChange={(e) => setAuthToken(e.currentTarget.value)}
                 placeholder={platform === "github" ? "ghp_..." : platform === "gitlab" ? "glpat-..." : platform === "reddit" ? "your Reddit password" : "Your X auth_token cookie"}
-                className="min-h-11 w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-[var(--ring)]" />
+                />
               <p className="text-[12px] text-[var(--muted-foreground)] mt-1">
                 {editing ? t("editAccountForm.tokenHint") : (
                   platform === "github" ? t("addAccountForm.helpGithubToken")
@@ -382,9 +377,9 @@ function AccountFormPanel({
         {platform === "gitlab" && (
           <fieldset>
             <legend className="text-sm font-medium mb-1.5">{t("addAccountForm.instanceUrl")}</legend>
-            <input type="text" value={instanceUrl} onChange={(e) => setInstanceUrl(e.target.value)}
+            <TextInput value={instanceUrl} onChange={(e) => setInstanceUrl(e.currentTarget.value)}
               placeholder="https://gitlab.com"
-              className="min-h-11 w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]" />
+              />
             <p className="text-[12px] text-[var(--muted-foreground)] mt-1">{t("addAccountForm.helpInstanceUrl")}</p>
           </fieldset>
         )}
@@ -424,10 +419,9 @@ function AccountFormPanel({
         </fieldset>
       </div>
 
-      <button onClick={() => mutation.mutate()} disabled={!canSubmit}
-        className="min-h-11 w-full rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40">
+      <Button onClick={() => mutation.mutate()} disabled={!canSubmit} fullWidth loading={mutation.isPending}>
         {mutation.isPending ? (editing ? t("editAccountForm.saving") : t("addAccountForm.adding")) : (editing ? t("editAccountForm.save") : t("addAccountForm.addAccount"))}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -464,30 +458,28 @@ function CookieTable({
             {entries.map((row, i) => (
               <tr key={i} className="border-b border-[var(--border)]/50">
                 <td className="py-1 pr-2">
-                  <input type="text" value={row.key} onChange={(e) => updateRow(i, "key", e.target.value)}
+                  <TextInput value={row.key} onChange={(e) => updateRow(i, "key", e.currentTarget.value)}
                     placeholder="cookie name"
-                    className="min-h-11 w-full rounded border border-[var(--border)] bg-transparent px-2 py-1.5 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-[var(--ring)]" />
+                    />
                 </td>
                 <td className="py-1 pr-2">
-                  <input type="password" value={row.value} onChange={(e) => updateRow(i, "value", e.target.value)}
+                  <PasswordInput value={row.value} onChange={(e) => updateRow(i, "value", e.currentTarget.value)}
                     placeholder="..."
-                    className="min-h-11 w-full rounded border border-[var(--border)] bg-transparent px-2 py-1.5 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-[var(--ring)]" />
+                    />
                 </td>
                 <td className="py-1">
-                  <button onClick={() => removeRow(i)} className="flex min-h-11 min-w-11 items-center justify-center rounded text-xs text-[var(--danger)]/60 transition-colors hover:bg-[var(--danger)]/10 hover:text-[var(--danger)]">
+                  <ActionIcon onClick={() => removeRow(i)} variant="subtle" color="danger" aria-label="Remove cookie">
                     &times;
-                  </button>
+                  </ActionIcon>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <button onClick={addRow}
-        className="flex min-h-11 w-full items-center justify-center gap-1 rounded-lg border border-dashed border-[var(--border)] px-3 py-1.5 text-xs text-[var(--muted-foreground)] transition-colors hover:border-[var(--primary)]/50 hover:text-[var(--foreground)]"
-      >
+      <Button onClick={addRow} variant="default" color="gray" fullWidth>
         + {t("addAccountForm.addCookieRow")}
-      </button>
+      </Button>
     </div>
   );
 }

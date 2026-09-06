@@ -6,6 +6,7 @@ import { Users, Plus, Trash2 } from "lucide-react";
 import { validatePassword } from "@/lib/client/validatePassword";
 import { PasswordHints } from "@/components/ui/PasswordHints";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Alert, Button, PasswordInput, Select, TextInput } from "@/components/ui";
 
 export default function Admin() {
   const { t } = useTranslation();
@@ -76,36 +77,29 @@ export default function Admin() {
         <h3 className="text-sm font-semibold flex items-center gap-1.5">
           <Plus size={14} /> {t("admin.createUser")}
         </h3>
-        <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--card)]">
+        <div className="admin-create-card rounded-xl border border-[var(--border)] bg-[var(--card)]">
           <form onSubmit={handleCreateUser} className="flex flex-col gap-3">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <input
-                name="username" placeholder={t("admin.username")} required
-                className="min-h-11 w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
-              />
-              <input
-                name="password" type="password" placeholder={t("admin.password")} required
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <TextInput name="username" label={t("admin.username")} required />
+              <PasswordInput
+                name="password" type="password" label={t("admin.password")} required
                 value={password} onChange={(e) => { setPassword(e.target.value); setCreateError(""); }}
-                className="min-h-11 w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
               />
-              <select name="role" className="min-h-11 w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm">
-                <option value="user">{t("admin.roleUser")}</option>
-              </select>
+              <Select name="role" label={t("admin.role")} data={[{ value: "user", label: t("admin.roleUser") }]} defaultValue="user" />
             </div>
             {password && <PasswordHints rules={pwRules} t={t} namespace="admin" />}
-            <input
-              name="confirmPassword" type="password" placeholder={t("admin.confirmPassword")} required
+            <PasswordInput
+              name="confirmPassword" type="password" label={t("admin.confirmPassword")} required
               value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setCreateError(""); }}
-              className="min-h-11 w-full rounded-lg border border-[var(--border)] bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
             />
             {pwMismatch && <p className="text-xs text-[var(--danger)]">{t("admin.errorPasswordsDontMatch")}</p>}
-            {createError && <p className="text-xs text-[var(--danger)]">{createError}</p>}
-            <button
+            {createError && <Alert color="danger" variant="light">{createError}</Alert>}
+            <Button
               type="submit"
-              className="min-h-11 w-full sm:w-auto sm:self-start rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+              className="sm:self-start"
             >
               {t("admin.createUser")}
-            </button>
+            </Button>
           </form>
         </div>
       </section>
@@ -126,12 +120,15 @@ export default function Admin() {
                     <span className="text-[11px] text-[var(--muted-foreground)] ml-1.5">({u.role})</span>
                   </span>
                   {u.id !== 1 && (
-                    <button
+                    <Button
                       onClick={() => setDeleteUserId(u.id)}
-                      className="flex min-h-11 items-center gap-1 rounded-md px-2 text-xs text-[var(--danger)] hover:bg-[var(--danger)]/10"
+                      variant="subtle"
+                      color="danger"
+                      size="compact-xs"
+                      leftSection={<Trash2 size={12} />}
                     >
-                      <Trash2 size={12} /> {t("common.delete")}
-                    </button>
+                      {t("common.delete")}
+                    </Button>
                   )}
                 </div>
               ))}

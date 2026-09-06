@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Bot, X, MapPin } from "lucide-react";
 import { useAiChat } from "@/app/(dashboard)/overview/useAiChat";
 import { AiChatUI } from "./AiChatUI";
+import { ActionIcon } from "@/components/ui";
 
 const PAGE_LABELS: Record<string, string> = {
   "/": "Overview",
@@ -51,15 +52,19 @@ export function FloatingAiChat({ pathname = "/" }: { pathname?: string }) {
   return (
     <>
       {/* Floating button — respects safe-area-inset-bottom */}
-      <button
+      <ActionIcon
         onClick={toggle}
         aria-expanded={isOpen}
         aria-label={t("overview.aiAgent.heading")}
-        className="fixed z-50 w-14 h-14 rounded-full bg-[var(--primary)] text-[var(--primary-foreground)] shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 flex items-center justify-center"
+        variant="filled"
+        color="primary"
+        radius="xl"
+        size="xl"
+        className="fixed z-50 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
         style={{ bottom: "max(1.5rem, env(safe-area-inset-bottom, 1.5rem))", right: "max(1.5rem, env(safe-area-inset-right, 1.5rem))" }}
       >
         {isOpen ? <X size={22} /> : <Bot size={22} />}
-      </button>
+      </ActionIcon>
 
       {/* Chat panel */}
       {isOpen && (
@@ -80,12 +85,16 @@ export function FloatingAiChat({ pathname = "/" }: { pathname?: string }) {
                 <MapPin size={10} />
                 {getPageLabel(pathname)}
               </span>
-              <button
+              <ActionIcon
                 onClick={() => setIsOpen(false)}
-                className="p-1.5 rounded-lg hover:bg-[var(--muted)] text-[var(--muted-foreground)] transition-colors"
+                variant="subtle"
+                color="gray"
+                size="md"
+                ml="auto"
+                aria-label={t("common.close") || "Close"}
               >
                 <X size={16} />
-              </button>
+              </ActionIcon>
             </div>
 
             {/* Chat content */}
