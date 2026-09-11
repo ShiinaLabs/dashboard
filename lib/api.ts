@@ -42,7 +42,7 @@ import type {
   Account, AccountWithStats, AccountsResponse, OverviewStats,
   Tweet, PaginatedTweets, TimelineData, CalendarDay,
   GithubContribution, GithubOverview, GithubRepo, GithubRelease, GithubReleaseAsset,
-  GithubReleaseDownloadTimeline,
+  GithubReleaseDownloadTimeline, GithubWatchlistResponse, GithubWatchlistCandidate, GithubWatchlistSource, GithubAvailableOrgsResponse,
   GitlabContribution, GitlabOverview, GitlabProject, GitlabRelease,
   RedditOverview, RedditPost, RedditComment, PaginatedRedditPosts, PaginatedRedditComments,
   PulseResponse,
@@ -55,7 +55,7 @@ export type {
   Account, AccountWithStats, AccountsResponse, OverviewStats,
   Tweet, PaginatedTweets, TimelineData, CalendarDay,
   GithubContribution, GithubOverview, GithubRepo, GithubRelease, GithubReleaseAsset,
-  GithubReleaseDownloadTimeline,
+  GithubReleaseDownloadTimeline, GithubWatchlistResponse, GithubWatchlistCandidate, GithubWatchlistSource, GithubAvailableOrgsResponse,
   GitlabContribution, GitlabOverview, GitlabProject, GitlabRelease,
   RedditOverview, RedditPost, RedditComment, PaginatedRedditPosts, PaginatedRedditComments,
   PulseResponse,
@@ -126,6 +126,12 @@ export const api = {
     fetchJSON<GithubReleaseAsset[]>(`/github/${accountId}/repos/${repoId}/releases/${releaseId}/assets`),
   getGithubReleaseDownloadTimeline: (accountId: number, repoId: number, days = 30) =>
     fetchJSON<GithubReleaseDownloadTimeline[]>(`/github/${accountId}/repos/${repoId}/releases/growth?days=${days}`),
+  getGithubWatchlist: (accountId: number) =>
+    fetchJSON<GithubWatchlistResponse>(`/github/watchlist/${accountId}`),
+  saveGithubWatchlist: (accountId: number, input: { orgs: string[]; watched: number[] }) =>
+    fetchJSON<GithubWatchlistResponse>(`/github/watchlist/${accountId}`, { method: "PUT", body: JSON.stringify(input) }),
+  getGithubAvailableOrgs: (accountId: number) =>
+    fetchJSON<GithubAvailableOrgsResponse>(`/github/sources/${accountId}/available`),
   setPinnedRepos: (accountId: number, repoIds: number[]) =>
     fetchJSON<{ ok: boolean }>(`/github/repos/pin`, { method: "PUT", body: JSON.stringify({ accountId, repoIds }) }),
 

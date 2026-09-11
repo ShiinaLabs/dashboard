@@ -1,15 +1,16 @@
-export type GithubSourceKind = "user" | "organization";
-
 /**
- * A PAT-accessible GitHub namespace used for discovery.  This is deliberately
- * separate from repository identity: a source may discover a repository, but
- * it does not own the repository or define its stable identity.
+ * A GitHub organization used for discovery. This is deliberately separate from
+ * repository identity: an organization is only somewhere to look for
+ * candidates, and it never implies that anything found there is monitored.
+ *
+ * The account's own repositories are always candidates and are not a source —
+ * there is nothing to configure about them.
  */
 export interface GithubSource {
-  kind: GithubSourceKind;
   login: string;
 }
 
+/** A repository the user explicitly chose to monitor. */
 export interface GithubTrackedRepository {
   repositoryId: number;
   githubId: number;

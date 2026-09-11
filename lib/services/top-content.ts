@@ -1,6 +1,7 @@
 // @ts-nocheck — cross-platform aggregate queries use dynamic PostgreSQL results
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { getDb } from "../db/connection";
+import { githubWatchedReposFilter } from "../repositories/github-watchlist";
 import { isMockMode } from "../config";
 import * as mock from "../mock";
 import {
@@ -196,7 +197,7 @@ async function readRepoGrowth(
       stars: github_repos.stars,
       forks: github_repos.forks,
       isFork: github_repos.is_fork,
-    }).from(github_repos).where(inArray(github_repos.account_id, accountIds));
+    }).from(github_repos).where(await githubWatchedReposFilter(accountIds));
     repoRows = rows;
   } else {
     const rows = await db.select({

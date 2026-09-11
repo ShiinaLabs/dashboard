@@ -1,6 +1,7 @@
 // @ts-nocheck — cross-platform aggregate queries use dynamic PostgreSQL results
 import { and, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
 import { getDb } from "../db/connection";
+import { githubWatchedReposFilter } from "../repositories/github-watchlist";
 import { isMockMode } from "../config";
 import * as mock from "../mock";
 import {
@@ -255,13 +256,16 @@ async function readRepositories(accounts: PulseAccount[], accountIds: number[], 
   if (accountIds.length === 0) return [];
   const db = getDb();
   const accountById = new Map(accounts.map((account) => [account.id, account]));
+  // Only repositories the user still monitors: an unselected one must not
+  // resurface here just because its historical rows are intact.
+  const watchedGithubRepos = await githubWatchedReposFilter(accountIds);
   const [githubRepoRows, gitlabProjectRows, githubBaselines, gitlabBaselines] = await Promise.all([
     db.select({
       account_id: github_repos.account_id, external_id: github_repos.repo_id,
       name: github_repos.name, fullName: github_repos.full_name,
       description: github_repos.description, stars: github_repos.stars,
       forks: github_repos.forks, isFork: github_repos.is_fork,
-    }).from(github_repos).where(inArray(github_repos.account_id, accountIds)),
+    }).from(github_repos).where(watchedGithubRepos),
     db.select({
       account_id: gitlab_projects.account_id, external_id: gitlab_projects.project_id,
       name: gitlab_projects.name, fullName: gitlab_projects.path_with_namespace,

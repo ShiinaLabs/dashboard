@@ -149,6 +149,45 @@ export interface GithubRepo {
   created_at: string;
 }
 
+/** A configured organization used to find candidate repositories. */
+export interface GithubWatchlistSource {
+  login: string;
+  enabled: boolean;
+  lastError: string | null;
+}
+
+/** A repository the user can choose to monitor. */
+export interface GithubWatchlistCandidate {
+  /** Stable GitHub repository id. */
+  githubId: number | null;
+  /** `github_repos.id` once a local row exists, else null. */
+  githubReposId: number | null;
+  fullName: string;
+  ownerLogin: string | null;
+  ownerType: string | null;
+  isPrivate: boolean;
+  /** "own", an organization login, or null when no source lists it any more. */
+  listedFrom: string | null;
+  watched: boolean;
+  lastError: string | null;
+}
+
+export interface GithubWatchlistResponse {
+  accountId: number;
+  sources: GithubWatchlistSource[];
+  candidates: GithubWatchlistCandidate[];
+  /** Organizations that could not be listed, with the reason. */
+  warnings: string[];
+  /** Repositories that could not be added, present on save only. */
+  errors?: string[];
+}
+
+export interface GithubAvailableOrgsResponse {
+  orgs: Array<{ login: string; githubId: number | null; nodeId: string | null }>;
+  /** Set when the PAT cannot enumerate organizations (scope or token type). */
+  unavailable: string | null;
+}
+
 export interface GithubRelease {
   id: number;
   account_id: number;

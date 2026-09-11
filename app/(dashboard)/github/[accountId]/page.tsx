@@ -14,12 +14,13 @@ import { ChartCard } from "@/components/domain/shared/ChartCard";
 import { TriggerPanel } from "@/components/TriggerPanel";
 import { Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import {
-  ArrowLeft, ArrowUpRight, Trash2, AlertCircle, Star, GitFork, Code, Users, BookOpen, Settings2
+  ArrowLeft, ArrowUpRight, Trash2, AlertCircle, Star, GitFork, Code, Users, BookOpen, Settings2, ListChecks
 } from "lucide-react";
 import { useIsMobile } from "@/lib/client/useIsMobile";
 import { GithubIcon } from "@/components/BrandIcons";
 import { ChartCardSkeleton, Skeleton } from "@/components/Skeleton";
 import { FetchRunHistory } from "@/components/FetchRunHistory";
+import { GithubWatchlistModal } from "@/components/domain/github/GithubWatchlistModal";
 import { AccountActiveButton } from "@/components/AccountActiveButton";
 import { Button, Checkbox, Modal } from "@/components/ui";
 
@@ -95,6 +96,7 @@ export default function GitHubDetail() {
   const accountId = Number(id);
   const [showPinDialog, setShowPinDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showWatchlistDialog, setShowWatchlistDialog] = useState(false);
   const [pinnedIds, setPinnedIds] = useState<Set<number>>(new Set());
 
   const openPinDialog = () => {
@@ -226,12 +228,20 @@ export default function GitHubDetail() {
               <Stack gap={4}>
                 <Group justify="space-between" gap="sm">
                   <Group gap="xs"><BookOpen size={18} /><Text component="h3" fz="lg" fw={600}>{t("githubDetail.reposHeading")}</Text></Group>
+                <Group gap="xs">
                 <Button
                   onClick={openPinDialog}
                   variant="light" color="gray" size="sm" leftSection={<Settings2 size={14} />}
                 >
                   {t("githubDetail.managePins")}
                 </Button>
+                <Button
+                  onClick={() => setShowWatchlistDialog(true)}
+                  variant="light" color="gray" size="sm" leftSection={<ListChecks size={14} />}
+                >
+                  {t("githubWatchlist.manage")}
+                </Button>
+                </Group>
                 </Group>
               <Text size="sm" c="dimmed">
                 {overview.allRepos && overview.allRepos.some(r => r.pinned)
@@ -283,6 +293,12 @@ export default function GitHubDetail() {
               <Button onClick={handlePinSave} mt="md">{t("common.save")}</Button>
             </Stack>
           </Modal>
+
+          <GithubWatchlistModal
+            accountId={accountId!}
+            opened={showWatchlistDialog}
+            onClose={() => setShowWatchlistDialog(false)}
+          />
 
           <ChartCard
             title={t("githubDetail.readmeStats")}

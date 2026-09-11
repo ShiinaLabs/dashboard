@@ -5,6 +5,7 @@ import { z } from "zod";
 import { eq, desc } from "drizzle-orm";
 import { aiConfig, isMockMode } from "../config";
 import { getDb } from "../db/connection";
+import { githubWatchedReposFilter } from "../repositories/github-watchlist";
 import { github_repos, gitlab_stats, gitlab_projects } from "@/db/schema";
 import { checkQuota, recordUsage, getTodayUsage } from "./ai-quota";
 import { getSetting } from "../repositories/settings";
@@ -141,7 +142,7 @@ function createTools(userId: number) {
         const account = await validateAccountOwnership(userId, args.accountId);
         if (!account || account.platform !== "github") return { error: "Account not found or access denied" };
         const repos = await getDb().select().from(github_repos)
-          .where(eq(github_repos.account_id, args.accountId))
+          .where(await githubWatchedReposFilter([args.accountId]))
           .orderBy(desc(github_repos.stars))
           .limit(args.limit || 10);
         return repos.map((r: any) => ({

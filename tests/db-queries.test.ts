@@ -1,6 +1,20 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { resetTestDb, getTestPool, closeTestPool } from "./setup";
-import { closeDb, initPgPool } from "../lib/db/connection";
+import { closeDb, getDb, initPgPool } from "../lib/db/connection";
+import { github_repos } from "@/db/schema";
+import { hasGithubTrackingRelation, getGithubOverview } from "../lib/repositories/github";
+import {
+  listGithubWatchlist,
+  listGithubWatchedRepoIds,
+  setGithubWatchlist,
+  githubWatchedReposFilter,
+} from "../lib/repositories/github-watchlist";
+import {
+  listGithubSourceRows,
+  setGithubSources,
+  upsertGithubSource,
+  markGithubTrackingError,
+} from "../lib/repositories/github-sources";
 import * as usersQ from "../lib/repositories/users";
 import * as accountsQ from "../lib/repositories/accounts";
 import * as twitterQ from "../lib/repositories/twitter";
@@ -524,10 +538,31 @@ describe("top content service queries", () => {
       `INSERT INTO github_repo_snapshots (account_id, repo_id, stars, forks, snapshot_date) VALUES ($1, 100, 50, 5, $2)`,
       [ghAcctId, dayStr(10)],
     );
-    await pool.query(
+    const rising = await pool.query(
       `INSERT INTO github_repos (account_id, repo_id, name, full_name, stars, forks, is_fork)
-       VALUES ($1, 100, 'rising', 'tc_gh/rising', 80, 8, 0)`,
+       VALUES ($1, 100, 'rising', 'tc_gh/rising', 80, 8, 0) RETURNING id`,
       [ghAcctId],
+    );
+    // Surfacing in top content (and every other surface reading github_repos)
+    // requires the repository to be watched.
+    await pool.query(
+      `INSERT INTO github_repository_tracking (account_id, repository_id, enabled) VALUES ($1, $2, 1)`,
+      [ghAcctId, rising.rows[0].id],
+    );
+    // A repository the user has unselected, with identical growth, must not
+    // appear even though its rows and history are still present.
+    await pool.query(
+      `INSERT INTO github_repo_snapshots (account_id, repo_id, stars, forks, snapshot_date) VALUES ($1, 101, 50, 5, $2)`,
+      [ghAcctId, dayStr(10)],
+    );
+    const hidden = await pool.query(
+      `INSERT INTO github_repos (account_id, repo_id, name, full_name, stars, forks, is_fork)
+       VALUES ($1, 101, 'hidden', 'tc_gh/hidden', 80, 8, 0) RETURNING id`,
+      [ghAcctId],
+    );
+    await pool.query(
+      `INSERT INTO github_repository_tracking (account_id, repository_id, enabled) VALUES ($1, $2, 0)`,
+      [ghAcctId, hidden.rows[0].id],
     );
     // GitHub release published inside the window.
     await pool.query(
@@ -583,5 +618,177 @@ describe("top content service queries", () => {
     const ghRelease = result.items.find((item) => item.kind === "release" && item.platform === "github");
     expect(ghRelease).toBeDefined();
     expect(ghRelease!.metricValue).toBe(250);
+
+    // The unwatched repository is absent from every surface.
+    expect(result.items.some((item) => item.fullName === "tc_gh/hidden")).toBe(false);
+  });
+});
+
+// ─── GitHub watchlist: selection-based monitoring ──────────────────────────
+//
+// These live in this file rather than their own because `resetTestDb()` drops
+// and recreates every table: two files doing that in parallel collide in the
+// system catalog. One file owns the DB reset.
+
+/** Insert a repository plus its tracking relation; returns `github_repos.id`. */
+async function addGithubRepoFor(accountId: number, repoId: number, fullName: string, enabled = true): Promise<number> {
+  const pool = getTestPool();
+  const { rows } = await pool.query(
+    `INSERT INTO github_repos (account_id, repo_id, github_id, name, full_name, owner_login, owner_type)
+     VALUES ($1, $2::int, $2::bigint, $3, $4, $5, 'User') RETURNING id`,
+    [accountId, repoId, fullName.split("/")[1], fullName, fullName.split("/")[0]],
+  );
+  const githubReposId = rows[0].id as number;
+  await pool.query(
+    "INSERT INTO github_repository_tracking (account_id, repository_id, enabled) VALUES ($1, $2, $3)",
+    [accountId, githubReposId, enabled ? 1 : 0],
+  );
+  return githubReposId;
+}
+
+async function createWatchAccount(suffix: string): Promise<number> {
+  const user = await usersQ.insertUser({ username: `watch_${suffix}_${Date.now()}`, password_hash: "pass", role: "user" });
+  const { rows } = await getTestPool().query(
+    "INSERT INTO accounts (owner_id, screen_name, platform, auth_token) VALUES ($1, $2, 'github', 'tok') RETURNING id",
+    [user.id, `watch_${suffix}`],
+  );
+  return rows[0].id as number;
+}
+
+describe("github watchlist", () => {
+  let watchAccountId: number;
+
+  beforeAll(async () => {
+    watchAccountId = await createWatchAccount("main");
+  });
+
+  it("never deletes a tracking row or its history when unselecting", async () => {
+    const keep = await addGithubRepoFor(watchAccountId, 900001, "alice/keep");
+    const drop = await addGithubRepoFor(watchAccountId, 900002, "alice/drop");
+    await getTestPool().query(
+      "INSERT INTO github_repo_snapshots (account_id, repo_id, repository_id, stars, snapshot_date) VALUES ($1, 900002, $2, 5, '2026-09-01')",
+      [watchAccountId, drop],
+    );
+
+    await setGithubWatchlist(watchAccountId, [keep]);
+    const after = await listGithubWatchlist(watchAccountId);
+    expect(after.find((r) => r.githubReposId === keep)?.enabled).toBe(true);
+    expect(after.find((r) => r.githubReposId === drop)?.enabled).toBe(false);
+    // The row and its history are still there — only the flag moved.
+    expect(after).toHaveLength(2);
+    const snapshots = await getTestPool().query(
+      "SELECT count(*)::int AS n FROM github_repo_snapshots WHERE account_id = $1 AND repo_id = 900002",
+      [watchAccountId],
+    );
+    expect(snapshots.rows[0].n).toBe(1);
+
+    // Re-selecting resumes exactly where it left off.
+    await setGithubWatchlist(watchAccountId, [keep, drop]);
+    const reselected = await listGithubWatchlist(watchAccountId);
+    expect(reselected.every((r) => r.enabled)).toBe(true);
+  });
+
+  it("reports which repositories are monitored, and why a failing one is failing", async () => {
+    const failing = (await listGithubWatchlist(watchAccountId)).find((r) => r.githubId === 900002)!;
+    await markGithubTrackingError(watchAccountId, failing.githubReposId, "GitHub repository 404");
+    expect(await listGithubWatchedRepoIds([watchAccountId])).toHaveLength(2);
+    const row = (await listGithubWatchlist(watchAccountId)).find((r) => r.githubId === 900002);
+    expect(row?.lastError).toContain("404");
+  });
+
+  it("tells 'nothing selected' apart from 'nothing tracked yet'", async () => {
+    const fresh = await createWatchAccount("fresh");
+    expect(await hasGithubTrackingRelation(fresh)).toBe(false);
+
+    // No tracking rows at all: the legacy overview fallback still applies.
+    await getTestPool().query(
+      "INSERT INTO github_repos (account_id, repo_id, github_id, name, full_name) VALUES ($1, 800001, 800001, 'legacy', 'alice/legacy')",
+      [fresh],
+    );
+    expect((await getGithubOverview(fresh)).totalRepos).toBe(1);
+
+    // With tracking rows present but none enabled, nothing is monitored and
+    // nothing may be shown — the repositories must NOT come back.
+    const reposId = (await getTestPool().query("SELECT id FROM github_repos WHERE account_id = $1", [fresh])).rows[0].id;
+    await getTestPool().query(
+      "INSERT INTO github_repository_tracking (account_id, repository_id, enabled) VALUES ($1, $2, 0)",
+      [fresh, reposId],
+    );
+    expect(await hasGithubTrackingRelation(fresh)).toBe(true);
+    const selectedNone = await getGithubOverview(fresh);
+    expect(selectedNone.totalRepos).toBe(0);
+    expect(selectedNone.allRepos).toEqual([]);
+
+    // ...and the shared filter matches nothing either.
+    const filter = await githubWatchedReposFilter([fresh]);
+    expect(await getDb().select({ id: github_repos.id }).from(github_repos).where(filter)).toHaveLength(0);
+  });
+
+  it("filters non-GitHub surfaces down to monitored repositories only", async () => {
+    const accountId = await createWatchAccount("filter");
+    const pool = getTestPool();
+    const watched = await pool.query(
+      "INSERT INTO github_repos (account_id, repo_id, github_id, name, full_name) VALUES ($1, 700001, 700001, 'w', 'a/w') RETURNING id",
+      [accountId],
+    );
+    const unwatched = await pool.query(
+      "INSERT INTO github_repos (account_id, repo_id, github_id, name, full_name) VALUES ($1, 700002, 700002, 'u', 'a/u') RETURNING id",
+      [accountId],
+    );
+    await pool.query("INSERT INTO github_repository_tracking (account_id, repository_id, enabled) VALUES ($1, $2, 1)", [accountId, watched.rows[0].id]);
+    await pool.query("INSERT INTO github_repository_tracking (account_id, repository_id, enabled) VALUES ($1, $2, 0)", [accountId, unwatched.rows[0].id]);
+
+    expect(await listGithubWatchedRepoIds([accountId])).toEqual([watched.rows[0].id]);
+  });
+});
+
+describe("github discovery sources", () => {
+  let sourceAccount: number;
+
+  beforeAll(async () => {
+    sourceAccount = await createWatchAccount("sources");
+  });
+
+  it("soft-disables a removed organization instead of deleting it, and keeps its identity", async () => {
+    await upsertGithubSource({ account_id: sourceAccount, source_type: "organization", login: "ShiinaLabs", github_id: 1234, node_id: "O_1" });
+    await setGithubSources(sourceAccount, ["ShiinaLabs", "libsese"]);
+    expect((await listGithubSourceRows(sourceAccount)).map((r) => r.login).sort()).toEqual(["ShiinaLabs", "libsese"]);
+
+    await setGithubSources(sourceAccount, ["ShiinaLabs"]);
+    const rows = await listGithubSourceRows(sourceAccount);
+    expect(rows.find((r) => r.login === "ShiinaLabs")?.enabled).toBe(true);
+    expect(rows.find((r) => r.login === "libsese")?.enabled).toBe(false);
+
+    // The row survives, and re-adding restores it without losing the captured id.
+    expect(rows).toHaveLength(2);
+    await setGithubSources(sourceAccount, ["ShiinaLabs", "libsese"]);
+    expect((await listGithubSourceRows(sourceAccount)).find((r) => r.login === "libsese")?.enabled).toBe(true);
+    const identity = await getTestPool().query(
+      "SELECT github_id, node_id FROM github_sources WHERE account_id = $1 AND login = 'ShiinaLabs'",
+      [sourceAccount],
+    );
+    expect(Number(identity.rows[0].github_id)).toBe(1234);
+    expect(identity.rows[0].node_id).toBe("O_1");
+  });
+
+  it("re-enabling a source does not wipe an identity captured earlier", async () => {
+    await upsertGithubSource({ account_id: sourceAccount, source_type: "organization", login: "DreamerQcl" });
+    const created = await getTestPool().query(
+      "SELECT github_id FROM github_sources WHERE account_id = $1 AND login = 'DreamerQcl'",
+      [sourceAccount],
+    );
+    expect(created.rows[0].github_id).toBeNull();
+    // A later upsert that supplies no identity must not null out one that exists.
+    await upsertGithubSource({ account_id: sourceAccount, source_type: "organization", login: "ShiinaLabs" });
+    const kept = await getTestPool().query(
+      "SELECT github_id FROM github_sources WHERE account_id = $1 AND login = 'ShiinaLabs'",
+      [sourceAccount],
+    );
+    expect(Number(kept.rows[0].github_id)).toBe(1234);
+  });
+
+  it("clears every organization when the selection is empty", async () => {
+    await setGithubSources(sourceAccount, []);
+    expect((await listGithubSourceRows(sourceAccount)).every((r) => !r.enabled)).toBe(true);
   });
 });

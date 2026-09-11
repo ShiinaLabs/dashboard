@@ -237,17 +237,15 @@ async function executeWithNewArch(account: AccountRow, level: string): Promise<F
     client = new MockGithubClient();
     fetcher = new MockFetcher();
   } else {
-    client = new GithubClient();
+    const githubClient = new GithubClient();
+    client = githubClient;
     const { GithubFetcher } = await import("./infra/fetchers/GithubFetcher");
-    const { listGithubSources, listGithubTrackedRepositories } = await import("./repositories/github-sources");
+    const { listGithubTrackedRepositories } = await import("./repositories/github-sources");
+    // The watchlist is the whole input: no source list, no discovery. What the
+    // user selected is what gets fetched, at every level.
     const githubFetcher = new GithubFetcher(
-      client,
-      async (account) => {
-        const configured = await listGithubSources(account.id);
-        return configured.length > 0 ? configured : [{ kind: "user", login: account.screenName }];
-      },
+      githubClient,
       async (account) => listGithubTrackedRepositories(account.id),
-      level === "l0",
     );
     fetcher = githubFetcher;
     readGithubDiagnostics = () => githubFetcher.getLastFetchDiagnostics();

@@ -26,9 +26,11 @@ export async function getGithubOverview(accountId: number) {
       .innerJoin(github_repos, eq(github_repository_tracking.repository_id, github_repos.id))
       .where(and(eq(github_repository_tracking.account_id, accountId), eq(github_repository_tracking.enabled, 1)))
       .orderBy(desc(github_repos.stars));
-    // Keep the legacy query as a compatibility fallback for a database that
-    // has not yet run the additive tracking backfill.
-    allRepos = tracked.length > 0
+    // The legacy query is a compatibility fallback for a database that has not
+    // run the additive tracking backfill yet. An account that HAS tracking rows
+    // but none enabled has simply selected nothing to monitor, and must show an
+    // empty list rather than every repository it ever saw.
+    allRepos = tracked.length > 0 || await hasGithubTrackingRelation(accountId)
       ? tracked.map(({ repo, pinned }) => ({ ...repo, pinned }))
       : await getDb().select().from(github_repos).where(eq(github_repos.account_id, accountId)).orderBy(desc(github_repos.stars));
   } catch {
@@ -70,6 +72,19 @@ export async function getGithubContributions(accountId: number, yr?: number) {
   const conditions: SQL<unknown>[] = [eq(github_contributions.account_id, accountId)];
   if (yr) conditions.push(sql`EXTRACT(YEAR FROM ${github_contributions.date}) = ${String(yr)}`);
   return getDb().select().from(github_contributions).where(and(...conditions)).orderBy(github_contributions.date);
+}
+
+/**
+ * Whether the account has any tracking rows at all, enabled or not. This is
+ * what tells "the user selected nothing to monitor" (show nothing) apart from
+ * "this database predates the additive tracking backfill" (legacy fallback).
+ */
+export async function hasGithubTrackingRelation(accountId: number, db = getDb()): Promise<boolean> {
+  const [row] = await db.select({ id: github_repository_tracking.id })
+    .from(github_repository_tracking)
+    .where(eq(github_repository_tracking.account_id, accountId))
+    .limit(1);
+  return Boolean(row);
 }
 
 export async function upsertGithubRepo(value: Parameters<typeof upsertGithubRepoLocked>[0]) {

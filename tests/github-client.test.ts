@@ -22,23 +22,27 @@ function mockFetchWithLink() {
 }
 
 describe("GithubClient", () => {
-  it("fetchAllRepos paginates via Link header", async () => {
+  it("fetchOwnedRepos paginates via Link header", async () => {
     const client = new GithubClient(mockFetchWithLink() as any);
-    const repos = await client.fetchAllRepos("alice", "tok");
+    const repos = await client.fetchOwnedRepos("tok");
     expect(repos.length).toBe(150);
   });
-  it("fetchAllRepos single page without Link", async () => {
-    const singleFetch = async () => ({
-      ok: true,
-      headers: { get: () => null },
-      json: async () => [{id:1, name:"r1"}],
-    } as any);
-    const client = new GithubClient(singleFetch as any);
-    const repos = await client.fetchAllRepos("bob", "tok");
-    expect(repos.length).toBe(1);
+
+  it("fetchOwnedRepos asks only for the PAT's own repos, never collaborator or org-member ones", async () => {
+    let requestedUrl = "";
+    const capture = async (url: string, _init?: unknown) => {
+      requestedUrl = url;
+      return { ok: true, headers: { get: () => null }, json: async () => [] } as any;
+    };
+    const client = new GithubClient(capture as any);
+    await client.fetchOwnedRepos("tok");
+    expect(requestedUrl).toBe("https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner");
+    // The whole point of the narrower scope: these must never appear.
+    expect(requestedUrl).not.toContain("collaborator");
+    expect(requestedUrl).not.toContain("organization_member");
   });
 
-  it("discovers organization repositories from the organization endpoint", async () => {
+  it("fetchOrgRepos reads the organization endpoint", async () => {
     let requestedUrl = "";
     const orgFetch = async (url: string, _init?: unknown) => {
       requestedUrl = url;
@@ -49,19 +53,52 @@ describe("GithubClient", () => {
       } as any;
     };
     const client = new GithubClient(orgFetch as any);
-    const repos = await client.fetchAllRepos({ kind: "organization", login: "ShiinaLabs" }, "tok");
+    const repos = await client.fetchOrgRepos("ShiinaLabs", "tok");
     expect(repos).toHaveLength(1);
     expect(requestedUrl).toBe("https://api.github.com/orgs/ShiinaLabs/repos?per_page=100&sort=updated");
   });
 
-  it("rejects a non-array repository discovery response instead of coercing it into data", async () => {
+  it("fetchAuthenticatedOrgs reads the org membership list", async () => {
+    let requestedUrl = "";
+    const orgFetch = async (url: string, _init?: unknown) => {
+      requestedUrl = url;
+      return { ok: true, headers: { get: () => null }, json: async () => [{ login: "ShiinaLabs", id: 1 }, { login: "libsese", id: 2 }] } as any;
+    };
+    const client = new GithubClient(orgFetch as any);
+    const orgs = await client.fetchAuthenticatedOrgs("tok");
+    expect(orgs).toHaveLength(2);
+    expect(requestedUrl).toBe("https://api.github.com/user/orgs?per_page=100");
+  });
+
+  it("send an abort signal so a user-facing listing cannot hang forever", async () => {
+    let seenSignal: unknown;
+    const capture = async (_url: string, init?: unknown) => {
+      seenSignal = (init as { signal?: unknown })?.signal;
+      return { ok: true, headers: { get: () => null }, json: async () => [] } as any;
+    };
+    const client = new GithubClient(capture as any);
+    await client.fetchOwnedRepos("tok");
+    expect(seenSignal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("stops following a runaway Link chain instead of looping forever", async () => {
+    const alwaysNext = async () => ({
+      ok: true,
+      headers: { get: (k: string) => k.toLowerCase() === "link" ? `<https://api.github.com/user/repos?page=2>; rel="next"` : null },
+      json: async () => [{ id: 1 }],
+    } as any);
+    const client = new GithubClient(alwaysNext as any);
+    await expect(client.fetchOwnedRepos("tok")).rejects.toThrow("refusing to follow more than 20 pages");
+  });
+
+  it("rejects a non-array listing response instead of coercing it into data", async () => {
     const invalidFetch = async () => ({
       ok: true,
       headers: { get: () => null },
       json: async () => ({ message: "Bad credentials" }),
     } as any);
     const client = new GithubClient(invalidFetch as any);
-    await expect(client.fetchAllRepos("alice", "tok")).rejects.toThrow("invalid repository list");
+    await expect(client.fetchOwnedRepos("tok")).rejects.toThrow("invalid list");
   });
 
   it("fetchRepoReleases throws on HTTP errors instead of returning []", async () => {
