@@ -25,6 +25,18 @@ export interface Repo {
 
   accountId: number;
   repoId: number;
+  /** Stable GitHub repository id. During the additive migration this mirrors repoId. */
+  githubId?: number;
+  nodeId?: string | null;
+  instance?: string;
+  ownerGithubId?: number | null;
+  ownerNodeId?: string | null;
+  ownerLogin?: string | null;
+  ownerType?: string | null;
+  htmlUrl?: string | null;
+  isPrivate?: number | null;
+  isArchived?: number | null;
+  defaultBranch?: string | null;
   name: string;
   fullName: string;
   stars: Stars;

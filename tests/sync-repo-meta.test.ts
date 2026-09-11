@@ -34,12 +34,14 @@ class FakeFetcher {
 describe("SyncRepoMeta", () => {
   it("upserts detached fork (is_fork 1 -> 0)", async () => {
     const repoRepo = new InMemoryRepoRepo([{accountId:1, repoId:1, isFork:1, stars: new Stars(80), forks: new Forks(10)}]);
-    const newRepo = {accountId:1, repoId:1, isFork:0, stars: new Stars(100), forks: new Forks(20), name:"r", fullName:"a/r", language:null, description:null, homepage:null, topics:"[]"};
+    const newRepo = {accountId:1, repoId:1, githubId:1, nodeId:"R_1", ownerLogin:"ShiinaLabs", ownerType:"Organization", isFork:0, stars: new Stars(100), forks: new Forks(20), name:"r", fullName:"ShiinaLabs/r", language:null, description:null, homepage:null, topics:"[]"};
     const fetcher = new FakeFetcher([newRepo]);
     const uc = new SyncRepoMeta(repoRepo as any, fetcher as any);
     await uc.execute({id:1, screenName:"alice", platform:"github", ownerId:1, instanceUrl:null, isActive:1} as any);
     const after = (await repoRepo.findAllByAccountIds([1]))[0];
     expect(after.isFork).toBe(0);
+    expect(after.githubId).toBe(1);
+    expect(after.ownerLogin).toBe("ShiinaLabs");
     // L0 static does not overwrite stars (now L1 timely)
     expect(after.stars.value).toBe(80);
   });

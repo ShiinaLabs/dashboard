@@ -69,13 +69,43 @@ const SCHEMA = [
     table: "github_repos",
     sql: `CREATE TABLE IF NOT EXISTS github_repos (
       id SERIAL PRIMARY KEY, account_id INTEGER NOT NULL REFERENCES accounts(id),
-      repo_id INTEGER NOT NULL, name TEXT NOT NULL, full_name TEXT NOT NULL, description TEXT,
+      repo_id INTEGER NOT NULL, github_id BIGINT, node_id TEXT,
+      instance TEXT NOT NULL DEFAULT 'github.com', owner_github_id BIGINT,
+      owner_node_id TEXT, owner_login TEXT, owner_type TEXT, html_url TEXT,
+      is_private INTEGER DEFAULT 0, is_archived INTEGER DEFAULT 0, default_branch TEXT,
+      name TEXT NOT NULL, full_name TEXT NOT NULL, description TEXT,
       language TEXT, stars INTEGER DEFAULT 0, forks INTEGER DEFAULT 0, open_issues INTEGER DEFAULT 0,
       open_issues_only INTEGER, open_pull_requests INTEGER,
       topics TEXT DEFAULT '[]', homepage TEXT, is_fork INTEGER DEFAULT 0, pinned INTEGER DEFAULT 0,
       created_at TEXT, updated_at TEXT, pushed_at TEXT, fetched_at TEXT NOT NULL DEFAULT NOW()
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_github_repos_uniq ON github_repos(account_id, repo_id)`,
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_github_repos_uniq ON github_repos(account_id, repo_id);
+    CREATE INDEX IF NOT EXISTS idx_github_repos_instance_github_id ON github_repos(instance, github_id);
+    CREATE INDEX IF NOT EXISTS idx_github_repos_instance_node_id ON github_repos(instance, node_id)`,
+  },
+  {
+    table: "github_sources",
+    sql: `CREATE TABLE IF NOT EXISTS github_sources (
+      id SERIAL PRIMARY KEY, account_id INTEGER NOT NULL REFERENCES accounts(id),
+      source_type TEXT NOT NULL, login TEXT NOT NULL, github_id BIGINT, node_id TEXT,
+      enabled INTEGER NOT NULL DEFAULT 1, last_discovered_at TEXT, last_success_at TEXT,
+      last_error TEXT, created_at TEXT NOT NULL DEFAULT NOW(), updated_at TEXT NOT NULL DEFAULT NOW()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_github_sources_account_type_login ON github_sources(account_id, source_type, login);
+    CREATE INDEX IF NOT EXISTS idx_github_sources_account_enabled ON github_sources(account_id, enabled)`,
+  },
+  {
+    table: "github_repository_tracking",
+    sql: `CREATE TABLE IF NOT EXISTS github_repository_tracking (
+      id SERIAL PRIMARY KEY, account_id INTEGER NOT NULL REFERENCES accounts(id),
+      repository_id INTEGER NOT NULL REFERENCES github_repos(id), enabled INTEGER NOT NULL DEFAULT 1,
+      pinned INTEGER NOT NULL DEFAULT 0, first_seen_at TEXT NOT NULL DEFAULT NOW(),
+      last_seen_at TEXT, last_synced_at TEXT, last_access_ok_at TEXT, last_error TEXT,
+      created_at TEXT NOT NULL DEFAULT NOW(), updated_at TEXT NOT NULL DEFAULT NOW()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_github_tracking_account_repository ON github_repository_tracking(account_id, repository_id);
+    CREATE INDEX IF NOT EXISTS idx_github_tracking_account_enabled ON github_repository_tracking(account_id, enabled);
+    CREATE INDEX IF NOT EXISTS idx_github_tracking_repository ON github_repository_tracking(repository_id)`,
   },
   {
     table: "github_contributions",
@@ -89,66 +119,73 @@ const SCHEMA = [
     table: "github_repo_snapshots",
     sql: `CREATE TABLE IF NOT EXISTS github_repo_snapshots (
       id SERIAL PRIMARY KEY, account_id INTEGER NOT NULL REFERENCES accounts(id),
-      repo_id INTEGER NOT NULL, stars INTEGER NOT NULL, forks INTEGER DEFAULT 0,
+      repo_id INTEGER NOT NULL, repository_id INTEGER REFERENCES github_repos(id), stars INTEGER NOT NULL, forks INTEGER DEFAULT 0,
       open_issues INTEGER DEFAULT 0, open_issues_only INTEGER, open_pull_requests INTEGER,
       snapshot_date TEXT NOT NULL
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_github_repo_snapshots_uniq ON github_repo_snapshots(account_id, repo_id, snapshot_date)`,
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_github_repo_snapshots_uniq ON github_repo_snapshots(account_id, repo_id, snapshot_date);
+    CREATE INDEX IF NOT EXISTS idx_github_repo_snapshots_repository_id ON github_repo_snapshots(repository_id)`,
   },
   {
     table: "github_traffic_clones",
     sql: `CREATE TABLE IF NOT EXISTS github_traffic_clones (
       id SERIAL PRIMARY KEY, account_id INTEGER NOT NULL REFERENCES accounts(id),
-      repo_id INTEGER NOT NULL, date TEXT NOT NULL, count INTEGER DEFAULT 0, uniques INTEGER DEFAULT 0
+      repo_id INTEGER NOT NULL, repository_id INTEGER REFERENCES github_repos(id), date TEXT NOT NULL, count INTEGER DEFAULT 0, uniques INTEGER DEFAULT 0
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_github_traffic_clones_uniq ON github_traffic_clones(account_id, repo_id, date)`,
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_github_traffic_clones_uniq ON github_traffic_clones(account_id, repo_id, date);
+    CREATE INDEX IF NOT EXISTS idx_github_traffic_clones_repository_id ON github_traffic_clones(repository_id)`,
   },
   {
     table: "github_traffic_views",
     sql: `CREATE TABLE IF NOT EXISTS github_traffic_views (
       id SERIAL PRIMARY KEY, account_id INTEGER NOT NULL REFERENCES accounts(id),
-      repo_id INTEGER NOT NULL, date TEXT NOT NULL, count INTEGER DEFAULT 0, uniques INTEGER DEFAULT 0
+      repo_id INTEGER NOT NULL, repository_id INTEGER REFERENCES github_repos(id), date TEXT NOT NULL, count INTEGER DEFAULT 0, uniques INTEGER DEFAULT 0
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_github_traffic_views_uniq ON github_traffic_views(account_id, repo_id, date)`,
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_github_traffic_views_uniq ON github_traffic_views(account_id, repo_id, date);
+    CREATE INDEX IF NOT EXISTS idx_github_traffic_views_repository_id ON github_traffic_views(repository_id)`,
   },
   {
     table: "github_referrers",
     sql: `CREATE TABLE IF NOT EXISTS github_referrers (
       id SERIAL PRIMARY KEY, account_id INTEGER NOT NULL REFERENCES accounts(id),
-      repo_id INTEGER NOT NULL, referrer TEXT NOT NULL, count INTEGER DEFAULT 0,
+      repo_id INTEGER NOT NULL, repository_id INTEGER REFERENCES github_repos(id), referrer TEXT NOT NULL, count INTEGER DEFAULT 0,
       uniques INTEGER DEFAULT 0, snapshot_date TEXT NOT NULL DEFAULT CURRENT_DATE
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_github_referrers_uniq ON github_referrers(account_id, repo_id, referrer, snapshot_date)`,
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_github_referrers_uniq ON github_referrers(account_id, repo_id, referrer, snapshot_date);
+    CREATE INDEX IF NOT EXISTS idx_github_referrers_repository_id ON github_referrers(repository_id)`,
   },
   {
     table: "github_paths",
     sql: `CREATE TABLE IF NOT EXISTS github_paths (
       id SERIAL PRIMARY KEY, account_id INTEGER NOT NULL REFERENCES accounts(id),
-      repo_id INTEGER NOT NULL, path TEXT NOT NULL, title TEXT, count INTEGER DEFAULT 0,
+      repo_id INTEGER NOT NULL, repository_id INTEGER REFERENCES github_repos(id), path TEXT NOT NULL, title TEXT, count INTEGER DEFAULT 0,
       uniques INTEGER DEFAULT 0, snapshot_date TEXT NOT NULL DEFAULT CURRENT_DATE
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_github_paths_uniq ON github_paths(account_id, repo_id, path, snapshot_date)`,
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_github_paths_uniq ON github_paths(account_id, repo_id, path, snapshot_date);
+    CREATE INDEX IF NOT EXISTS idx_github_paths_repository_id ON github_paths(repository_id)`,
   },
   {
     table: "github_releases",
     sql: `CREATE TABLE IF NOT EXISTS github_releases (
       id SERIAL PRIMARY KEY, account_id INTEGER NOT NULL REFERENCES accounts(id),
-      repo_id INTEGER NOT NULL, release_id INTEGER NOT NULL, tag_name TEXT, name TEXT,
+      repo_id INTEGER NOT NULL, repository_id INTEGER REFERENCES github_repos(id), release_id INTEGER NOT NULL, tag_name TEXT, name TEXT,
       body TEXT, prerelease INTEGER DEFAULT 0, published_at TEXT, html_url TEXT,
       total_downloads INTEGER DEFAULT 0, fetched_at TEXT NOT NULL DEFAULT NOW()
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_github_releases_uniq ON github_releases(account_id, repo_id, release_id)`,
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_github_releases_uniq ON github_releases(account_id, repo_id, release_id);
+    CREATE INDEX IF NOT EXISTS idx_github_releases_repository_id ON github_releases(repository_id)`,
   },
   {
     table: "github_release_asset_snapshots",
     sql: `CREATE TABLE IF NOT EXISTS github_release_asset_snapshots (
       id SERIAL PRIMARY KEY, account_id INTEGER NOT NULL REFERENCES accounts(id),
-      repo_id INTEGER NOT NULL, release_id INTEGER NOT NULL REFERENCES github_releases(id),
+      repo_id INTEGER NOT NULL, repository_id INTEGER REFERENCES github_repos(id), release_id INTEGER NOT NULL REFERENCES github_releases(id),
       asset_name TEXT NOT NULL, download_count INTEGER DEFAULT 0,
       snapshot_date TEXT NOT NULL, recorded_at TEXT NOT NULL DEFAULT NOW()
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_github_release_asset_snapshots_uniq
-      ON github_release_asset_snapshots(release_id, asset_name, snapshot_date)`,
+      ON github_release_asset_snapshots(release_id, asset_name, snapshot_date);
+    CREATE INDEX IF NOT EXISTS idx_github_release_asset_snapshots_repository_id ON github_release_asset_snapshots(repository_id)`,
   },
   {
     table: "github_release_assets",

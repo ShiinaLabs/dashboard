@@ -231,7 +231,16 @@ async function executeWithNewArch(account: AccountRow, level: string): Promise<F
   } else {
     client = new GithubClient();
     const { GithubFetcher } = await import("./infra/fetchers/GithubFetcher");
-    fetcher = new GithubFetcher(client);
+    const { listGithubSources, listGithubTrackedRepositories } = await import("./repositories/github-sources");
+    fetcher = new GithubFetcher(
+      client,
+      async (account) => {
+        const configured = await listGithubSources(account.id);
+        return configured.length > 0 ? configured : [{ kind: "user", login: account.screenName }];
+      },
+      async (account) => listGithubTrackedRepositories(account.id),
+      level === "l0",
+    );
   }
 
   if (level === "l0") {

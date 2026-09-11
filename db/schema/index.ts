@@ -9,6 +9,7 @@ export {
   github_referrers, github_paths, github_releases, github_release_assets,
   github_release_asset_snapshots,
 } from "./github";
+export { github_sources, github_repository_tracking } from "./github-sources";
 export {
   gitlab_stats, gitlab_projects, gitlab_project_snapshots,
   gitlab_releases, gitlab_release_assets, gitlab_contributions,

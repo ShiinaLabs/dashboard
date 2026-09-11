@@ -28,6 +28,7 @@ export class SyncTelemetry {
 
     const token = (account as unknown as { authToken?: string }).authToken ?? undefined;
     const { getDb } = await import("../../db/connection");
+    const { resolveGithubRepositoryId } = await import("../../repositories/github");
     const { github_traffic_clones, github_traffic_views, github_referrers, github_paths } = await import("@/db/schema");
     let db: ReturnType<typeof getDb>;
     try { db = getDb(); } catch { return; }
@@ -37,13 +38,14 @@ export class SyncTelemetry {
 
     for (const repo of repos) {
       const fullName = repo.fullName;
+      const repositoryId = await resolveGithubRepositoryId(account.id, repo.repoId);
       // Traffic (clones/views/referrers/paths)
       try {
         const traffic = await client.fetchRepoTraffic(fullName, token);
-        for (const d of traffic.clones) await db.insert(github_traffic_clones).values({ account_id: account.id, repo_id: repo.repoId, date: d.date, count: d.count, uniques: d.uniques }).onConflictDoNothing();
-        for (const d of traffic.views) await db.insert(github_traffic_views).values({ account_id: account.id, repo_id: repo.repoId, date: d.date, count: d.count, uniques: d.uniques }).onConflictDoNothing();
-        for (const r of traffic.referrers) await db.insert(github_referrers).values({ account_id: account.id, repo_id: repo.repoId, referrer: r.referrer, count: r.count, uniques: r.uniques, snapshot_date: today }).onConflictDoNothing();
-        for (const p of traffic.paths) await db.insert(github_paths).values({ account_id: account.id, repo_id: repo.repoId, path: p.path, title: p.title, count: p.count, uniques: p.uniques, snapshot_date: today }).onConflictDoNothing();
+        for (const d of traffic.clones) await db.insert(github_traffic_clones).values({ account_id: account.id, repo_id: repo.repoId, repository_id: repositoryId, date: d.date, count: d.count, uniques: d.uniques }).onConflictDoNothing();
+        for (const d of traffic.views) await db.insert(github_traffic_views).values({ account_id: account.id, repo_id: repo.repoId, repository_id: repositoryId, date: d.date, count: d.count, uniques: d.uniques }).onConflictDoNothing();
+        for (const r of traffic.referrers) await db.insert(github_referrers).values({ account_id: account.id, repo_id: repo.repoId, repository_id: repositoryId, referrer: r.referrer, count: r.count, uniques: r.uniques, snapshot_date: today }).onConflictDoNothing();
+        for (const p of traffic.paths) await db.insert(github_paths).values({ account_id: account.id, repo_id: repo.repoId, repository_id: repositoryId, path: p.path, title: p.title, count: p.count, uniques: p.uniques, snapshot_date: today }).onConflictDoNothing();
       } catch { void 0; }
     }
     logger.info("GitHub", "L2 @%s: telemetry (traffic) fetched for %d repos", account.screenName, repos.length);

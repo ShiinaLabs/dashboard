@@ -3,8 +3,8 @@ import type { Repo } from "../../domain/repo";
 import { Stars, Forks } from "../../domain/repo";
 import type { RepoSnapshot } from "../../domain/snapshot";
 import { getDb } from "../../db/connection";
-import { github_repos, github_repo_snapshots, gitlab_projects, gitlab_project_snapshots } from "@/db/schema";
-import { inArray, sql } from "drizzle-orm";
+import { github_repos, github_repo_snapshots, github_repository_tracking, gitlab_projects, gitlab_project_snapshots } from "@/db/schema";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 
 // Parameterized int[] literal. Identical to the pulse/top-content helpers and
 // preferred over string-concatenating ids into sql.raw(...), which is an
@@ -18,6 +18,17 @@ function toDomainRepo(row: Record<string, unknown>, accountId: number): Repo {
   return {
     accountId,
     repoId: (row.repo_id as number) ?? (row.project_id as number),
+    githubId: (row.github_id as number | null) ?? (row.repo_id as number),
+    nodeId: (row.node_id as string | null) ?? null,
+    instance: (row.instance as string | null) ?? "github.com",
+    ownerGithubId: (row.owner_github_id as number | null) ?? null,
+    ownerNodeId: (row.owner_node_id as string | null) ?? null,
+    ownerLogin: (row.owner_login as string | null) ?? null,
+    ownerType: (row.owner_type as string | null) ?? null,
+    htmlUrl: (row.html_url as string | null) ?? null,
+    isPrivate: (row.is_private as number | null) ?? null,
+    isArchived: (row.is_archived as number | null) ?? null,
+    defaultBranch: (row.default_branch as string | null) ?? null,
     name: row.name as string,
     fullName: (row.full_name as string) ?? (row.path_with_namespace as string) ?? (row.name as string),
     stars: new Stars((row.stars as number) ?? 0),
@@ -44,8 +55,19 @@ export class PgRepoRepository implements RepoRepository {
     const db = this.dbInstance;
     if (!db) return [];
     // Query both GitHub and GitLab in parallel — compatible with existing schema
-    const [githubRows, gitlabRows] = await Promise.all([
-      db.select().from(github_repos).where(inArray(github_repos.account_id, ids)),
+    let githubRows: unknown[];
+    try {
+      const trackedRows = await db.select({ repo: github_repos, account_id: github_repository_tracking.account_id })
+        .from(github_repository_tracking)
+        .innerJoin(github_repos, eq(github_repository_tracking.repository_id, github_repos.id))
+        .where(and(inArray(github_repository_tracking.account_id, ids), eq(github_repository_tracking.enabled, 1)));
+      githubRows = trackedRows.length > 0
+        ? trackedRows.map((row) => ({ ...row.repo, account_id: row.account_id }))
+        : await db.select().from(github_repos).where(inArray(github_repos.account_id, ids));
+    } catch {
+      githubRows = await db.select().from(github_repos).where(inArray(github_repos.account_id, ids));
+    }
+    const [gitlabRows] = await Promise.all([
       db.select().from(gitlab_projects).where(inArray(gitlab_projects.account_id, ids)),
     ]);
     const repos: Repo[] = [];
@@ -103,19 +125,25 @@ export class PgRepoRepository implements RepoRepository {
     // Fetch existing rows once so L0/partial objects don't clobber stars/forks or
     // wipe open_issues/open_pull_requests (which the pure-new path doesn't yet compute).
     const accountIds = [...new Set(repos.map(r => r.accountId))];
+    const githubIds = [...new Set(repos.map(r => r.githubId ?? r.repoId))];
     const existing = new Map<string, { stars: number | null; forks: number | null; open_issues: number | null; open_issues_only: number | null; open_pull_requests: number | null }>();
     try {
       const rows = await db.select({
         account_id: github_repos.account_id,
         repo_id: github_repos.repo_id,
+        github_id: github_repos.github_id,
         stars: github_repos.stars,
         forks: github_repos.forks,
         open_issues: github_repos.open_issues,
         open_issues_only: github_repos.open_issues_only,
         open_pull_requests: github_repos.open_pull_requests,
-      }).from(github_repos).where(inArray(github_repos.account_id, accountIds));
+      }).from(github_repos).where(or(inArray(github_repos.account_id, accountIds), inArray(github_repos.github_id, githubIds)));
       for (const r of rows) {
         existing.set(`${r.account_id}:${r.repo_id}`, {
+          stars: r.stars, forks: r.forks, open_issues: r.open_issues,
+          open_issues_only: r.open_issues_only, open_pull_requests: r.open_pull_requests,
+        });
+        existing.set(`stable:${r.github_id ?? r.repo_id}`, {
           stars: r.stars, forks: r.forks, open_issues: r.open_issues,
           open_issues_only: r.open_issues_only, open_pull_requests: r.open_pull_requests,
         });
@@ -123,7 +151,8 @@ export class PgRepoRepository implements RepoRepository {
     } catch { /* table may not exist yet */ }
 
     for (const repo of repos) {
-      const ex = existing.get(`${repo.accountId}:${repo.repoId}`);
+      const ex = existing.get(`${repo.accountId}:${repo.repoId}`)
+        ?? existing.get(`stable:${repo.githubId ?? repo.repoId}`);
       const starsVal = (repo as unknown as { stars?: { value: number } }).stars?.value ?? ex?.stars ?? 0;
       const forksVal = (repo as unknown as { forks?: { value: number } }).forks?.value ?? ex?.forks ?? 0;
       const openIssues = (repo as unknown as { openIssues?: number | null }).openIssues ?? ex?.open_issues ?? 0;
@@ -133,6 +162,17 @@ export class PgRepoRepository implements RepoRepository {
       await upsertGithubRepo({
         account_id: repo.accountId,
         repo_id: repo.repoId,
+        github_id: repo.githubId ?? repo.repoId,
+        node_id: repo.nodeId ?? null,
+        instance: repo.instance ?? "github.com",
+        owner_github_id: repo.ownerGithubId ?? null,
+        owner_node_id: repo.ownerNodeId ?? null,
+        owner_login: repo.ownerLogin ?? null,
+        owner_type: repo.ownerType ?? null,
+        html_url: repo.htmlUrl ?? null,
+        is_private: repo.isPrivate ?? 0,
+        is_archived: repo.isArchived ?? 0,
+        default_branch: repo.defaultBranch ?? null,
         name: repo.name,
         full_name: repo.fullName,
         description: repo.description,

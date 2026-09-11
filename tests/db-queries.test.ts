@@ -374,6 +374,99 @@ describe("github queries", () => {
     expect(repo).toMatchObject({ open_issues: 7, open_issues_only: 4, open_pull_requests: 3 });
   });
 
+  it("keeps one repository row when a second PAT tracks the same stable GitHub id", async () => {
+    const pool = getTestPool();
+    const secondUser = await usersQ.insertUser({ username: `gh_second_${Date.now()}`, password_hash: "pass", role: "user" });
+    const { rows } = await pool.query(
+      "INSERT INTO accounts (owner_id, screen_name, platform, auth_token) VALUES ($1, $2, $3, $4) RETURNING id",
+      [secondUser.id, "gh_second", "github", "tok"],
+    );
+    const secondAccountId = rows[0].id as number;
+    expect(await githubQ.resolveGithubRepositoryId(secondAccountId, 200)).toBeNull();
+    expect(await githubQ.resolveGithubRepositoryId(acctId, 987654321)).toBeNull();
+
+    const stableRepo = {
+      github_id: 1241734389,
+      node_id: "R_kgDOTransfer",
+      owner_github_id: 7654321,
+      owner_login: "ShiinaLabs",
+      owner_type: "Organization",
+      html_url: "https://github.com/ShiinaLabs/wifi-lens",
+    };
+    await githubQ.upsertGithubRepo({
+      account_id: acctId, repo_id: 1241734389, ...stableRepo,
+      name: "wifi-lens", full_name: "SHIINASAMA/wifi-lens", description: null,
+      language: "TypeScript", stars: 10, forks: 2, open_issues: 1, topics: "[]",
+      homepage: null, is_fork: 0, created_at: null, updated_at: null, pushed_at: null,
+    });
+    await githubQ.upsertGithubRepo({
+      account_id: secondAccountId, repo_id: 1241734389, ...stableRepo,
+      name: "wifi-lens", full_name: "ShiinaLabs/wifi-lens", description: null,
+      language: "TypeScript", stars: 11, forks: 2, open_issues: 1, topics: "[]",
+      homepage: null, is_fork: 0, created_at: null, updated_at: null, pushed_at: null,
+    });
+
+    const repoRows = await pool.query("SELECT id, full_name FROM github_repos WHERE github_id = $1", [1241734389]);
+    const trackingRows = await pool.query("SELECT account_id, repository_id FROM github_repository_tracking WHERE repository_id = $1", [repoRows.rows[0].id]);
+    expect(repoRows.rows).toHaveLength(1);
+    expect(await githubQ.resolveGithubRepositoryId(acctId, 1241734389)).toBe(repoRows.rows[0].id);
+    expect(repoRows.rows[0].full_name).toBe("ShiinaLabs/wifi-lens");
+    expect(trackingRows.rows.map((row) => row.account_id).sort()).toEqual([acctId, secondAccountId].sort());
+
+    await githubQ.upsertGithubRepoSnapshot({
+      account_id: acctId, repo_id: 1241734389, stars: 10, forks: 2,
+      open_issues: 1, snapshot_date: "2026-09-11",
+    });
+    await githubQ.upsertGithubRepoSnapshot({
+      account_id: secondAccountId, repo_id: 1241734389, stars: 11, forks: 2,
+      open_issues: 1, snapshot_date: "2026-09-11",
+    });
+    const snapshot = await pool.query(
+      "SELECT repository_id, stars FROM github_repo_snapshots WHERE repository_id = $1 AND snapshot_date = $2",
+      [repoRows.rows[0].id, "2026-09-11"],
+    );
+    expect(snapshot.rows).toHaveLength(1);
+    expect(snapshot.rows[0]).toMatchObject({ repository_id: repoRows.rows[0].id, stars: 11 });
+
+    await githubQ.upsertGithubRelease({
+      account_id: acctId, repo_id: 1241734389, release_id: 900001,
+      tag_name: "v1", name: "v1", body: null, prerelease: 0,
+      published_at: "2026-09-10T00:00:00.000Z", html_url: null, total_downloads: 10,
+    });
+    await githubQ.upsertGithubRelease({
+      account_id: secondAccountId, repo_id: 1241734389, release_id: 900001,
+      tag_name: "v1", name: "v1", body: null, prerelease: 0,
+      published_at: "2026-09-10T00:00:00.000Z", html_url: null, total_downloads: 12,
+    });
+    const releases = await githubQ.getGithubReleases(secondAccountId, 1241734389);
+    expect(releases).toHaveLength(1);
+    expect(releases[0].total_downloads).toBe(12);
+  });
+
+  it("rolls back the entire asset replacement when a later asset is invalid", async () => {
+    const { PgReleaseWrite } = await import("../lib/infra/drizzle/PgReleaseWrite");
+    const writer = new PgReleaseWrite();
+    const pool = getTestPool();
+    const { rows } = await pool.query(`INSERT INTO github_releases
+      (account_id, repo_id, release_id, tag_name) VALUES ($1, 200, 900002, 'v2') RETURNING id`, [acctId]);
+    const id = rows[0].id;
+    await writer.replaceAssets(id, [{ name: "original.zip", download_count: 42 }]);
+    const before = await pool.query("SELECT * FROM github_release_assets WHERE release_id = $1", [id]);
+    await expect(writer.replaceAssets(id, [{ name: "new.zip" }, { name: null }])).rejects.toThrow();
+    const after = await pool.query("SELECT * FROM github_release_assets WHERE release_id = $1", [id]);
+    expect(after.rows).toEqual(before.rows);
+  });
+
+  it("keeps legacy history visible while repository backfill is incomplete", async () => {
+    const pool = getTestPool();
+    const day = new Date().toISOString().slice(0, 10);
+    await pool.query(`INSERT INTO github_traffic_views (account_id, repo_id, date, count, uniques)
+      VALUES ($1, 200, $2, 123, 45)`, [acctId, day]);
+    const views = await githubQ.getGithubTrafficViews(acctId, 200);
+    expect(views.some(row => row.count === 123 && row.repository_id === null)).toBe(true);
+    expect(await githubQ.getGithubTrafficViews(acctId, 999999)).toEqual([]);
+  });
+
   it("upserts a contribution", async () => {
     await githubQ.upsertGithubContribution({ account_id: acctId, date: "2024-01-01", count: 5, level: 2 });
     const contribs = await githubQ.getGithubContributions(acctId);

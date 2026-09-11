@@ -1,4 +1,5 @@
 import { fetchWithConfig, withNetworkRetry } from "../../http";
+import type { GithubSource } from "../../domain/github-source";
 
 type FetchFn = typeof fetchWithConfig;
 
@@ -40,8 +41,19 @@ export class GithubClient {
     return [];
   }
 
-  async fetchAllRepos(username: string, token?: string): Promise<unknown[]> {
-    let url: string | null = `https://api.github.com/users/${username}/repos?per_page=100&sort=updated`;
+  async fetchAllRepos(source: GithubSource | string, token?: string): Promise<unknown[]> {
+    const isLegacyUsername = typeof source === "string";
+    const login = isLegacyUsername ? source : source.login;
+    const path = isLegacyUsername
+      ? `/users/${encodeURIComponent(login)}/repos?per_page=100&sort=updated`
+      : source.kind === "organization"
+        ? `/orgs/${encodeURIComponent(login)}/repos?per_page=100&sort=updated`
+        // /user/repos is based on the authenticated PAT principal, so it
+        // continues to see repositories after a transfer away from the old
+        // username.  The legacy string form remains for compatibility with
+        // existing callers and fixtures.
+        : `/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member`;
+    let url: string | null = `https://api.github.com${path}`;
     const all: unknown[] = [];
     const headers: Record<string, string> = {
       Accept: "application/vnd.github.v3+json",
@@ -55,13 +67,36 @@ export class GithubClient {
         const body = await res.text?.().catch(() => "") ?? "";
         throw new Error(`GitHub API ${res.status}: ${body.slice(0,200)}`);
       }
-      const data = (await res.json()) as unknown[];
-      if (Array.isArray(data)) all.push(...(data as unknown[]));
-      else all.push(data);
+      const data = (await res.json()) as unknown;
+      if (!Array.isArray(data)) {
+        throw new Error("GitHub API returned an invalid repository list");
+      }
+      all.push(...data);
       const link = res.headers?.get?.("link") ?? res.headers?.get?.("Link") ?? null;
       url = parseLink(link);
     }
     return all;
+  }
+
+  async fetchRepositoryById(githubId: number, token?: string): Promise<Record<string, unknown>> {
+    const headers: Record<string, string> = {
+      Accept: "application/vnd.github.v3+json",
+      "User-Agent": "dashboard",
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await this.fetchFn(
+      `https://api.github.com/repositories/${encodeURIComponent(String(githubId))}`,
+      { headers } as unknown as RequestInit,
+    );
+    if (!res.ok) {
+      const body = await res.text?.().catch(() => "") ?? "";
+      throw new Error(`GitHub repository ${res.status}: ${body.slice(0, 200)}`);
+    }
+    const data = await res.json() as unknown;
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      throw new Error("GitHub API returned an invalid repository");
+    }
+    return data as Record<string, unknown>;
   }
 
   // TODO: real L2 telemetry (traffic/referrers/paths) not yet migrated into new arch.

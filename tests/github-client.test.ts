@@ -38,6 +38,32 @@ describe("GithubClient", () => {
     expect(repos.length).toBe(1);
   });
 
+  it("discovers organization repositories from the organization endpoint", async () => {
+    let requestedUrl = "";
+    const orgFetch = async (url: string, _init?: unknown) => {
+      requestedUrl = url;
+      return {
+        ok: true,
+        headers: { get: () => null },
+        json: async () => [{ id: 42, name: "dashboard", full_name: "ShiinaLabs/dashboard" }],
+      } as any;
+    };
+    const client = new GithubClient(orgFetch as any);
+    const repos = await client.fetchAllRepos({ kind: "organization", login: "ShiinaLabs" }, "tok");
+    expect(repos).toHaveLength(1);
+    expect(requestedUrl).toBe("https://api.github.com/orgs/ShiinaLabs/repos?per_page=100&sort=updated");
+  });
+
+  it("rejects a non-array repository discovery response instead of coercing it into data", async () => {
+    const invalidFetch = async () => ({
+      ok: true,
+      headers: { get: () => null },
+      json: async () => ({ message: "Bad credentials" }),
+    } as any);
+    const client = new GithubClient(invalidFetch as any);
+    await expect(client.fetchAllRepos("alice", "tok")).rejects.toThrow("invalid repository list");
+  });
+
   it("fetchRepoReleases throws on HTTP errors instead of returning []", async () => {
     const httpError = async () => ({
       ok: false,
