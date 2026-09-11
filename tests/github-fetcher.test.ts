@@ -33,6 +33,49 @@ describe("GithubFetcher", () => {
     const fetcher = new GithubFetcher(client, async () => [], async () => [{ repositoryId: 7, githubId: 42, fullName: "alice/private" }]);
     await expect(fetcher.fetchRepoMeta({ id: 1, screenName: "alice", platform: "github", ownerId: 1, instanceUrl: null, isActive: 1 })).rejects.toThrow("Unable to resolve 1 of 1");
   });
+  it("keeps the readable repositories and reports the gap when only some tracked repos fail", async () => {
+    const client = {
+      fetchAllRepos: async () => [],
+      fetchRepositoryById: async (id: number) => {
+        if (id === 42) throw new Error("GitHub repository 404");
+        return { id, name: "wifi-lens", full_name: "ShiinaLabs/wifi-lens", stargazers_count: 1, forks_count: 0, fork: false, topics: [] };
+      },
+    };
+    const fetcher = new GithubFetcher(client as any, async () => [], async () => [
+      { repositoryId: 7, githubId: 42, fullName: "SHIINASAMA/transferred-away" },
+      { repositoryId: 8, githubId: 43, fullName: "ShiinaLabs/wifi-lens" },
+    ]);
+    const events = await fetcher.fetchRepoMeta({ id: 1, screenName: "alice", platform: "github", ownerId: 1, instanceUrl: null, isActive: 1 } as any);
+    // The reachable repository is still written; only the unreachable one is dropped.
+    expect(events.map((event) => event.repo.repoId)).toEqual([43]);
+    expect(fetcher.getLastFetchDiagnostics()).toEqual({
+      trackedTotal: 2,
+      failed: 1,
+      failures: [{ repositoryId: 7, fullName: "SHIINASAMA/transferred-away", message: "GitHub repository 404" }],
+    });
+  });
+
+  it("resets diagnostics between runs so a run that read everything reports no gap", async () => {
+    let failWifiLens = true;
+    const client = {
+      fetchAllRepos: async () => [],
+      fetchRepositoryById: async (id: number) => {
+        if (failWifiLens && id === 42) throw new Error("GitHub repository 403");
+        return { id, name: "r", full_name: "ShiinaLabs/r", stargazers_count: 1, forks_count: 0, fork: false, topics: [] };
+      },
+    };
+    const fetcher = new GithubFetcher(client as any, async () => [], async () => [
+      { repositoryId: 7, githubId: 42, fullName: "ShiinaLabs/r" },
+      { repositoryId: 8, githubId: 43, fullName: "ShiinaLabs/other" },
+    ]);
+    const account = { id: 1, screenName: "alice", platform: "github", ownerId: 1, instanceUrl: null, isActive: 1 } as any;
+    await fetcher.fetchRepoMeta(account);
+    expect(fetcher.getLastFetchDiagnostics().failed).toBe(1);
+    failWifiLens = false;
+    await fetcher.fetchRepoMeta(account);
+    expect(fetcher.getLastFetchDiagnostics()).toEqual({ trackedTotal: 2, failed: 0, failures: [] });
+  });
+
   it("rejects metadata for a different repository before producing write events", async () => {
     const client = { fetchAllRepos: async () => [], fetchRepositoryById: async () => ({ id: 99 }) };
     const fetcher = new GithubFetcher(client, async () => [], async () => [{ repositoryId: 7, githubId: 42, fullName: "alice/private" }]);

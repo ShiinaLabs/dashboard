@@ -13,7 +13,16 @@ interface RepoClient {
 type SourceProvider = (account: Account) => Promise<GithubSource[]>;
 type TrackingProvider = (account: Account) => Promise<GithubTrackedRepository[]>;
 
+/** Outcome of one fetchRepoMeta call for an explicitly tracked repository. */
+export interface GithubFetchDiagnostics {
+  trackedTotal: number;
+  failed: number;
+  failures: Array<{ repositoryId: number; fullName: string; message: string }>;
+}
+
 export class GithubFetcher implements FetcherPort {
+  private diagnostics: GithubFetchDiagnostics = { trackedTotal: 0, failed: 0, failures: [] };
+
   constructor(
     private client: RepoClient,
     private sourceProvider: SourceProvider = async (account) => [{ kind: "user", login: account.screenName }],
@@ -21,8 +30,19 @@ export class GithubFetcher implements FetcherPort {
     private discoverNewRepositories = false,
   ) {}
 
+  /**
+   * Per-repository outcome of the most recent fetchRepoMeta call. A tracked
+   * repository that cannot be read is skipped instead of failing the run, so
+   * callers must read this to report the gap; otherwise a lost permission
+   * would look like a clean success with a shorter repo list.
+   */
+  getLastFetchDiagnostics(): GithubFetchDiagnostics {
+    return this.diagnostics;
+  }
+
   async fetchRepoMeta(account: Account): Promise<RepoFetchedEvent[]> {
     const logger = getLogger();
+    this.diagnostics = { trackedTotal: 0, failed: 0, failures: [] };
     const token = (account as unknown as {authToken?: string; auth_token?: string}).authToken ?? (account as unknown as {authToken?: string; auth_token?: string}).auth_token ?? undefined;
     logger.info("GitHub", "Fetching tracked/discovered repos for @%s (token=%s)", account.screenName, token ? "set" : "NONE");
     let raws: unknown[];
@@ -30,7 +50,7 @@ export class GithubFetcher implements FetcherPort {
       const tracked = await this.trackingProvider(account);
       if (tracked.length > 0 && this.client.fetchRepositoryById) {
         const resolved: unknown[] = [];
-        let failures = 0;
+        const failures: GithubFetchDiagnostics["failures"] = [];
         for (const repository of tracked) {
           let accessOk = false;
           try {
@@ -39,21 +59,26 @@ export class GithubFetcher implements FetcherPort {
             resolved.push(raw);
             accessOk = true;
           } catch (error) {
-            failures++;
+            const message = error instanceof Error ? error.message : String(error);
+            failures.push({ repositoryId: repository.repositoryId, fullName: repository.fullName, message });
             // A permission loss must not delete the tracking relation or any
-            // history. Skip only this repository and let the run report the
-            // remaining repositories it could still read.
-            logger.warn("GitHub", "Repository %s could not be resolved: %s", repository.fullName, error instanceof Error ? error.message : String(error));
+            // history, and must not discard the repositories that could still
+            // be read. Skip only this one and record it; the caller reports the
+            // gap via getLastFetchDiagnostics() instead of losing the whole run.
+            logger.warn("GitHub", "Repository %s could not be resolved: %s", repository.fullName, message);
             const { markGithubTrackingError } = await import("../../repositories/github-sources");
-            await markGithubTrackingError(account.id, repository.repositoryId, error instanceof Error ? error.message : String(error));
+            await markGithubTrackingError(account.id, repository.repositoryId, message);
           }
           if (accessOk) {
             const { markGithubTrackingAccessOk } = await import("../../repositories/github-sources");
             await markGithubTrackingAccessOk(account.id, repository.repositoryId);
           }
         }
-        if (failures > 0) {
-          throw new Error(`Unable to resolve ${failures} of ${tracked.length} tracked GitHub repositories`);
+        this.diagnostics = { trackedTotal: tracked.length, failed: failures.length, failures };
+        // Resolving nothing means the credential itself is unusable; an empty
+        // list must not be reported as a clean success.
+        if (failures.length === tracked.length) {
+          throw new Error(`Unable to resolve ${failures.length} of ${tracked.length} tracked GitHub repositories`);
         }
         raws = resolved;
       } else {

@@ -9,6 +9,7 @@ import { fetchRedditAccount, fetchRedditPublicAccount } from "./fetchers/reddit"
 import type { AccountRow } from "./repositories/accounts";
 import type { Account } from "./domain/account";
 import type { GithubClient } from "./infra/fetchers/GithubClient";
+import type { GithubFetchDiagnostics } from "./infra/fetchers/GithubFetcher";
 import type { MockGithubClient } from "./infra/fetchers/MockGithubClient";
 import type { FetcherPort } from "./domain/ports";
 import type { CapabilityGap, FetchRunStatus, FetchTrigger } from "./fetch-health";
@@ -115,8 +116,11 @@ async function executeAndRecord(
             merged = r;
           } else if (typeof merged === "object" && typeof r === "object") {
             const m = merged as { status?: string; capabilityGaps?: unknown[] };
-            const rr = r as { capabilityGaps?: unknown[] };
+            const rr = r as { status?: string; capabilityGaps?: unknown[] };
             if (rr.capabilityGaps?.length) m.capabilityGaps = [...(m.capabilityGaps ?? []), ...rr.capabilityGaps];
+            // A gap found by a later level must not be hidden behind an earlier
+            // level's clean success.
+            if (rr.status === "partial" && m.status === "success") m.status = "partial";
           }
         } catch (e) {
           failedLevels++;
@@ -223,6 +227,10 @@ async function executeWithNewArch(account: AccountRow, level: string): Promise<F
   const useMock = isMockMode() || isMockFetcherMode();
   let client: GithubClient | MockGithubClient;
   let fetcher: FetcherPort;
+  // Set for the real GitHub fetcher only. Read after the level's usecase runs
+  // so a tracked repository that could not be read makes the level "partial"
+  // instead of being silently dropped from a clean-looking success.
+  let readGithubDiagnostics: (() => GithubFetchDiagnostics) | null = null;
   if (useMock) {
     const { MockGithubClient } = await import("./infra/fetchers/MockGithubClient");
     const { MockFetcher } = await import("./infra/fetchers/MockFetcher");
@@ -232,7 +240,7 @@ async function executeWithNewArch(account: AccountRow, level: string): Promise<F
     client = new GithubClient();
     const { GithubFetcher } = await import("./infra/fetchers/GithubFetcher");
     const { listGithubSources, listGithubTrackedRepositories } = await import("./repositories/github-sources");
-    fetcher = new GithubFetcher(
+    const githubFetcher = new GithubFetcher(
       client,
       async (account) => {
         const configured = await listGithubSources(account.id);
@@ -241,24 +249,47 @@ async function executeWithNewArch(account: AccountRow, level: string): Promise<F
       async (account) => listGithubTrackedRepositories(account.id),
       level === "l0",
     );
+    fetcher = githubFetcher;
+    readGithubDiagnostics = () => githubFetcher.getLastFetchDiagnostics();
   }
+
+  // A tracked repository that could not be read is reported as a capability gap
+  // rather than a failed run: the repositories that were readable still wrote
+  // their data, and the scheduler/health view can see what was left out.
+  const trackedRepoGaps = (): CapabilityGap[] => {
+    const diagnostics = readGithubDiagnostics?.();
+    if (!diagnostics || diagnostics.failed === 0) return [];
+    const names = diagnostics.failures.map((failure) => failure.fullName).join(", ");
+    return [{
+      capability: "github.tracked_repositories",
+      message: `${diagnostics.failed}/${diagnostics.trackedTotal} tracked repositories could not be read (${names})`,
+    }];
+  };
+  const levelResult = (): FetcherResult => {
+    const capabilityGaps = trackedRepoGaps();
+    return {
+      status: capabilityGaps.length > 0 ? "partial" : "success",
+      errorMessage: null,
+      capabilityGaps,
+    };
+  };
 
   if (level === "l0") {
     const uc = new SyncRepoMeta(repoRepo, fetcher);
     await uc.execute(domainAccount);
-    return { status: "success" as const, errorMessage: null, capabilityGaps: [] };
+    return levelResult();
   }
   if (level === "l1") {
     const { PgReleaseWrite } = await import("./infra/drizzle/PgReleaseWrite");
     const uc = new SyncActivity(repoRepo, fetcher, undefined, client, new PgReleaseWrite());
     await uc.execute(domainAccount);
-    return { status: "success" as const, errorMessage: null, capabilityGaps: [] };
+    return levelResult();
   }
   if (level === "l2") {
     const { SyncTelemetry } = await import("./application/usecases/SyncTelemetry");
     const uc = new SyncTelemetry(repoRepo, fetcher, client);
     await uc.execute(domainAccount);
-    return { status: "success" as const, errorMessage: null, capabilityGaps: [] };
+    return levelResult();
   }
   // l2 and others: new SyncTelemetry is still TODO, fallback to old
   return null as unknown as FetcherResult;
