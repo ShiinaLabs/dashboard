@@ -1,13 +1,17 @@
 import { json } from "@/lib/api-server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { requireSession, authorizeAccountOwner } from "@/lib/auth-helpers";
+import { getAccountByIdWithCredential } from "@/lib/services/accounts";
 import { GithubWatchlistService } from "@/lib/services/github-watchlist";
 import type { AccountRow } from "@/lib/repositories/accounts";
 
 /**
  * Resolve the account for this route: authenticated, owned (or admin), and
- * actually a GitHub account. The PAT is read from the returned account, which
- * `authorizeAccountOwner` has already decrypted.
+ * actually a GitHub account.
+ *
+ * `authorizeAccountOwner` intentionally returns metadata WITHOUT the token, so
+ * the credential is fetched separately and only here — this route is the one
+ * place that legitimately needs the PAT to list candidates.
  */
 async function resolve(req: Request, params: Record<string, string>) {
   const auth = await requireSession(req);
@@ -16,7 +20,14 @@ async function resolve(req: Request, params: Record<string, string>) {
   if (!account) return { error: json({ error: "Account not found" }, { status: 404 }) };
   if (!authorized) return { error: json({ error: "Forbidden" }, { status: 403 }) };
   if (account.platform !== "github") return { error: json({ error: "Not a GitHub account" }, { status: 400 }) };
-  return { account: account as AccountRow };
+  let credential: AccountRow | undefined;
+  try {
+    credential = await getAccountByIdWithCredential(account.id);
+  } catch {
+    return { error: json({ error: "Stored credential cannot be decrypted; update the credential first" }, { status: 409 }) };
+  }
+  if (!credential) return { error: json({ error: "Account not found" }, { status: 404 }) };
+  return { account: credential };
 }
 
 async function GET(req: Request, params: Record<string, string>) {

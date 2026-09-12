@@ -7,6 +7,15 @@ vi.mock("@/lib/auth-helpers", () => ({
   authorizeAccountOwner: (...args: unknown[]) => authorizeAccountOwner(...args),
 }));
 
+const getAccountByIdWithCredential = vi.fn();
+vi.mock("@/lib/services/accounts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/services/accounts")>();
+  return {
+    ...actual,
+    getAccountByIdWithCredential: (...args: unknown[]) => getAccountByIdWithCredential(...args),
+  };
+});
+
 const serviceGet = vi.fn();
 const serviceSave = vi.fn();
 vi.mock("@/lib/services/github-watchlist", async (importOriginal) => {
@@ -42,6 +51,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   requireSession.mockResolvedValue(session);
   authorizeAccountOwner.mockResolvedValue({ authorized: true, account: GITHUB_ACCOUNT });
+  getAccountByIdWithCredential.mockResolvedValue(GITHUB_ACCOUNT);
   serviceGet.mockResolvedValue(PAYLOAD);
   serviceSave.mockResolvedValue(PAYLOAD);
   fetchAuthenticatedOrgs.mockResolvedValue([{ login: "ShiinaLabs", id: 1, node_id: "O_1" }]);
@@ -58,6 +68,13 @@ describe("GET /api/github/watchlist/:accountId", () => {
     expect((await call(watchlistLoader, new Request("http://x/api/github/watchlist/6"))).status).toBe(404);
     authorizeAccountOwner.mockResolvedValue({ authorized: false, account: { ...GITHUB_ACCOUNT, owner_id: 99 } });
     expect((await call(watchlistLoader, new Request("http://x/api/github/watchlist/6"))).status).toBe(403);
+  });
+
+  it("409 when the stored credential cannot be decrypted", async () => {
+    // The token is fetched separately from the authorization result, so a
+    // credential that cannot be decrypted must not become a 500.
+    getAccountByIdWithCredential.mockRejectedValue(new Error("Ciphertext too short"));
+    expect((await call(watchlistLoader, new Request("http://x/api/github/watchlist/6"))).status).toBe(409);
   });
 
   it("400 for a non-GitHub account", async () => {

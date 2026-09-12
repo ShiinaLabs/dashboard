@@ -1,6 +1,7 @@
 import { json } from "@/lib/api-server";
 import type { LoaderFunctionArgs } from "react-router";
 import { requireSession, authorizeAccountOwner } from "@/lib/auth-helpers";
+import { getAccountByIdWithCredential } from "@/lib/services/accounts";
 import { GithubClient } from "@/lib/infra/fetchers/GithubClient";
 
 /**
@@ -20,8 +21,17 @@ async function GET(req: Request, params: Record<string, string>) {
   if (!authorized) return json({ error: "Forbidden" }, { status: 403 });
   if (account.platform !== "github") return json({ error: "Not a GitHub account" }, { status: 400 });
 
+  // The token never travels with the authorization result, so ask for it here.
+  let credential;
   try {
-    const orgs = await new GithubClient().fetchAuthenticatedOrgs(account.auth_token);
+    credential = await getAccountByIdWithCredential(account.id);
+  } catch {
+    return json({ error: "Stored credential cannot be decrypted; update the credential first" }, { status: 409 });
+  }
+  if (!credential) return json({ error: "Account not found" }, { status: 404 });
+
+  try {
+    const orgs = await new GithubClient().fetchAuthenticatedOrgs(credential.auth_token);
     return json({
       orgs: orgs
         .map((raw) => {
