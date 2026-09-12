@@ -57,7 +57,9 @@ export async function getActiveAccounts() {
 
 export async function getAccountById(id: number) {
   if (isMockMode()) return mockAccounts.find((a) => a.id === id);
-  const rows = await getDb().select().from(accounts).where(eq(accounts.id, id)).limit(1);
+  const rows = await getDb().select().from(accounts)
+    .where(and(eq(accounts.id, id), isNull(accounts.deleted_at)))
+    .limit(1);
   return rows[0] as AccountRow | undefined;
 }
 

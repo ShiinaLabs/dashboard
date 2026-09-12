@@ -40,6 +40,7 @@ describe("supported platform guardrails", () => {
       platform: "medium",
       instanceUrl: null,
       authType: null,
+      ownerId: 1,
     })).rejects.toThrow("Unsupported platform: medium");
 
     expect(createAccountRepo).not.toHaveBeenCalled();

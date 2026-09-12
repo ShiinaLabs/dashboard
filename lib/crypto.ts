@@ -4,6 +4,8 @@ import { isMockMode } from "./config";
 const ALGO = "aes-256-gcm";
 const IV_LEN = 12;
 const TAG_LEN = 16;
+const ENCRYPTED_PREFIX = "v1:";
+const MIN_CIPHERTEXT_BYTES = IV_LEN + TAG_LEN + 1;
 
 const g = globalThis as unknown as { __cryptoKey?: Buffer };
 
@@ -46,14 +48,20 @@ export function encrypt(plaintext: string): string {
   const cipher = createCipheriv(ALGO, toU8(key), toU8(iv), { authTagLength: TAG_LEN });
   const encrypted = concatToU8(cipher.update(plaintext, "utf8"), cipher.final());
   const tag = toU8(cipher.getAuthTag());
-  return Buffer.from(concatToU8(iv, tag, Buffer.from(encrypted))).toString("hex");
+  return `${ENCRYPTED_PREFIX}${Buffer.from(concatToU8(iv, tag, Buffer.from(encrypted))).toString("hex")}`;
 }
 
 export function decrypt(ciphertext: string): string {
   if (isMockMode()) return ciphertext;
   const key = getKey();
-  const buf = Buffer.from(ciphertext, "hex");
-  if (buf.length < IV_LEN + TAG_LEN + 1) throw new Error("Ciphertext too short");
+  const encoded = ciphertext.startsWith(ENCRYPTED_PREFIX)
+    ? ciphertext.slice(ENCRYPTED_PREFIX.length)
+    : ciphertext;
+  if (!/^[0-9a-f]+$/i.test(encoded) || encoded.length % 2 !== 0) {
+    throw new Error("Invalid ciphertext encoding");
+  }
+  const buf = Buffer.from(encoded, "hex");
+  if (buf.length < MIN_CIPHERTEXT_BYTES) throw new Error("Ciphertext too short");
   const iv = buf.subarray(0, IV_LEN);
   const tag = buf.subarray(IV_LEN, IV_LEN + TAG_LEN);
   const encrypted = buf.subarray(IV_LEN + TAG_LEN);
@@ -61,6 +69,21 @@ export function decrypt(ciphertext: string): string {
   decipher.setAuthTag(tag);
   const decrypted = concatToU8(decipher.update(toU8(encrypted)), decipher.final());
   return Buffer.from(decrypted).toString("utf8");
+}
+
+/**
+ * Identify values that have the shape of an encrypted credential.
+ *
+ * The prefix covers all newly-written values. The legacy hex check is kept so
+ * key rotation never mistakes an old ciphertext for plaintext and overwrites
+ * it with a ciphertext encrypted by the wrong key.
+ */
+export function isEncryptedCredential(value: string): boolean {
+  if (value.startsWith(ENCRYPTED_PREFIX)) return true;
+  const encoded = value;
+  return /^[0-9a-f]+$/i.test(encoded)
+    && encoded.length % 2 === 0
+    && Buffer.byteLength(encoded, "hex") >= MIN_CIPHERTEXT_BYTES;
 }
 
 export function sign(payload: string): string {

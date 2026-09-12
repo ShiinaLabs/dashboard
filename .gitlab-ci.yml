@@ -40,6 +40,18 @@ build:
 test:
   stage: test
   image: reg.mikumikumi.xyz/mirror/node:20
+  services:
+    - name: postgres:16-alpine
+      alias: postgres
+  variables:
+    POSTGRES_DB: dashboard_test
+    POSTGRES_USER: dashboard
+    POSTGRES_PASSWORD: dashboard
+    PG_HOST: postgres
+    PG_PORT: "5432"
+    PG_DB: dashboard_test
+    PG_USER: dashboard
+    PG_PASSWORD: dashboard
   <<: *build_template
   before_script:
     - npm install -g pnpm@10
@@ -47,6 +59,7 @@ test:
   script:
     - pnpm run lint
     - pnpm run typecheck
+    - pnpm test
 
 deploy:
   stage: deploy
