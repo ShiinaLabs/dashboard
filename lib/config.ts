@@ -97,7 +97,7 @@ export function loadConfig(): DashboardConfig {
 
   g.__dashboardConfig = {
     host: process.env.HOST || "0.0.0.0",
-    port: Number(process.env.PORT) || 3001,
+    port: Number(process.env.PORT) || 3000,
     https: process.env.HTTPS === "true",
     allowedOrigins: parseOrigins(process.env.ALLOWED_ORIGINS),
     passwordHash: process.env.ADMIN_PASSWORD_HASH?.trim() || "",

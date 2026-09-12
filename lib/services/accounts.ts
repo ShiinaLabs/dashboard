@@ -15,7 +15,7 @@ function encToken(plain: string): string {
 function decToken(cipher: string): string {
   try { return decrypt(cipher); } catch (e) {
     getLogger().warn("Service", "decToken: decryption failed (ENCRYPTION_KEY may have changed): %s", e instanceof Error ? e.message : String(e));
-    return cipher;
+    throw new Error("Stored credential cannot be decrypted; check ENCRYPTION_KEY", { cause: e });
   }
 }
 
@@ -52,7 +52,7 @@ export async function getAccountById(id: number) {
 export async function createAccount(data: {
   screenName: string; authToken: string; fetchInterval: number;
   platform?: string; instanceUrl?: string | null; authType?: string | null;
-  ownerId?: number;
+  ownerId: number;
 }) {
   const platform = data.platform ?? "twitter";
   if (!isSupportedPlatform(platform)) {
@@ -61,7 +61,7 @@ export async function createAccount(data: {
 
   const token = encToken(data.authToken);
   const account = await accountsRepo.createAccount({
-    owner_id: data.ownerId ?? 1,
+    owner_id: data.ownerId,
     screen_name: data.screenName,
     auth_token: token,
     fetch_interval: data.fetchInterval,

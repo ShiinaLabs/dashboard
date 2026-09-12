@@ -1,9 +1,10 @@
 // @ts-nocheck — setup/bootstrap; types are loose
 import { join } from "path";
 import { existsSync } from "fs";
-import { initCrypto, encrypt, decrypt } from "./crypto";
+import { initCrypto, encrypt, decrypt, isEncryptedCredential } from "./crypto";
 import { loadConfig, loadOrGenerateKey, dataDir, isMockMode } from "./config";
 import { initPgPool, getPgPool } from "./db/connection";
+import type { Pool } from "pg";
 
 // ═══════════════════════════════════════════════════════════════════
 // Main entry
@@ -93,7 +94,7 @@ async function autoMigrate() {
 // Schema — CREATE TABLE IF NOT EXISTS
 // ═══════════════════════════════════════════════════════════════════
 
-const SCHEMA = [
+export const SCHEMA = [
   { table: "users", sql: `CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'user', created_at TEXT NOT NULL DEFAULT NOW(), deleted_at TEXT)` },
   { table: "accounts", sql: `CREATE TABLE IF NOT EXISTS accounts (id SERIAL PRIMARY KEY, owner_id INTEGER NOT NULL REFERENCES users(id), screen_name TEXT NOT NULL, platform TEXT NOT NULL DEFAULT 'twitter', user_id TEXT, auth_token TEXT NOT NULL, fetch_interval INTEGER DEFAULT 30, is_active INTEGER DEFAULT 1, last_fetched_at TEXT, error_message TEXT, instance_url TEXT, auth_type TEXT, created_at TEXT NOT NULL DEFAULT NOW(), updated_at TEXT NOT NULL DEFAULT NOW(), deleted_at TEXT); CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_screen_name_platform ON accounts(owner_id, screen_name, platform)` },
   { table: "fetch_policy", sql: `CREATE TABLE IF NOT EXISTS fetch_policy (platform TEXT NOT NULL, level TEXT NOT NULL, interval_minutes INTEGER NOT NULL, PRIMARY KEY(platform, level)); INSERT INTO fetch_policy (platform, level, interval_minutes) VALUES ('github','l0',1440),('github','l1',90),('github','l2',480),('gitlab','l0',1440),('gitlab','l1',90),('gitlab','l2',480),('twitter','l0',1440),('twitter','l1',90),('twitter','l2',480),('reddit','l0',1440),('reddit','l1',90),('reddit','l2',480) ON CONFLICT DO NOTHING` },
@@ -127,8 +128,11 @@ const SCHEMA = [
   { table: "ai_quota", sql: `CREATE TABLE IF NOT EXISTS ai_quota (user_id INTEGER PRIMARY KEY REFERENCES users(id), tokens INTEGER NOT NULL DEFAULT 0, period_date TEXT NOT NULL DEFAULT CURRENT_DATE)` },
 ];
 
-async function createMissingTables(): Promise<void> {
-  const pool = getPgPool()!;
+export function getSchemaTableNames(): string[] {
+  return SCHEMA.map(({ table }) => table);
+}
+
+export async function createMissingTables(pool: Pool = getPgPool()!): Promise<void> {
   const { rows: existing } = await pool.query(
     `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'`
   );
@@ -170,8 +174,7 @@ const SCHEMA_COLUMNS = [
   { table: "github_repo_snapshots", ddl: "ADD COLUMN IF NOT EXISTS open_pull_requests INTEGER" },
 ];
 
-async function ensureSchemaColumns(): Promise<void> {
-  const pool = getPgPool()!;
+async function ensureSchemaColumns(pool: Pool = getPgPool()!): Promise<void> {
   for (const { table, ddl } of SCHEMA_COLUMNS) {
     await pool.query(`ALTER TABLE ${table} ${ddl}`);
   }
@@ -298,7 +301,17 @@ async function reEncryptPlaintextTokens(): Promise<void> {
   for (const row of rows) {
     try {
       decrypt(row.auth_token);
-    } catch {
+    } catch (error) {
+      // A failed decrypt can mean the key changed, not that the value is
+      // plaintext. Never overwrite a value that has an encrypted envelope;
+      // doing so would destroy the only copy of a credential we can recover.
+      if (isEncryptedCredential(row.auth_token)) {
+        console.warn(
+          `[Bootstrap] Could not decrypt encrypted token for ${row.platform}:${row.screen_name} (id=${row.id}); leaving it unchanged`,
+          error instanceof Error ? error.message : String(error),
+        );
+        continue;
+      }
       const encrypted = encrypt(row.auth_token);
       await pool.query("UPDATE accounts SET auth_token = $1 WHERE id = $2", [encrypted, row.id]);
       console.log(`[Bootstrap] Re-encrypted token for ${row.platform}:${row.screen_name} (id=${row.id})`);

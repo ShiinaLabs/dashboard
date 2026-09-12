@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { encrypt, decrypt, sign, verifySignature, initCrypto, getJwtSecret } from "../lib/crypto";
+import {
+  encrypt,
+  decrypt,
+  isEncryptedCredential,
+  sign,
+  verifySignature,
+  initCrypto,
+  getJwtSecret,
+} from "../lib/crypto";
 
 beforeAll(() => {
   initCrypto("a".repeat(64)); // deterministic key for testing
@@ -9,8 +17,19 @@ describe("crypto", () => {
   it("encrypts and decrypts", () => {
     const plain = "hello world";
     const encrypted = encrypt(plain);
+    expect(encrypted).toMatch(/^v1:/);
+    expect(isEncryptedCredential(encrypted)).toBe(true);
     expect(encrypted).not.toBe(plain);
     expect(decrypt(encrypted)).toBe(plain);
+  });
+
+  it("recognizes legacy ciphertext without treating ordinary tokens as encrypted", () => {
+    const encrypted = encrypt("legacy token");
+    const legacyCiphertext = encrypted.slice("v1:".length);
+
+    expect(isEncryptedCredential(legacyCiphertext)).toBe(true);
+    expect(isEncryptedCredential("ghp_plaintext-token")).toBe(false);
+    expect(decrypt(legacyCiphertext)).toBe("legacy token");
   });
 
   it("produces different ciphertexts each time (IV randomisation)", () => {

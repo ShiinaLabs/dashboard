@@ -153,7 +153,7 @@ describe("accounts queries", () => {
   it("soft-deletes an account", async () => {
     await accountsQ.deleteAccount(accountId);
     const account = await accountsQ.getAccountById(accountId);
-    expect(account).toBeDefined();
+    expect(account).toBeUndefined();
   });
 });
 

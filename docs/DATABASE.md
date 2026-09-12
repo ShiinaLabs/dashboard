@@ -46,7 +46,9 @@ Migrations are idempotent `CREATE TABLE IF NOT EXISTS` statements executed by `b
 3. Creates any missing tables from the schema list (indexes included in the DDL)
 4. Adds idempotent missing columns required by newer releases
 5. Checks for a legacy SQLite file — if found without a migration flag, logs a warning and skips (the old `bun:sqlite` import is not available in the Node runtime)
-6. Re-encrypts any plaintext `auth_token` values found in `accounts`
+6. Re-encrypts only legacy plaintext `auth_token` values that are distinguishable
+   from encrypted envelopes; values that look encrypted but cannot be decrypted
+   are left untouched so a changed key cannot destroy recoverable ciphertext
 7. Bootstraps the `admin` user if it does not exist (using `ADMIN_PASSWORD_HASH` if set, otherwise a generated random password printed to the console)
 
 `db/migrate.ts` exists only as a backward-compat re-export of `bootstrap()`.
@@ -97,4 +99,6 @@ UPDATE users SET deleted_at = NULL WHERE id = $1;
 
 ## Tests
 
-Unit/integration tests use a separate database (default `dashboard_test`) and re-create all tables from the same DDL via `tests/setup.ts` + `tests/migrate-helper.ts`. See [TESTING.md](TESTING.md).
+Unit/integration tests use a separate database (default `dashboard_test`) and
+re-create all tables from the runtime bootstrap schema via `tests/setup.ts` +
+`tests/migrate-helper.ts`. See [TESTING.md](TESTING.md).

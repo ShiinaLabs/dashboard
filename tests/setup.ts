@@ -1,17 +1,26 @@
 /**
  * Test helper — drop and re-create all tables in the test database
- * using the same SQL as db/migrate.ts.
+ * using the runtime bootstrap schema.
  */
 import { Pool } from "pg";
+import { getSchemaTableNames } from "../lib/setup";
 
 let _pool: Pool | null = null;
 
+export function isSafeTestDatabaseName(name: string): boolean {
+  return name === "test" || /[_-]test$/i.test(name);
+}
+
 export function getTestPool(): Pool {
   if (!_pool) {
+    const database = process.env.PG_DB || "dashboard_test";
+    if (!isSafeTestDatabaseName(database)) {
+      throw new Error(`Refusing to run destructive test setup against unsafe database: ${database}`);
+    }
     _pool = new Pool({
       host: process.env.PG_HOST || "localhost",
       port: Number(process.env.PG_PORT) || 5432,
-      database: process.env.PG_DB || "dashboard_test",
+      database,
       user: process.env.PG_USER || "dashboard",
       password: process.env.PG_PASSWORD || "dashboard",
       max: 2,
@@ -27,20 +36,7 @@ export async function closeTestPool() {
   }
 }
 
-const ALL_TABLES = [
-  "fetch_runs",
-  "github_repository_tracking", "github_sources",
-  "github_release_asset_snapshots", "github_release_assets", "github_releases", "github_paths", "github_referrers",
-  "github_traffic_views", "github_traffic_clones", "github_repo_snapshots",
-  "github_contributions", "github_repos", "github_stats",
-  "gitlab_release_assets", "gitlab_releases", "gitlab_project_snapshots",
-  "gitlab_contributions", "gitlab_projects", "gitlab_stats",
-  "reddit_comments", "reddit_posts", "reddit_stats",
-  "tweets", "user_stats",
-  "settings",
-  "accounts",
-  "users",
-];
+const ALL_TABLES = getSchemaTableNames().reverse();
 
 export async function resetTestDb() {
   const pool = getTestPool();

@@ -94,4 +94,7 @@ describe("my feature", () => {
 
 ## CI
 
-Tests are not yet wired into CI pipelines. The GitLab CI pipeline (`.gitlab-ci.yml`) currently only builds and deploys.
+The GitLab CI test job starts a PostgreSQL 16 service, runs lint and typecheck,
+then executes the full `pnpm test` suite against the isolated `dashboard_test`
+database. The test helper refuses to run destructive setup against a database
+name that is not explicitly marked for tests.
