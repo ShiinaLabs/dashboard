@@ -1,18 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getActiveAccounts = vi.fn();
-const getAccountById = vi.fn();
+const getAccountByIdWithCredential = vi.fn();
 const fetchAccount = vi.fn();
 const fetchGithubAccount = vi.fn();
 const fetchGitlabAccount = vi.fn();
 const fetchRedditAccount = vi.fn();
 const fetchRedditPublicAccount = vi.fn();
 const dispatchFetch = vi.fn();
+const updateAccount = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("../lib/services/accounts", () => ({
   getActiveAccounts,
-  getAccountById,
-  updateAccount: vi.fn().mockResolvedValue(undefined),
+  getAccountByIdWithCredential,
+  updateAccount,
 }));
 
 vi.mock("../lib/fetcher", () => ({
@@ -74,12 +75,12 @@ describe("scheduler", () => {
     };
 
     getActiveAccounts.mockResolvedValue([staleActiveAccount]);
-    getAccountById.mockResolvedValue({ ...staleActiveAccount, is_active: 0 });
+    getAccountByIdWithCredential.mockResolvedValue({ ...staleActiveAccount, is_active: 0 });
 
     const { runCycleOnceForTests } = await import("../lib/scheduler");
     await runCycleOnceForTests();
 
-    expect(getAccountById).toHaveBeenCalledWith(7);
+    expect(getAccountByIdWithCredential).toHaveBeenCalledWith(7);
     expect(fetchAccount).not.toHaveBeenCalled();
   });
 
@@ -102,14 +103,54 @@ describe("scheduler", () => {
     };
 
     getActiveAccounts.mockResolvedValue([dueAccount]);
-    getAccountById.mockResolvedValue(dueAccount);
+    getAccountByIdWithCredential.mockResolvedValue(dueAccount);
     dispatchFetch.mockResolvedValue({ status: "success" });
 
     const { runCycleOnceForTests } = await import("../lib/scheduler");
     await runCycleOnceForTests();
 
-    expect(getAccountById).toHaveBeenCalledWith(8);
+    expect(getAccountByIdWithCredential).toHaveBeenCalledWith(8);
     expect(dispatchFetch).toHaveBeenCalledWith(dueAccount, "scheduler", "l1");
+  });
+
+  it("isolates a credential decryption failure to the affected account", async () => {
+    const brokenAccount = {
+      id: 14,
+      owner_id: 1,
+      screen_name: "broken-user",
+      platform: "twitter",
+      user_id: null,
+      auth_token: "encrypted-token",
+      fetch_interval: 30,
+      is_active: 1,
+      last_fetched_at: null,
+      error_message: null,
+      instance_url: null,
+      auth_type: null,
+      created_at: "2026-07-05T00:00:00.000Z",
+      updated_at: "2026-07-05T00:00:00.000Z",
+    };
+    const healthyAccount = {
+      ...brokenAccount,
+      id: 15,
+      screen_name: "healthy-user",
+      last_fetched_at: new Date(Date.now() - 91 * 60_000).toISOString(),
+    };
+
+    getActiveAccounts.mockResolvedValue([brokenAccount, healthyAccount]);
+    getAccountByIdWithCredential
+      .mockRejectedValueOnce(new Error("Stored credential cannot be decrypted; check ENCRYPTION_KEY"))
+      .mockResolvedValueOnce(healthyAccount);
+    dispatchFetch.mockResolvedValue({ status: "success" });
+
+    const { runCycleOnceForTests } = await import("../lib/scheduler");
+    await runCycleOnceForTests();
+
+    expect(dispatchFetch).toHaveBeenCalledWith(healthyAccount, "scheduler", "l1");
+    expect(updateAccount).toHaveBeenCalledWith(
+      14,
+      expect.objectContaining({ error_message: expect.stringContaining("cannot be decrypted") }),
+    );
   });
 
   it("skips active accounts on unsupported platforms", async () => {
@@ -135,7 +176,7 @@ describe("scheduler", () => {
     const { runCycleOnceForTests } = await import("../lib/scheduler");
     await runCycleOnceForTests();
 
-    expect(getAccountById).not.toHaveBeenCalled();
+    expect(getAccountByIdWithCredential).not.toHaveBeenCalled();
     expect(dispatchFetch).not.toHaveBeenCalled();
     expect(fetchAccount).not.toHaveBeenCalled();
   });

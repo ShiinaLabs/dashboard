@@ -12,8 +12,7 @@ async function GET(req: Request) {
   const ownerId = getOwnerId(auth.user);
   const accounts = await getAccounts(ownerId);
   const overview = await getOverviewStats(accounts.map((a) => a.id));
-  const safe = accounts.map(({ auth_token: _, ...rest }) => rest);
-  return json({ accounts: safe, overview });
+  return json({ accounts, overview });
 }
 
 async function POST(req: Request) {

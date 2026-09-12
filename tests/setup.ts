@@ -4,6 +4,7 @@
  */
 import { Pool } from "pg";
 import { getSchemaTableNames } from "../lib/setup";
+import type { DatabaseConfig } from "../lib/config";
 
 let _pool: Pool | null = null;
 
@@ -11,18 +12,30 @@ export function isSafeTestDatabaseName(name: string): boolean {
   return name === "test" || /[_-]test$/i.test(name);
 }
 
+export function getTestDatabaseConfig(): DatabaseConfig {
+  if (process.env.DATABASE_URL?.trim()) {
+    throw new Error("Refusing to run destructive tests while DATABASE_URL is set");
+  }
+
+  const database = process.env.PG_DB || "dashboard_test";
+  if (!isSafeTestDatabaseName(database)) {
+    throw new Error(`Refusing to run destructive test setup against unsafe database: ${database}`);
+  }
+
+  return {
+    host: process.env.PG_HOST || "localhost",
+    port: Number(process.env.PG_PORT) || 5432,
+    database,
+    user: process.env.PG_USER || "dashboard",
+    password: process.env.PG_PASSWORD || "dashboard",
+  };
+}
+
 export function getTestPool(): Pool {
+  const config = getTestDatabaseConfig();
   if (!_pool) {
-    const database = process.env.PG_DB || "dashboard_test";
-    if (!isSafeTestDatabaseName(database)) {
-      throw new Error(`Refusing to run destructive test setup against unsafe database: ${database}`);
-    }
     _pool = new Pool({
-      host: process.env.PG_HOST || "localhost",
-      port: Number(process.env.PG_PORT) || 5432,
-      database,
-      user: process.env.PG_USER || "dashboard",
-      password: process.env.PG_PASSWORD || "dashboard",
+      ...config,
       max: 2,
     });
   }

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { resetTestDb, getTestPool, closeTestPool } from "./setup";
+import { getTestDatabaseConfig, resetTestDb, getTestPool, closeTestPool } from "./setup";
 import { closeDb, getDb, initPgPool } from "../lib/db/connection";
 import { github_repos } from "@/db/schema";
 import { hasGithubTrackingRelation, getGithubOverview } from "../lib/repositories/github";
@@ -31,8 +31,9 @@ import { getTopContent } from "../lib/services/top-content";
 import { createUser } from "../lib/services/users";
 
 beforeAll(async () => {
+  const databaseConfig = getTestDatabaseConfig();
   await resetTestDb();
-  await initPgPool();
+  await initPgPool(databaseConfig);
 });
 
 describe("fetch run queries", () => {

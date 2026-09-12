@@ -1,6 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { loadConfig } from "../config";
+import type { DatabaseConfig } from "../config";
 import * as schema from "@/db/schema";
 
 // Use globalThis to survive Next.js standalone module identity splits.
@@ -9,9 +10,9 @@ const g = globalThis as unknown as {
   __db?: ReturnType<typeof drizzle>;
 };
 
-export async function initPgPool(): Promise<void> {
+export async function initPgPool(databaseConfig?: DatabaseConfig): Promise<void> {
   if (g.__pgPool) return; // already initialized
-  const cfg = loadConfig().database;
+  const cfg = databaseConfig ?? loadConfig().database;
   if (!cfg) throw new Error("PostgreSQL config missing");
   const { Pool } = await import("pg");
   g.__pgPool = new Pool({

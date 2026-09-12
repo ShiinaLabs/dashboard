@@ -1,9 +1,10 @@
-import { getActiveAccounts, getAccountById } from "./services/accounts";
+import { getActiveAccounts, getAccountByIdWithCredential, updateAccount } from "./services/accounts";
 import { dispatchFetch } from "./fetch-dispatch";
 import { getLogger } from "./logger";
 import { isSupportedPlatform } from "./platforms";
 import { getFetchInterval, type FetchLevel } from "./application/scheduler/fetchPolicy";
 import { getAccountFetchState, upsertAccountFetchState } from "./repositories/account-fetch-state";
+import type { AccountRow } from "./repositories/accounts";
 
 // Minimum seconds between fetching two accounts of the same platform.
 // Prevents hammering a single API with back-to-back full-profile fetches.
@@ -81,7 +82,15 @@ async function runCycle() {
       }
 
       // Re-fetch the account to ensure it's still active and has the latest state.
-      const freshAccount = await getAccountById(account.id);
+      let freshAccount: AccountRow | undefined;
+      try {
+        freshAccount = await getAccountByIdWithCredential(account.id);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        getLogger().warn("Scheduler", "Account %s credential unavailable: %s", account.id, message);
+        await updateAccount(account.id, { error_message: message }).catch(() => undefined);
+        continue;
+      }
       if (!freshAccount || !freshAccount.is_active || !isSupportedPlatform(freshAccount.platform)) {
         continue;
       }
@@ -93,8 +102,7 @@ async function runCycle() {
       } catch { /* per-level state table may not exist yet */ }
       // Also update legacy last_fetched_at for backward compat / health display
       try {
-        const { updateAccount } = await import("./services/accounts");
-        await updateAccount(account.id, { last_fetched_at: new Date().toISOString() } as unknown as Record<string, unknown>);
+        await updateAccount(account.id, { last_fetched_at: new Date().toISOString() });
       } catch { /* legacy update best-effort */ }
 
       lastPlatformFetch.set(freshAccount.platform, Date.now());

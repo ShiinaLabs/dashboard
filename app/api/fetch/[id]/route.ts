@@ -1,6 +1,6 @@
 import { json } from "@/lib/api-server";
 import type { ActionFunctionArgs } from "react-router";
-import { updateAccount } from "@/lib/services/accounts";
+import { getAccountByIdWithCredential, updateAccount } from "@/lib/services/accounts";
 import { isMockMode } from "@/lib/config";
 import { dispatchFetch } from "@/lib/fetch-dispatch";
 import { requireSession, authorizeAccountOwner } from "@/lib/auth-helpers";
@@ -21,7 +21,13 @@ async function POST(req: Request, params: Record<string, string>) {
   if (!account) return json({ error: "Account not found" }, { status: 404 });
   if (!authorized) return json({ error: "Forbidden" }, { status: 403 });
 
-  const acct = account as AccountRow;
+  let acct: AccountRow | undefined;
+  try {
+    acct = await getAccountByIdWithCredential(Number(id));
+  } catch {
+    return json({ error: "Stored credential cannot be decrypted; update the credential first" }, { status: 409 });
+  }
+  if (!acct) return json({ error: "Account not found" }, { status: 404 });
   if (!acct.is_active) {
     await updateAccount(Number(id), { is_active: 1 });
     acct.is_active = 1;

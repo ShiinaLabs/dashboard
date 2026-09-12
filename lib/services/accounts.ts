@@ -5,6 +5,12 @@ import type { AccountRow } from "../repositories/accounts";
 import { isSupportedPlatform } from "../platforms";
 import { validateUpstreamUrl } from "../ssrf-guard";
 
+export type AccountMetadata = Omit<AccountRow, "auth_token">;
+
+function toMetadata({ auth_token: _authToken, ...account }: AccountRow): AccountMetadata {
+  return account;
+}
+
 function encToken(plain: string): string {
   try { return encrypt(plain); } catch (e) {
     getLogger().error("Service", "encToken: encryption failed: %s", e instanceof Error ? e.message : String(e));
@@ -35,18 +41,29 @@ export function assertSafeInstanceUrl(instanceUrl: string | null | undefined): v
 
 export async function getAccounts(ownerId?: number) {
   const rows = await accountsRepo.getAccounts(ownerId);
-  return rows.map(r => ({ ...r, auth_token: decToken(r.auth_token) })) as AccountRow[];
+  return rows.map((row) => toMetadata(row as AccountRow));
 }
 
 export async function getActiveAccounts() {
   const rows = await accountsRepo.getActiveAccounts();
-  return rows.map(r => ({ ...r, auth_token: decToken(r.auth_token) })) as AccountRow[];
+  return rows.map((row) => toMetadata(row as AccountRow));
 }
 
 export async function getAccountById(id: number) {
   const row = await accountsRepo.getAccountById(id);
   if (!row) return undefined;
-  return { ...row, auth_token: decToken(row.auth_token) } as AccountRow;
+  return toMetadata(row);
+}
+
+/**
+ * Decrypt a credential only at an execution boundary that needs to call an
+ * upstream API. Metadata and authorization paths must use getAccountById()
+ * so a single damaged credential cannot lock the account out of the UI.
+ */
+export async function getAccountByIdWithCredential(id: number): Promise<AccountRow | undefined> {
+  const row = await accountsRepo.getAccountById(id);
+  if (!row) return undefined;
+  return { ...row, auth_token: decToken(row.auth_token) };
 }
 
 export async function createAccount(data: {

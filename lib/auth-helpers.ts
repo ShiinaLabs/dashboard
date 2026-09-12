@@ -3,8 +3,7 @@ import { getJwtSecret } from "./crypto";
 import { isMockMode } from "./config";
 import { getRequestCookie } from "./api-server";
 import { getUserByUsername } from "./services/users";
-import { getAccountById, getAccounts } from "./services/accounts";
-import type { AccountRow } from "./repositories/accounts";
+import { getAccountById, getAccounts, type AccountMetadata } from "./services/accounts";
 
 const SESSION_MAX_AGE = 7 * 24 * 60 * 60; // 7 days
 
@@ -66,7 +65,7 @@ export async function requireSession(request: Request): Promise<{ session: AuthS
 export async function authorizeAccountOwner(
   user: AuthUser,
   accountId: number,
-): Promise<{ authorized: boolean; account?: AccountRow }> {
+): Promise<{ authorized: boolean; account?: AccountMetadata }> {
   const account = await getAccountById(accountId);
   if (!account) return { authorized: false };
   // Admin can access all accounts; regular users can only access their own
