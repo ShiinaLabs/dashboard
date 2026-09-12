@@ -3,29 +3,31 @@ stages:
   - build
   - deploy
 
+.build_paths: &build_paths
+  - app/**/*
+  - components/**/*
+  - lib/**/*
+  - shared/**/*
+  - db/**/*
+  - scripts/**/*
+  - locales/**/*
+  - server/**/*
+  - patches/**/*
+  - Dockerfile
+  - .dockerignore
+  - package.json
+  - pnpm-lock.yaml
+  - pnpm-workspace.yaml
+  - react-router.config.ts
+  - vite.config.ts
+  - tsconfig.json
+  - postcss.config.mjs
+  - proxy.ts
+  - .gitlab-ci.yml
+
 .build_template: &build_template
   rules:
-    - changes:
-        - app/**/*
-        - components/**/*
-        - lib/**/*
-        - shared/**/*
-        - db/**/*
-        - scripts/**/*
-        - locales/**/*
-        - server/**/*
-        - patches/**/*
-        - Dockerfile
-        - .dockerignore
-        - package.json
-        - pnpm-lock.yaml
-        - pnpm-workspace.yaml
-        - react-router.config.ts
-        - vite.config.ts
-        - tsconfig.json
-        - postcss.config.mjs
-        - proxy.ts
-        - .gitlab-ci.yml
+    - changes: *build_paths
 
 build:
   stage: build
@@ -66,6 +68,9 @@ deploy:
   image: reg.mikumikumi.xyz/base/kubectl:latest
   needs: [build]
   <<: *build_template
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      changes: *build_paths
   script:
     - echo "${KUBECONFIG}" > ~/.kube/config
     - "kubectl set image -n kaoru statefulset/dashboard dashboard=reg.mikumikumi.xyz/kaoru/dashboard:${CI_COMMIT_SHORT_SHA} --kubeconfig ~/.kube/config"
