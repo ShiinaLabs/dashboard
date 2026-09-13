@@ -57,7 +57,12 @@ async function runCycle() {
       const stateMap = new Map((states ?? []).map(s => [s.level, s.lastFetchedAt ? new Date(s.lastFetchedAt).getTime() : 0]));
       let dueLevel: FetchLevel | null = null;
       for (const level of LEVELS) { // L0: static 24h, L1: stars/issues/PR/release downloads 90m, L2: traffic telemetry 8h
-        const lastFetched = stateMap.get(level) ?? (account.last_fetched_at ? new Date(account.last_fetched_at).getTime() : 0);
+        // A level with no state row has never run, so it is due. Falling back to
+        // the shared `account.last_fetched_at` here starved L0 and L2 outright:
+        // that column is refreshed by every successful fetch of ANY level, and
+        // L1 runs every 90 minutes, so the 24h and 8h intervals were never
+        // reached and neither level ever ran.
+        const lastFetched = stateMap.get(level) ?? 0;
         const intervalMs = getFetchInterval(account.platform, level, null);
         if (now - lastFetched >= intervalMs) {
           dueLevel = level;
