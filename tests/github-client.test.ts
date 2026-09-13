@@ -101,6 +101,44 @@ describe("GithubClient", () => {
     await expect(client.fetchOwnedRepos("tok")).rejects.toThrow("invalid list");
   });
 
+  it("surfaces a traffic endpoint failure instead of returning silent emptiness", async () => {
+    const fetchFn = async (url: string) => {
+      if (url.includes("/traffic/clones")) {
+        return { ok: false, status: 403, text: async () => "Resource not accessible by personal access token" } as any;
+      }
+      return { ok: true, headers: { get: () => null }, json: async () => [] } as any;
+    };
+    const client = new GithubClient(fetchFn as any);
+    const traffic = await client.fetchRepoTraffic("ShiinaLabs/wifi-lens", "tok");
+    expect(traffic.errors).toHaveLength(1);
+    expect(traffic.errors[0]).toContain("403");
+    expect(traffic.errors[0]).toContain("lacks push access");
+  });
+
+  it("treats an empty traffic payload as no data, not as a failure", async () => {
+    // GitHub omits days with no traffic and returns no referrers at all for a
+    // quiet repository, so emptiness must not be reported as an error.
+    const fetchFn = async (url: string) => {
+      const body = url.endsWith("/traffic/clones") ? { clones: [] }
+        : url.endsWith("/traffic/views") ? { views: [] }
+        : [];
+      return { ok: true, headers: { get: () => null }, json: async () => body } as any;
+    };
+    const client = new GithubClient(fetchFn as any);
+    const traffic = await client.fetchRepoTraffic("alice/r", "tok");
+    expect(traffic.errors).toEqual([]);
+    expect(traffic.clones).toEqual([]);
+    expect(traffic.referrers).toEqual([]);
+  });
+
+  it("does not crash the caller when a traffic endpoint returns the wrong shape", async () => {
+    const fetchFn = async () => ({ ok: true, headers: { get: () => null }, json: async () => ({ unexpected: true }) } as any);
+    const client = new GithubClient(fetchFn as any);
+    const traffic = await client.fetchRepoTraffic("alice/r", "tok");
+    expect(traffic.errors).toEqual([]);
+    expect(traffic.paths).toEqual([]);
+  });
+
   it("fetchRepoReleases throws on HTTP errors instead of returning []", async () => {
     const httpError = async () => ({
       ok: false,

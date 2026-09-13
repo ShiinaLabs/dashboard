@@ -64,8 +64,9 @@ export class MockGithubClient {
     views: Array<{ date: string; count: number; uniques: number }>;
     referrers: Array<{ referrer: string; count: number; uniques: number }>;
     paths: Array<{ path: string; title: string | null; count: number; uniques: number }>;
+    errors: string[];
   }> {
-    return { clones: [], views: [], referrers: [], paths: [] };
+    return { clones: [], views: [], referrers: [], paths: [], errors: [] };
   }
 
   async fetchRepoReleases(_fullName: string, _token?: string): Promise<Array<Record<string, unknown>>> {

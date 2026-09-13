@@ -263,8 +263,8 @@ async function executeWithNewArch(account: AccountRow, level: string): Promise<F
       message: `${diagnostics.failed}/${diagnostics.trackedTotal} tracked repositories could not be read (${names})`,
     }];
   };
-  const levelResult = (): FetcherResult => {
-    const capabilityGaps = trackedRepoGaps();
+  const levelResult = (extraGaps: CapabilityGap[] = []): FetcherResult => {
+    const capabilityGaps = [...trackedRepoGaps(), ...extraGaps];
     return {
       status: capabilityGaps.length > 0 ? "partial" : "success",
       errorMessage: null,
@@ -286,8 +286,17 @@ async function executeWithNewArch(account: AccountRow, level: string): Promise<F
   if (level === "l2") {
     const { SyncTelemetry } = await import("./application/usecases/SyncTelemetry");
     const uc = new SyncTelemetry(repoRepo, fetcher, client);
-    await uc.execute(domainAccount);
-    return levelResult();
+    const telemetry = await uc.execute(domainAccount);
+    // Traffic that could not be read must be visible on the run: a repository
+    // whose telemetry quietly stops updating otherwise looks like a chart that
+    // simply stopped, with nothing to explain it.
+    const trafficGaps: CapabilityGap[] = telemetry.trafficFailures.length > 0
+      ? [{
+          capability: "github.traffic",
+          message: `${telemetry.trafficFailures.length}/${telemetry.repos} repositories returned no traffic (${telemetry.trafficFailures.slice(0, 3).map((f) => `${f.fullName}: ${f.message}`).join("; ")})`,
+        }]
+      : [];
+    return levelResult(trafficGaps);
   }
   // l2 and others: new SyncTelemetry is still TODO, fallback to old
   return null as unknown as FetcherResult;

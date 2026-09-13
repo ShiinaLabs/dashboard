@@ -28,6 +28,7 @@ import {
   startFetchRun,
 } from "../lib/repositories/fetch-runs";
 import { getTopContent } from "../lib/services/top-content";
+import { SyncTelemetry } from "../lib/application/usecases/SyncTelemetry";
 import { createUser } from "../lib/services/users";
 
 beforeAll(async () => {
@@ -791,5 +792,79 @@ describe("github discovery sources", () => {
   it("clears every organization when the selection is empty", async () => {
     await setGithubSources(sourceAccount, []);
     expect((await listGithubSourceRows(sourceAccount)).every((r) => !r.enabled)).toBe(true);
+  });
+});
+
+// ─── GitHub L2 telemetry ───────────────────────────────────────────────────
+//
+// These need a database: SyncTelemetry returns early when no pool is
+// initialised, so a unit test without PostgreSQL never reaches the loop.
+
+describe("github L2 telemetry", () => {
+  const telemetryRepo = (accountId: number, repoId: number, fullName: string) => ({
+    type: "RepoMetaFetched" as const,
+    repo: { accountId, repoId, fullName } as never,
+  });
+
+  it("keeps collecting after a repository fails, and reports it", async () => {
+    const accountId = await createWatchAccount("l2");
+    await addGithubRepoFor(accountId, 600001, "alice/ok");
+    await addGithubRepoFor(accountId, 600002, "alice/broken");
+    const account = { id: accountId, screenName: "l2", platform: "github", authToken: "tok" };
+
+    // The failing repository comes FIRST. Previously the per-repository
+    // identity lookup sat outside the guard, so one failure aborted the whole
+    // loop and every repository after it silently stopped updating — a fixed
+    // subset of repositories stayed stale while the rest looked healthy.
+    const fetcher = {
+      fetchRepoMeta: async () => [
+        telemetryRepo(accountId, 600002, "alice/broken"),
+        telemetryRepo(accountId, 600001, "alice/ok"),
+      ],
+    };
+    const client = {
+      fetchRepoTraffic: async (fullName: string) => {
+        if (fullName === "alice/broken") throw new Error("GitHub traffic 500");
+        return { clones: [{ date: "2026-09-12", count: 5, uniques: 2 }], views: [], referrers: [], paths: [], errors: [] };
+      },
+    };
+
+    const result = await new SyncTelemetry({} as never, fetcher as never, client as never).execute(account as never);
+
+    expect(result.repos).toBe(2);
+    expect(result.trafficFailures).toEqual([{ fullName: "alice/broken", message: "GitHub traffic 500" }]);
+    // The repository AFTER the failure was still collected.
+    const written = await getTestPool().query(
+      "SELECT count(*)::int AS n FROM github_traffic_clones WHERE account_id = $1 AND repo_id = 600001",
+      [accountId],
+    );
+    expect(written.rows[0].n).toBe(1);
+  });
+
+  it("writes the data that did come back and reports only the failing endpoints", async () => {
+    const accountId = await createWatchAccount("l2partial");
+    await addGithubRepoFor(accountId, 600003, "alice/partial");
+    const account = { id: accountId, screenName: "l2partial", platform: "github", authToken: "tok" };
+    const fetcher = { fetchRepoMeta: async () => [telemetryRepo(accountId, 600003, "alice/partial")] };
+    const client = {
+      fetchRepoTraffic: async () => ({
+        clones: [{ date: "2026-09-12", count: 9, uniques: 4 }],
+        views: [],
+        referrers: [],
+        paths: [],
+        errors: ["paths 403 (traffic needs push access): Resource not accessible"],
+      }),
+    };
+
+    const result = await new SyncTelemetry({} as never, fetcher as never, client as never).execute(account as never);
+
+    expect(result.trafficFailures).toHaveLength(1);
+    expect(result.trafficFailures[0].message).toContain("push access");
+    const written = await getTestPool().query(
+      "SELECT count, uniques FROM github_traffic_clones WHERE account_id = $1 AND repo_id = 600003",
+      [accountId],
+    );
+    // Partial data is still persisted rather than discarded with the failure.
+    expect(written.rows).toEqual([{ count: 9, uniques: 4 }]);
   });
 });

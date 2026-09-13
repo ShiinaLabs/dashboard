@@ -156,7 +156,7 @@ describe("GitHub L2 telemetry (new arch, mock client, no PG)", () => {
   it("does not throw with empty traffic", async () => {
     const repo = new InMemoryRepo();
     const fakeFetcher = { fetchRepoMeta: async () => [{ type: "RepoMetaFetched" as const, repo: { accountId: 1, repoId: 1, fullName: "alice/r", stars: new Stars(1), forks: new Forks(1), isFork: 0, language: null, description: null, homepage: null, topics: "[]" } }] };
-    const mockClient = { fetchRepoTraffic: async () => ({ clones: [], views: [], referrers: [], paths: [] }) };
+    const mockClient = { fetchRepoTraffic: async () => ({ clones: [], views: [], referrers: [], paths: [], errors: [] }) };
     const uc = new SyncTelemetry(repo as any, fakeFetcher as any, mockClient as any);
     await expect(uc.execute(account as any)).resolves.not.toThrow();
   });
@@ -166,7 +166,7 @@ describe("GitHub L2 telemetry (new arch, mock client, no PG)", () => {
     const fakeFetcher = { fetchRepoMeta: async () => [{ type: "RepoMetaFetched" as const, repo: { accountId: 1, repoId: 1, fullName: "alice/r", stars: new Stars(1), forks: new Forks(1), isFork: 0, language: null, description: null, homepage: null, topics: "[]" } }] };
     const fetchRepoReleases = vi.fn();
     const mockClient = {
-      fetchRepoTraffic: async () => ({ clones: [], views: [], referrers: [], paths: [] }),
+      fetchRepoTraffic: async () => ({ clones: [], views: [], referrers: [], paths: [], errors: [] }),
       fetchRepoReleases,
     };
     const uc = new SyncTelemetry(repo as any, fakeFetcher as any, mockClient as any);
