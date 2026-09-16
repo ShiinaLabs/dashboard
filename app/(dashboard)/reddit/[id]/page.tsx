@@ -20,6 +20,14 @@ import { ChartCardSkeleton, Skeleton } from "@/components/Skeleton";
 import { FetchRunHistory } from "@/components/FetchRunHistory";
 import { AccountActiveButton } from "@/components/AccountActiveButton";
 import { Button } from "@/components/ui";
+import { useEntityTitle } from "@/lib/client/document-title";
+import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
+
+const titleKey = "nav.reddit" satisfies PageTitleKey;
+
+export const meta = pageMeta(titleKey);
+export const handle = { titleKey } satisfies TitleHandle;
+
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -37,6 +45,8 @@ export default function RedditDetail() {
     queryFn: () => api.getAccount(accountId),
     enabled: !!accountId,
   });
+
+  useEntityTitle(account ? account.screen_name : null);
 
   const { data: overview, isLoading: overviewLoading } = useQuery<RedditOverview>({
     queryKey: ["reddit", "overview", accountId],

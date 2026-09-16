@@ -18,6 +18,13 @@ import { calcYAxisWidth } from "@/lib/client/utils";
 import { sumSelectedAssetDownloads } from "@/lib/utils/download-growth";
 import { ActionIcon, Button, Checkbox, TextInput } from "@/components/ui";
 import { ChartCard } from "@/components/domain/shared/ChartCard";
+import { useEntityTitle } from "@/lib/client/document-title";
+import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
+
+const titleKey = "nav.github" satisfies PageTitleKey;
+
+export const meta = pageMeta(titleKey);
+export const handle = { titleKey } satisfies TitleHandle;
 
 const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#10b981", "#6366f1"];
 
@@ -345,6 +352,8 @@ export default function RepoDetail() {
   });
 
   const repo: GithubRepo | undefined = overview?.repos.find((r) => r.repo_id === rid);
+
+  useEntityTitle(repo ? repo.full_name : null);
 
   const { data: snapshots } = useQuery({
     queryKey: ["github", "snapshots", aid, rid, days],

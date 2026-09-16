@@ -4,6 +4,12 @@ import AccountListPage from "@/components/AccountListPage";
 import { RedditIcon } from "@/components/BrandIcons";
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, TrendingUp, ThumbsUp } from "lucide-react";
+import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
+
+const titleKey = "nav.reddit" satisfies PageTitleKey;
+
+export const meta = pageMeta(titleKey);
+export const handle = { titleKey } satisfies TitleHandle;
 
 export default function Reddit() {
   const { t } = useTranslation();

@@ -27,6 +27,13 @@ import { XFollowerGrowthChart } from "@/components/XFollowerGrowthChart";
 import { FetchRunHistory } from "@/components/FetchRunHistory";
 import { AccountActiveButton } from "@/components/AccountActiveButton";
 import { Button, Tabs } from "@/components/ui";
+import { useEntityTitle } from "@/lib/client/document-title";
+import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
+
+const titleKey = "nav.x" satisfies PageTitleKey;
+
+export const meta = pageMeta(titleKey);
+export const handle = { titleKey } satisfies TitleHandle;
 
 function ChartEmptyCard({ title, message, height }: { title: string; message: string; height: number }) {
   return (
@@ -76,6 +83,8 @@ export default function XDetail() {
     queryFn: () => api.getAccount(accountId),
     enabled: !!accountId,
   });
+
+  useEntityTitle(account ? `@${account.screen_name}` : null);
 
   const { data: tweets } = useQuery<PaginatedTweets>({
     queryKey: ["tweets", accountId],

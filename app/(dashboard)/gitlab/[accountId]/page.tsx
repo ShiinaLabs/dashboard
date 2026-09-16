@@ -20,6 +20,13 @@ import { ChartCardSkeleton, Skeleton } from "@/components/Skeleton";
 import { FetchRunHistory } from "@/components/FetchRunHistory";
 import { AccountActiveButton } from "@/components/AccountActiveButton";
 import { Button, Checkbox, Modal } from "@/components/ui";
+import { useEntityTitle } from "@/lib/client/document-title";
+import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
+
+const titleKey = "nav.gitlab" satisfies PageTitleKey;
+
+export const meta = pageMeta(titleKey);
+export const handle = { titleKey } satisfies TitleHandle;
 
 function ContributionHeatmap({ data, tNamespace }: { data: GitlabContribution[]; tNamespace: string }) {
   const { t } = useTranslation();
@@ -123,6 +130,8 @@ export default function GitLabDetail() {
     queryFn: () => api.getAccount(accountId),
     enabled: !!accountId,
   });
+
+  useEntityTitle(account ? account.screen_name : null);
 
   const { data: overview, isLoading: overviewLoading } = useQuery<GitlabOverview>({
     queryKey: ["gitlab", "overview", accountId],

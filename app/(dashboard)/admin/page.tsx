@@ -7,6 +7,12 @@ import { validatePassword } from "@/lib/client/validatePassword";
 import { PasswordHints } from "@/components/ui/PasswordHints";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Alert, Button, PasswordInput, Select, TextInput } from "@/components/ui";
+import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
+
+const titleKey = "nav.admin" satisfies PageTitleKey;
+
+export const meta = pageMeta(titleKey);
+export const handle = { titleKey } satisfies TitleHandle;
 
 export default function Admin() {
   const { t } = useTranslation();

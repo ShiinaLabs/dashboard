@@ -1,6 +1,12 @@
 import { useTranslation } from "react-i18next";
 import AccountListPage from "@/components/AccountListPage";
 import { XIcon } from "@/components/BrandIcons";
+import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
+
+const titleKey = "nav.x" satisfies PageTitleKey;
+
+export const meta = pageMeta(titleKey);
+export const handle = { titleKey } satisfies TitleHandle;
 
 export default function X() {
   const { t } = useTranslation();

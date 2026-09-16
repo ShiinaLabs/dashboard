@@ -16,6 +16,13 @@ import {
 import { ArrowLeft, Star, GitFork, Download, ExternalLink, TrendingUp, Activity } from "lucide-react";
 import { useIsMobile } from "@/lib/client/useIsMobile";
 import { Button } from "@/components/ui";
+import { useEntityTitle } from "@/lib/client/document-title";
+import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
+
+const titleKey = "nav.gitlab" satisfies PageTitleKey;
+
+export const meta = pageMeta(titleKey);
+export const handle = { titleKey } satisfies TitleHandle;
 
 export default function ProjectDetail() {
   const { t } = useTranslation();
@@ -39,6 +46,8 @@ export default function ProjectDetail() {
   const project = overview?.projects.find((p) => p.project_id === pid);
   const account = accountsData?.accounts.find((a: Account) => a.id === aid);
   const instanceUrl = account?.instance_url || "https://gitlab.com";
+
+  useEntityTitle(project ? project.path_with_namespace : null);
 
   const { data: snapshots } = useQuery({
     queryKey: ["gitlab", "snapshots", aid, pid, days],

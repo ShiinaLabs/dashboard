@@ -1,5 +1,11 @@
 import { json } from "@/lib/api-server";
-import { Link } from "react-router";
+import { Link, type MetaFunction } from "react-router";
+import { titleFor } from "@/lib/page-titles";
+
+// No title handle: the page body below is untranslated too, and
+// lib/client/document-title.tsx leaves the meta title alone when a route has
+// no handle rather than flattening it to the bare app name.
+export const meta: MetaFunction = () => [{ title: titleFor("Page not found") }];
 
 /**
  * Catch-all route: matches any URL that no concrete route handles.

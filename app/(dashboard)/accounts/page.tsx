@@ -13,6 +13,12 @@ import { Pencil, Plus, PlayCircle, PauseCircle, Trash2, AlertCircle, ArrowUpRigh
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TriggerPanel } from "@/components/TriggerPanel";
 import { ActionIcon, Button, PasswordInput, TextInput } from "@/components/ui";
+import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
+
+const titleKey = "nav.accounts" satisfies PageTitleKey;
+
+export const meta = pageMeta(titleKey);
+export const handle = { titleKey } satisfies TitleHandle;
 
 const TABS = [
   { key: "twitter", headingKey: "nav.x", basePath: "/x", Icon: XIcon, formatUsername: (a: Account) => `@${a.screen_name}` },

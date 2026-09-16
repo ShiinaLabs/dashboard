@@ -2,6 +2,13 @@ import { useTranslation } from "react-i18next";
 import { type Account } from "@/lib/api";
 import AccountListPage from "@/components/AccountListPage";
 import { GitlabIcon } from "@/components/BrandIcons";
+import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
+
+const titleKey = "nav.gitlab" satisfies PageTitleKey;
+
+export const meta = pageMeta(titleKey);
+export const handle = { titleKey } satisfies TitleHandle;
+
 import { Badge } from "@/components/ui/badge";
 import { Star, GitFork, Users, BookOpen } from "lucide-react";
 

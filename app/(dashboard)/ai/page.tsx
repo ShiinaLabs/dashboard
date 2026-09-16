@@ -2,6 +2,12 @@ import { useTranslation } from "react-i18next";
 import { useAiChat } from "../overview/useAiChat";
 import { AiChatUI } from "@/components/AiChatUI";
 import { useIsMobile } from "@/lib/client/useIsMobile";
+import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
+
+const titleKey = "nav.ai" satisfies PageTitleKey;
+
+export const meta = pageMeta(titleKey);
+export const handle = { titleKey } satisfies TitleHandle;
 
 export default function AiPage() {
   const { t } = useTranslation();

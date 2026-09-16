@@ -14,6 +14,12 @@ import { GitHubSection } from "./GitHubSection";
 import { GitLabSection } from "./GitLabSection";
 import { RedditSection } from "./RedditSection";
 import { isSupportedPlatform } from "@/lib/platforms";
+import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
+
+const titleKey = "nav.overview" satisfies PageTitleKey;
+
+export const meta = pageMeta(titleKey);
+export const handle = { titleKey } satisfies TitleHandle;
 
 export default function Overview() {
   const { t } = useTranslation();

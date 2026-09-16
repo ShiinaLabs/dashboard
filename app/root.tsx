@@ -1,10 +1,19 @@
 import { ColorSchemeScript, mantineHtmlProps } from "@mantine/core";
-import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
+import { Links, Meta, Outlet, Scripts, ScrollRestoration, type MetaFunction } from "react-router";
 import { Providers } from "./providers";
 import { middleware } from "./auth-middleware.server";
+import { DocumentTitleProvider } from "@/lib/client/document-title";
+import { titleFor } from "@/lib/page-titles";
 import "./globals.css";
 
 export { middleware };
+
+/**
+ * Fallback tab title for routes that set none of their own (including the
+ * `(dashboard)` layout itself). Page routes override it through their own
+ * `meta`; see lib/page-titles.ts for why the title is not localized here.
+ */
+export const meta: MetaFunction = () => [{ title: titleFor() }];
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -28,5 +37,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function Root() {
-  return <Outlet />;
+  return (
+    <DocumentTitleProvider>
+      <Outlet />
+    </DocumentTitleProvider>
+  );
 }

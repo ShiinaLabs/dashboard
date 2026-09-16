@@ -6,6 +6,12 @@ import { LayoutDashboard, LogIn, Eye, EyeOff } from "lucide-react";
 import { Alert, Button, PasswordInput, TextInput } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useBingWallpaper } from "@/lib/client/useBingWallpaper";
+import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
+
+const titleKey = "login.login" satisfies PageTitleKey;
+
+export const meta = pageMeta(titleKey);
+export const handle = { titleKey } satisfies TitleHandle;
 
 export default function Login() {
   const { t } = useTranslation();
