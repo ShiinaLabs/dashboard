@@ -371,16 +371,17 @@ describe("github queries", () => {
       is_fork: 0, created_at: null, updated_at: null, pushed_at: null,
     });
 
+    const snapshotDate = new Date().toISOString().slice(0, 10);
     await githubQ.upsertGithubRepoSnapshot({
       account_id: acctId, repo_id: 200, stars: 3, forks: 1, open_issues: 8,
-      snapshot_date: "2026-08-23",
+      snapshot_date: snapshotDate,
     });
     let snapshots = await githubQ.getGithubRepoSnapshots(acctId, 200);
     expect(snapshots[0]).toMatchObject({ open_issues: 8, open_issues_only: null, open_pull_requests: null });
 
     await githubQ.upsertGithubRepoSnapshot({
       account_id: acctId, repo_id: 200, stars: 3, forks: 1, open_issues: 8,
-      open_issues_only: 5, open_pull_requests: 3, snapshot_date: "2026-08-23",
+      open_issues_only: 5, open_pull_requests: 3, snapshot_date: snapshotDate,
     });
     snapshots = await githubQ.getGithubRepoSnapshots(acctId, 200);
     expect(snapshots[0]).toMatchObject({ open_issues: 8, open_issues_only: 5, open_pull_requests: 3 });
