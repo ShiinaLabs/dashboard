@@ -64,6 +64,8 @@ export class SyncTelemetry {
           trafficFailures.push({ fullName: repo.fullName, message: traffic.errors.join("; ") });
           logger.warn("GitHub", "L2 traffic incomplete for %s: %s", repo.fullName, traffic.errors.join("; "));
         }
+        // GitHub revises counts inside its rolling window, so refresh rows for
+        // existing dates instead of keeping only the first value we observed.
         for (const d of traffic.clones) await db.insert(github_traffic_clones).values({ account_id: account.id, repo_id: repo.repoId, repository_id: repositoryId, date: d.date, count: d.count, uniques: d.uniques }).onConflictDoUpdate({
           target: [github_traffic_clones.account_id, github_traffic_clones.repo_id, github_traffic_clones.date],
           set: { repository_id: repositoryId, count: d.count, uniques: d.uniques },
