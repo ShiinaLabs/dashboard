@@ -15,6 +15,5 @@ docs
 .DS_Store
 test.db
 .claude
-.superpowers
 .mimocode
 *.tsbuildinfo
