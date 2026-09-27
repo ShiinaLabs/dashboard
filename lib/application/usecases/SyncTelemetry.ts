@@ -64,10 +64,22 @@ export class SyncTelemetry {
           trafficFailures.push({ fullName: repo.fullName, message: traffic.errors.join("; ") });
           logger.warn("GitHub", "L2 traffic incomplete for %s: %s", repo.fullName, traffic.errors.join("; "));
         }
-        for (const d of traffic.clones) await db.insert(github_traffic_clones).values({ account_id: account.id, repo_id: repo.repoId, repository_id: repositoryId, date: d.date, count: d.count, uniques: d.uniques }).onConflictDoNothing();
-        for (const d of traffic.views) await db.insert(github_traffic_views).values({ account_id: account.id, repo_id: repo.repoId, repository_id: repositoryId, date: d.date, count: d.count, uniques: d.uniques }).onConflictDoNothing();
-        for (const r of traffic.referrers) await db.insert(github_referrers).values({ account_id: account.id, repo_id: repo.repoId, repository_id: repositoryId, referrer: r.referrer, count: r.count, uniques: r.uniques, snapshot_date: today }).onConflictDoNothing();
-        for (const p of traffic.paths) await db.insert(github_paths).values({ account_id: account.id, repo_id: repo.repoId, repository_id: repositoryId, path: p.path, title: p.title, count: p.count, uniques: p.uniques, snapshot_date: today }).onConflictDoNothing();
+        for (const d of traffic.clones) await db.insert(github_traffic_clones).values({ account_id: account.id, repo_id: repo.repoId, repository_id: repositoryId, date: d.date, count: d.count, uniques: d.uniques }).onConflictDoUpdate({
+          target: [github_traffic_clones.account_id, github_traffic_clones.repo_id, github_traffic_clones.date],
+          set: { repository_id: repositoryId, count: d.count, uniques: d.uniques },
+        });
+        for (const d of traffic.views) await db.insert(github_traffic_views).values({ account_id: account.id, repo_id: repo.repoId, repository_id: repositoryId, date: d.date, count: d.count, uniques: d.uniques }).onConflictDoUpdate({
+          target: [github_traffic_views.account_id, github_traffic_views.repo_id, github_traffic_views.date],
+          set: { repository_id: repositoryId, count: d.count, uniques: d.uniques },
+        });
+        for (const r of traffic.referrers) await db.insert(github_referrers).values({ account_id: account.id, repo_id: repo.repoId, repository_id: repositoryId, referrer: r.referrer, count: r.count, uniques: r.uniques, snapshot_date: today }).onConflictDoUpdate({
+          target: [github_referrers.account_id, github_referrers.repo_id, github_referrers.referrer, github_referrers.snapshot_date],
+          set: { repository_id: repositoryId, count: r.count, uniques: r.uniques },
+        });
+        for (const p of traffic.paths) await db.insert(github_paths).values({ account_id: account.id, repo_id: repo.repoId, repository_id: repositoryId, path: p.path, title: p.title, count: p.count, uniques: p.uniques, snapshot_date: today }).onConflictDoUpdate({
+          target: [github_paths.account_id, github_paths.repo_id, github_paths.path, github_paths.snapshot_date],
+          set: { repository_id: repositoryId, title: p.title, count: p.count, uniques: p.uniques },
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         trafficFailures.push({ fullName: repo.fullName, message });

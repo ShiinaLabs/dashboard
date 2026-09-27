@@ -68,7 +68,10 @@ Without recursive reply walking, only ~29 of 82 own tweets were found (35%). Wit
 Steps 4–5 are silently skipped if no PAT is configured on the account.
 
 In the new architecture these split by level: L1 (90m) refreshes release
-download counts, L2 (8h) refreshes traffic/clones/views/referrers/paths.
+download counts, L2 (8h) refreshes traffic/clones/views/referrers/paths. L2 uses
+upserts keyed by account, repository, metric date, and snapshot identity because
+GitHub revises values within its rolling traffic window; ignoring conflicts
+leaves overlapping dates stale until a later snapshot replaces them.
 
 GitHub REST `open_issues_count` includes both Issues and Pull Requests. The dashboard preserves this value in `open_issues` and adds nullable `open_issues_only` / `open_pull_requests` fields where split data is available; null means unknown, not zero.
 

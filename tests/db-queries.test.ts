@@ -841,6 +841,51 @@ describe("github L2 telemetry", () => {
     expect(written.rows[0].n).toBe(1);
   });
 
+  it("updates existing daily traffic rows and popular-item snapshots", async () => {
+    const accountId = await createWatchAccount("l2refresh");
+    await addGithubRepoFor(accountId, 600004, "alice/refresh");
+    const account = { id: accountId, screenName: "l2refresh", platform: "github", authToken: "tok" };
+    const fetcher = { fetchRepoMeta: async () => [telemetryRepo(accountId, 600004, "alice/refresh")] };
+    let count = 5;
+    const client = {
+      fetchRepoTraffic: async () => ({
+        clones: [{ date: "2026-09-12", count, uniques: count - 2 }],
+        views: [{ date: "2026-09-12", count: count * 2, uniques: count }],
+        referrers: [{ referrer: "example.com", count, uniques: count - 2 }],
+        paths: [{ path: "/README.md", title: "README", count, uniques: count - 2 }],
+        errors: [],
+      }),
+    };
+    const sync = new SyncTelemetry({} as never, fetcher as never, client as never);
+
+    await sync.execute(account as never);
+    count = 9;
+    await sync.execute(account as never);
+
+    const pool = getTestPool();
+    const clones = await pool.query(
+      "SELECT count, uniques FROM github_traffic_clones WHERE account_id = $1 AND repo_id = 600004 AND date = '2026-09-12'",
+      [accountId],
+    );
+    const referrers = await pool.query(
+      "SELECT count, uniques FROM github_referrers WHERE account_id = $1 AND repo_id = 600004 AND referrer = 'example.com'",
+      [accountId],
+    );
+    const paths = await pool.query(
+      "SELECT count, uniques FROM github_paths WHERE account_id = $1 AND repo_id = 600004 AND path = '/README.md'",
+      [accountId],
+    );
+    const views = await pool.query(
+      "SELECT count, uniques FROM github_traffic_views WHERE account_id = $1 AND repo_id = 600004 AND date = '2026-09-12'",
+      [accountId],
+    );
+
+    expect(clones.rows).toEqual([{ count: 9, uniques: 7 }]);
+    expect(views.rows).toEqual([{ count: 18, uniques: 9 }]);
+    expect(referrers.rows).toEqual([{ count: 9, uniques: 7 }]);
+    expect(paths.rows).toEqual([{ count: 9, uniques: 7 }]);
+  });
+
   it("writes the data that did come back and reports only the failing endpoints", async () => {
     const accountId = await createWatchAccount("l2partial");
     await addGithubRepoFor(accountId, 600003, "alice/partial");
