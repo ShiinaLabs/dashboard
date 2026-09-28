@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Pause, Play } from "lucide-react";
 import { api } from "@/lib/api";
-import { Button } from "@/components/ui";
+import { Button } from "@/components/ui/form-controls";
 
 // Toggles whether an account is active (fetching enabled). Uses an explicit
 // pause/play icon + label instead of the old ambiguous RefreshCw glyph.

@@ -2,7 +2,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
-import { Card, Group, Stack, Text } from "@mantine/core";
+import { Card } from "@/components/ui/card";
+import { Group, Stack, Text } from "@/components/ui/layout-primitives";
 import { api, type RedditOverview, type RedditPost, type RedditComment } from "@/lib/api";
 import { formatDateTime, formatDate } from "@/lib/client/datetime";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +20,7 @@ import { RedditIcon } from "@/components/BrandIcons";
 import { ChartCardSkeleton, Skeleton } from "@/components/Skeleton";
 import { FetchRunHistory } from "@/components/FetchRunHistory";
 import { AccountActiveButton } from "@/components/AccountActiveButton";
-import { Button } from "@/components/ui";
+import { Button } from "@/components/ui/form-controls";
 import { useEntityTitle } from "@/lib/client/document-title";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 

@@ -6,7 +6,7 @@ import { Users, Plus, Trash2 } from "lucide-react";
 import { validatePassword } from "@/lib/client/validatePassword";
 import { PasswordHints } from "@/components/ui/PasswordHints";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { Alert, Button, PasswordInput, Select, TextInput } from "@/components/ui";
+import { Alert, Button, PasswordInput, Select, TextInput } from "@/components/ui/form-controls";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 
 const titleKey = "nav.admin" satisfies PageTitleKey;

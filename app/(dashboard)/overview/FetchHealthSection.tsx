@@ -6,7 +6,8 @@ import {
   Clock,
   KeyRound,
 } from "lucide-react";
-import { Card, Text } from "@mantine/core";
+import { Card } from "@/components/ui/card";
+import { Text } from "@/components/ui/layout-primitives";
 import { api } from "@/lib/api";
 import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";

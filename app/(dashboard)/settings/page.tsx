@@ -8,7 +8,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { validatePassword } from "@/lib/client/validatePassword";
 import { PasswordHints } from "@/components/ui/PasswordHints";
-import { Alert, Button, PasswordInput, SegmentedControl, Select, TextInput } from "@/components/ui";
+import { Alert, Button, PasswordInput, SegmentedControl, Select, TextInput } from "@/components/ui/form-controls";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 
 const titleKey = "nav.settings" satisfies PageTitleKey;

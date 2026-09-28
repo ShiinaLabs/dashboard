@@ -1,9 +1,9 @@
 import {
-  applyDashboardCssVariables,
+  applyDashboardThemeTokens,
   dashboardThemeIds,
   isDashboardThemeId,
   resolveColorScheme,
-} from "./mantine-theme";
+} from "./theme-tokens";
 
 export interface Theme {
   id: string;
@@ -81,8 +81,7 @@ export function resolveTheme(settings: ThemeSettings, systemColorScheme?: "light
 export function applyTheme(themeId: string) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  const resolvedThemeId = applyDashboardCssVariables(root, themeId);
+  const resolvedThemeId = applyDashboardThemeTokens(root, themeId);
   root.setAttribute("data-theme", resolvedThemeId);
-  root.setAttribute("data-mantine-color-scheme", resolveColorScheme(resolvedThemeId));
   root.classList.toggle("dark", resolveColorScheme(resolvedThemeId) === "dark");
 }

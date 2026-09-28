@@ -16,7 +16,7 @@ import { ArrowLeft, Star, GitFork, Download, ExternalLink, Globe, TrendingUp, Ey
 import { useIsMobile } from "@/lib/client/useIsMobile";
 import { calcYAxisWidth } from "@/lib/client/utils";
 import { sumSelectedAssetDownloads } from "@/lib/utils/download-growth";
-import { ActionIcon, Button, Checkbox, TextInput } from "@/components/ui";
+import { ActionIcon, Button, Checkbox, TextInput } from "@/components/ui/form-controls";
 import { ChartCard } from "@/components/domain/shared/ChartCard";
 import { useEntityTitle } from "@/lib/client/document-title";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";

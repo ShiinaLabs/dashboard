@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Play } from "lucide-react";
 import { api } from "@/lib/api";
 import { getPlatformFetchLevels } from "@/lib/application/scheduler/fetchPolicy";
-import { Button, Select } from "@/components/ui";
+import { Button, Select } from "@/components/ui/form-controls";
 
 // Which trigger levels a platform supports. Sourced from the shared
 // fetchPolicy table so the UI can never offer a level the backend cannot run.

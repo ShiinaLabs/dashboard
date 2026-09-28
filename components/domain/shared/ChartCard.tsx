@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { Card, Text } from "@mantine/core";
-import { cn } from "@/lib/client/utils";
+import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface ChartCardProps {
   title: ReactNode;
@@ -13,23 +13,12 @@ interface ChartCardProps {
 
 export function ChartCard({ title, description, icon, children, className, bodyClassName }: ChartCardProps) {
   return (
-    <Card
-      withBorder
-      radius="md"
-      p={0}
-      className={className}
-      style={{ background: "var(--card)", color: "var(--card-foreground)" }}
-    >
+    <Card p={0} className={className}>
       <div className="chart-card-title" data-slot="chart-card-title">
-        <div className="chart-card-heading">
-          {icon}
-          <Text component="h3" fz="lg" fw={600} lh={1.2}>{title}</Text>
-        </div>
-        {description && <Text size="sm" c="dimmed">{description}</Text>}
+        <div className="chart-card-heading">{icon}<h3 className="text-lg font-semibold leading-tight">{title}</h3></div>
+        {description && <p className="text-sm text-muted-foreground">{description}</p>}
       </div>
-      <div className={cn("chart-card-body", bodyClassName)} data-slot="chart-card-body">
-        {children}
-      </div>
+      <div className={cn("chart-card-body", bodyClassName)} data-slot="chart-card-body">{children}</div>
     </Card>
   );
 }

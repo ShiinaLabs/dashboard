@@ -15,7 +15,7 @@ import {
 } from "recharts";
 import { ArrowLeft, Star, GitFork, Download, ExternalLink, TrendingUp, Activity } from "lucide-react";
 import { useIsMobile } from "@/lib/client/useIsMobile";
-import { Button } from "@/components/ui";
+import { Button } from "@/components/ui/form-controls";
 import { useEntityTitle } from "@/lib/client/document-title";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 

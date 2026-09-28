@@ -1,27 +1,106 @@
-import type { HTMLAttributes, ReactNode } from "react";
-import { Card as MantineCard, Text, type CardProps } from "@mantine/core";
-import { cn } from "@/lib/client/utils";
+import * as React from 'react'
+import { cn } from '@/lib/utils'
 
-export function Card({ className, children, ...props }: CardProps & HTMLAttributes<HTMLDivElement> & { children?: ReactNode }) {
+type CardProps = React.ComponentProps<'div'> & {
+  withBorder?: boolean;
+  radius?: 'sm' | 'md' | 'lg' | 'xl';
+  p?: number | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | { base?: number | 'xs' | 'sm' | 'md' | 'lg' | 'xl'; sm?: number | 'xs' | 'sm' | 'md' | 'lg' | 'xl' };
+};
+
+function paddingClass(p: CardProps['p']) {
+  const size = (value: NonNullable<CardProps['p']>) => typeof value === 'number' ? `p-[${value}px]` : ({ xs: 'p-2', sm: 'p-3', md: 'p-4', lg: 'p-6', xl: 'p-8' }[value as 'xs' | 'sm' | 'md' | 'lg' | 'xl']);
+  if (typeof p === 'object') return cn(p.base !== undefined && size(p.base), p.sm !== undefined && `sm:${size(p.sm)}`);
+  return p !== undefined ? size(p) : undefined;
+}
+
+function Card({ className, withBorder = true, radius = 'xl', p, ...props }: CardProps) {
   return (
-    <MantineCard withBorder radius="md" p={0} className={className} style={{ background: "var(--card)", color: "var(--card-foreground)" }} {...props}>
-      {children}
-    </MantineCard>
-  );
+    <div
+      data-slot='card'
+      className={cn(
+        'flex flex-col rounded-xl bg-card text-card-foreground shadow-sm',
+        withBorder && 'border',
+        { sm: 'rounded-md', md: 'rounded-lg', lg: 'rounded-xl', xl: 'rounded-2xl' }[radius],
+        paddingClass(p),
+        className
+      )}
+      {...props}
+    />
+  )
 }
 
-export function CardHeader({ className, children, ...props }: HTMLAttributes<HTMLDivElement> & { children?: ReactNode }) {
-  return <MantineCard.Section p={{ base: "md", sm: "lg" }} className={cn("flex flex-col gap-1.5", className)} {...props}>{children}</MantineCard.Section>;
+function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      data-slot='card-header'
+      className={cn(
+        '@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-1.5 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6',
+        className
+      )}
+      {...props}
+    />
+  )
 }
 
-export function CardTitle({ className, children, ...props }: HTMLAttributes<HTMLHeadingElement> & { children?: ReactNode }) {
-  return <Text component="h3" fz="lg" fw={600} className={className} {...props}>{children}</Text>;
+function CardTitle({ className, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      data-slot='card-title'
+      className={cn('leading-none font-semibold', className)}
+      {...props}
+    />
+  )
 }
 
-export function CardDescription({ className, children, ...props }: HTMLAttributes<HTMLParagraphElement> & { children?: ReactNode }) {
-  return <Text size="sm" c="dimmed" className={className} {...props}>{children}</Text>;
+function CardDescription({ className, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      data-slot='card-description'
+      className={cn('text-sm text-muted-foreground', className)}
+      {...props}
+    />
+  )
 }
 
-export function CardContent({ className, children, ...props }: HTMLAttributes<HTMLDivElement> & { children?: ReactNode }) {
-  return <MantineCard.Section p={{ base: "md", sm: "lg" }} className={cn("pt-0 sm:pt-0", className)} {...props}>{children}</MantineCard.Section>;
+function CardAction({ className, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      data-slot='card-action'
+      className={cn(
+        'col-start-2 row-span-2 row-start-1 self-start justify-self-end',
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function CardContent({ className, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      data-slot='card-content'
+      className={cn('px-6', className)}
+      {...props}
+    />
+  )
+}
+
+function CardFooter({ className, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      data-slot='card-footer'
+      className={cn('flex items-center px-6 [.border-t]:pt-6', className)}
+      {...props}
+    />
+  )
+}
+
+export {
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardAction,
+  CardDescription,
+  CardContent,
 }

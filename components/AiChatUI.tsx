@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Bot, Send, AlertCircle, Trash2 } from "lucide-react";
 import { renderMarkdown } from "@/lib/client/markdown";
-import { ActionIcon, Alert, Button, TextInput } from "@/components/ui";
+import { ActionIcon, Alert, Button, TextInput } from "@/components/ui/form-controls";
 import type { Message } from "@/app/(dashboard)/overview/useAiChat";
 
 interface AiChatUIProps {

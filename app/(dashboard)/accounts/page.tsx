@@ -12,7 +12,7 @@ import { useNow } from "@/lib/client/use-now";
 import { Pencil, Plus, PlayCircle, PauseCircle, Trash2, AlertCircle, ArrowUpRight } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TriggerPanel } from "@/components/TriggerPanel";
-import { ActionIcon, Button, PasswordInput, TextInput } from "@/components/ui";
+import { ActionIcon, Button, PasswordInput, TextInput } from "@/components/ui/form-controls";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 
 const titleKey = "nav.accounts" satisfies PageTitleKey;

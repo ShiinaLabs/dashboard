@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Card, Table, Text } from "@mantine/core";
+import { Card } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Text } from "@/components/ui/layout-primitives";
 import { BarChart3, TrendingUp } from "lucide-react";
 import { api } from "@/lib/api";
 import { SectionShell } from "@/components/domain/shared/SectionShell";
@@ -55,23 +57,23 @@ export function TopContentSection() {
           p={0}
           style={{ background: "var(--card)", color: "var(--card-foreground)" }}
         >
-          <Table.ScrollContainer minWidth={680}>
+          <div className="w-full overflow-x-auto"><div style={{ minWidth: 680 }}>
             <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
-              <Table.Thead>
-                <Table.Tr className="text-[11px] uppercase tracking-wide text-[var(--muted-foreground)]">
-                  <Table.Th className="w-full font-medium">{t("overview.topContent.colContent")}</Table.Th>
-                  <Table.Th className="whitespace-nowrap font-medium">{t("overview.topContent.colPlatform")}</Table.Th>
-                  <Table.Th className="whitespace-nowrap text-right font-medium">{t("overview.topContent.colMetric")}</Table.Th>
-                  <Table.Th className="whitespace-nowrap text-right font-medium">{t("overview.topContent.colGrowth")}</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
+              <TableHeader>
+                <TableRow className="text-[11px] uppercase tracking-wide text-[var(--muted-foreground)]">
+                  <TableHead className="w-full font-medium">{t("overview.topContent.colContent")}</TableHead>
+                  <TableHead className="whitespace-nowrap font-medium">{t("overview.topContent.colPlatform")}</TableHead>
+                  <TableHead className="whitespace-nowrap text-right font-medium">{t("overview.topContent.colMetric")}</TableHead>
+                  <TableHead className="whitespace-nowrap text-right font-medium">{t("overview.topContent.colGrowth")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {items.slice(0, 15).map((item) => (
                   <TopContentRow key={item.id} item={item} />
                 ))}
-              </Table.Tbody>
+              </TableBody>
             </Table>
-          </Table.ScrollContainer>
+          </div></div>
         </Card>
       )}
     </SectionShell>
@@ -86,8 +88,8 @@ function TopContentRow({ item }: { item: TopContentItem }) {
     : null;
 
   return (
-    <Table.Tr className="transition-colors active:bg-[var(--border)]/50">
-      <Table.Td style={{ width: "100%" }}>
+    <TableRow className="transition-colors active:bg-[var(--border)]/50">
+      <TableCell style={{ width: "100%" }}>
         <div className="top-content-row">
           <span className="top-content-icon" aria-hidden="true"><PlatformIcon platform={item.platform} /></span>
           <div className="top-content-primary">
@@ -104,16 +106,16 @@ function TopContentRow({ item }: { item: TopContentItem }) {
             </p>
           </div>
         </div>
-      </Table.Td>
-      <Table.Td className="whitespace-nowrap text-[11px] text-[var(--muted-foreground)]">
+      </TableCell>
+      <TableCell className="whitespace-nowrap text-[11px] text-[var(--muted-foreground)]">
         {t(`nav.${item.platform === "twitter" ? "x" : item.platform}`)}
-      </Table.Td>
-      <Table.Td className="whitespace-nowrap text-right tabular-nums">
+      </TableCell>
+      <TableCell className="whitespace-nowrap text-right tabular-nums">
         <span className="text-sm font-semibold">{item.metricValue.toLocaleString()}</span>
         {" "}
         <span className="text-[11px] text-[var(--muted-foreground)]">{metricLabel}</span>
-      </Table.Td>
-      <Table.Td className="whitespace-nowrap text-right tabular-nums">
+      </TableCell>
+      <TableCell className="whitespace-nowrap text-right tabular-nums">
         {item.growthRate !== null ? (
           <span className={`inline-flex items-center gap-0.5 text-sm font-semibold ${
             item.growthRate > 0
@@ -128,7 +130,7 @@ function TopContentRow({ item }: { item: TopContentItem }) {
         ) : (
           <span className="text-[11px] text-[var(--muted-foreground)]">—</span>
         )}
-      </Table.Td>
-    </Table.Tr>
+      </TableCell>
+    </TableRow>
   );
 }

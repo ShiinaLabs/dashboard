@@ -3,7 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Card, Group, Stack, Text } from "@mantine/core";
+import { Card } from "@/components/ui/card";
+import { Group, Stack, Text } from "@/components/ui/layout-primitives";
 import { api, type GithubOverview, type GithubContribution, type GithubRepo } from "@/lib/api";
 import { formatDateTime } from "@/lib/client/datetime";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +23,7 @@ import { ChartCardSkeleton, Skeleton } from "@/components/Skeleton";
 import { FetchRunHistory } from "@/components/FetchRunHistory";
 import { GithubWatchlistModal } from "@/components/domain/github/GithubWatchlistModal";
 import { AccountActiveButton } from "@/components/AccountActiveButton";
-import { Button, Checkbox, Modal } from "@/components/ui";
+import { Button, Checkbox, Modal } from "@/components/ui/form-controls";
 import { useEntityTitle } from "@/lib/client/document-title";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 

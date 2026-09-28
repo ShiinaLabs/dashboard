@@ -1,15 +1,13 @@
 import { Star, GitFork } from "lucide-react";
 import { languageColor } from "@/app/(dashboard)/overview/constants";
-import { Button } from "@mantine/core";
+import { Button } from "@/components/ui/button";
 
 export function RepoChip({ name, language, stars, forks, onClick }: {
   name: string; language: string | null; stars: number; forks: number; onClick: () => void;
 }) {
   return (
-    <Button onClick={onClick} variant="light" color="gray" size="sm"
-      className="repo-chip min-w-0"
-      justify="flex-start"
-      classNames={{ inner: "repo-chip-inner", label: "repo-chip-label" }}
+    <Button onClick={onClick} variant="outline" size="sm"
+      className="repo-chip h-auto min-w-0 justify-start px-3 py-2"
     >
       {language && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: languageColor(language) }} />}
       <span className="repo-chip-name text-xs font-medium truncate">{name}</span>

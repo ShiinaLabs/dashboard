@@ -2,7 +2,8 @@ import { useState, type CSSProperties } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Card, Text } from "@mantine/core";
+import { Card } from "@/components/ui/card";
+import { Text } from "@/components/ui/layout-primitives";
 import {
   Activity, GitFork, Layers, MessageSquare,
   Star, TrendingUp,

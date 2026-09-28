@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { Card, Text } from "@mantine/core";
+import { Card } from "@/components/ui/card";
+import { Text } from "@/components/ui/layout-primitives";
 import { MetricCard } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";
 import { SectionShell } from "@/components/domain/shared/SectionShell";

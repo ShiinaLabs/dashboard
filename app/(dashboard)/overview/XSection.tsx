@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { Card, Text } from "@mantine/core";
+import { Card } from "@/components/ui/card";
+import { Text } from "@/components/ui/layout-primitives";
 import { type OverviewStats, type TimelineData, type Tweet, type Account } from "@/lib/api";
 import { MetricCard } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";

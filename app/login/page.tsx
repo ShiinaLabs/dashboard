@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LayoutDashboard, LogIn, Eye, EyeOff } from "lucide-react";
-import { Alert, Button, PasswordInput, TextInput } from "@/components/ui";
+import { Alert, Button, PasswordInput, TextInput } from "@/components/ui/form-controls";
 import { api } from "@/lib/api";
 import { useBingWallpaper } from "@/lib/client/useBingWallpaper";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";

@@ -1,13 +1,7 @@
-import { MantineProvider } from "@mantine/core";
-import { Notifications } from "@mantine/notifications";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import {
-  createDashboardMantineTheme,
-  dashboardCssVariablesResolver,
-  resolveColorScheme,
-} from "@/lib/client/mantine-theme";
+import { Toaster } from "@/components/ui/sonner";
 import { applyTheme, loadSettings, resolveTheme, saveSettings } from "@/lib/client/themes";
 import type { ThemeSettings } from "@/lib/client/themes";
 import "@/lib/client/i18n";
@@ -46,9 +40,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, []);
 
   const themeId = useMemo(() => resolveTheme(settings, systemColorScheme), [settings, systemColorScheme]);
-  const mantineTheme = useMemo(() => createDashboardMantineTheme(themeId), [themeId]);
-  const colorScheme = resolveColorScheme(themeId);
-
   useEffect(() => {
     if (settings.mode !== "system") return;
 
@@ -70,16 +61,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <MantineProvider
-        theme={mantineTheme}
-        cssVariablesResolver={dashboardCssVariablesResolver}
-        forceColorScheme={colorScheme}
-      >
-        <Notifications position="top-right" zIndex={1000} />
-        <ThemeProvider value={{ settings, setSettings }}>
-          {children}
-        </ThemeProvider>
-      </MantineProvider>
+      <ThemeProvider value={{ settings, setSettings }}>
+        <Toaster position="top-right" />
+        {children}
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

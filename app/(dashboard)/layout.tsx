@@ -1,12 +1,12 @@
 import { Outlet } from "react-router";
-import Layout from "@/components/Layout";
+import { AuthenticatedLayout } from "@/components/layout/authenticated-layout";
 import { MockModeBanner } from "@/components/MockModeBanner";
 
 export default function DashboardLayout() {
   return (
-    <Layout>
+    <AuthenticatedLayout>
       <Outlet />
       <MockModeBanner />
-    </Layout>
+    </AuthenticatedLayout>
   );
 }

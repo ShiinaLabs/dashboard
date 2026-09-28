@@ -1,14 +1,7 @@
 import type { ReactNode } from "react";
-import {
-  Card,
-  Group,
-  NumberFormatter,
-  Skeleton as MantineSkeleton,
-  Stack,
-  Text,
-  ThemeIcon,
-} from "@mantine/core";
-import { cn } from "@/lib/client/utils";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 export type MetricCardDensity = "default" | "compact";
 export type MetricCardTone = "primary" | "success" | "warn" | "danger";
@@ -26,152 +19,44 @@ export interface MetricCardProps {
 }
 
 const densityTokens = {
-  default: {
-    padding: { base: "sm", sm: "md" },
-    minHeight: 108,
-    iconSize: 40,
-    iconRadius: "md",
-    valueSize: "xl",
-  },
-  compact: {
-    padding: "md",
-    minHeight: 96,
-    iconSize: 40,
-    iconRadius: "md",
-    valueSize: "xl",
-  },
+  default: { padding: "sm", minHeight: 108, iconSize: 40 },
+  compact: { padding: "md", minHeight: 96, iconSize: 40 },
 } as const;
 
-function getDensityTokens(density: MetricCardDensity) {
-  return densityTokens[density];
-}
-
-export function MetricCard({
-  icon,
-  label,
-  value,
-  hint,
-  density = "default",
-  tone = "primary",
-  className,
-  valuePrefix,
-  valueSuffix,
-}: MetricCardProps) {
-  const tokens = getDensityTokens(density);
-
+export function MetricCard({ icon, label, value, hint, density = "default", tone = "primary", className, valuePrefix, valueSuffix }: MetricCardProps) {
+  const tokens = densityTokens[density];
+  const formattedValue = `${valuePrefix ?? ""}${value.toLocaleString("en-US")}${valueSuffix ?? ""}`;
   return (
     <Card
-      withBorder
-      radius="lg"
       p={tokens.padding}
       className={cn("metric-card", className)}
       data-tone={tone}
-      style={{
-        minHeight: tokens.minHeight,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "var(--card)",
-        color: "var(--card-foreground)",
-        borderColor: `color-mix(in srgb, var(--${tone}) 22%, var(--border))`,
-      }}
+      style={{ minHeight: tokens.minHeight, justifyContent: "center", borderColor: `color-mix(in srgb, var(--${tone}) 22%, var(--border))` }}
     >
-      <Group gap="sm" wrap="nowrap" align="center" style={{ minWidth: 0, width: "100%" }}>
-        <ThemeIcon
-          data-slot="metric-icon"
-          variant="light"
-          color={tone}
-          radius={tokens.iconRadius}
-          size={tokens.iconSize}
-          style={{
-            width: tokens.iconSize,
-            minWidth: tokens.iconSize,
-            height: tokens.iconSize,
-          }}
-        >
-          {icon}
-        </ThemeIcon>
-        <Stack gap={2} justify="center" style={{ minWidth: 0, flex: 1 }}>
-          <Text
-            data-slot="metric-label"
-            size="xs"
-            fw={600}
-            tt="uppercase"
-            c="dimmed"
-            lh={1.25}
-            lineClamp={2}
-            style={{ minWidth: 0 }}
-          >
-            {label}
-          </Text>
-          <Text
-            data-slot="metric-value"
-            component="div"
-            fw={700}
-            fz={tokens.valueSize}
-            lh={1.15}
-            style={{
-              minWidth: 0,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              fontFamily: "var(--font-mono, 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace)",
-              fontVariantNumeric: "tabular-nums",
-            }}
-          >
-            <NumberFormatter value={value} thousandSeparator="," prefix={valuePrefix} suffix={valueSuffix} />
-          </Text>
-          <Text
-            data-slot="metric-hint"
-            size="xs"
-            c="dimmed"
-            lh={1.25}
-            lineClamp={2}
-            style={{ minWidth: 0, opacity: hint != null ? 0.8 : 0 }}
-            aria-hidden={hint != null ? undefined : true}
-          >
-            {hint ?? "No additional context"}
-          </Text>
-        </Stack>
-      </Group>
+      <div className="flex w-full min-w-0 items-center gap-3">
+        <span data-slot="metric-icon" className="grid shrink-0 place-items-center rounded-lg bg-[color-mix(in_srgb,var(--primary)_10%,transparent)] text-[var(--primary)]" style={{ width: tokens.iconSize, height: tokens.iconSize }}>{icon}</span>
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
+          <span data-slot="metric-label" className="line-clamp-2 min-w-0 text-xs font-semibold uppercase leading-tight text-muted-foreground">{label}</span>
+          <span data-slot="metric-value" className="truncate text-xl font-bold leading-tight tabular-nums" style={{ fontFamily: "var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)" }}>{formattedValue}</span>
+          <span data-slot="metric-hint" className="line-clamp-2 min-w-0 text-xs leading-tight text-muted-foreground" style={{ opacity: hint != null ? 0.8 : 0 }} aria-hidden={hint == null}>{hint ?? "No additional context"}</span>
+        </div>
+      </div>
     </Card>
   );
 }
 
 export function MetricCardSkeleton({ density = "default", className }: { density?: MetricCardDensity; className?: string }) {
-  const tokens = getDensityTokens(density);
-
+  const tokens = densityTokens[density];
   return (
-    <Card
-      withBorder
-      radius="lg"
-      p={tokens.padding}
-      className={cn("metric-card", className)}
-      data-tone={"primary"}
-      style={{
-        minHeight: tokens.minHeight,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "var(--card)",
-        color: "var(--card-foreground)",
-        borderColor: "color-mix(in srgb, var(--primary) 22%, var(--border))",
-      }}
-    >
-      <Group gap="sm" wrap="nowrap" align="center" style={{ minWidth: 0, width: "100%" }}>
-        <MantineSkeleton
-          data-slot="metric-skeleton-icon"
-          radius={tokens.iconRadius}
-          width={tokens.iconSize}
-          height={tokens.iconSize}
-          style={{ minWidth: tokens.iconSize }}
-        />
-        <Stack gap={6} justify="center" style={{ minWidth: 0, flex: 1 }}>
-          <MantineSkeleton data-slot="metric-skeleton-label" height={12} width="70%" radius="sm" />
-          <MantineSkeleton data-slot="metric-skeleton-value" height={26} width="62%" radius="sm" />
-          <MantineSkeleton data-slot="metric-skeleton-hint" height={12} width="52%" radius="sm" />
-        </Stack>
-      </Group>
+    <Card p={tokens.padding} className={cn("metric-card justify-center", className)} data-tone="primary" style={{ minHeight: tokens.minHeight, borderColor: "color-mix(in srgb, var(--primary) 22%, var(--border))" }}>
+      <div className="flex w-full min-w-0 items-center gap-3">
+        <Skeleton data-slot="metric-skeleton-icon" className="shrink-0 rounded-lg" style={{ width: tokens.iconSize, height: tokens.iconSize }} />
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
+          <Skeleton data-slot="metric-skeleton-label" className="h-3 w-[70%]" />
+          <Skeleton data-slot="metric-skeleton-value" className="h-6 w-[62%]" />
+          <Skeleton data-slot="metric-skeleton-hint" className="h-3 w-[52%]" />
+        </div>
+      </div>
     </Card>
   );
 }

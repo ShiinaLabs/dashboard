@@ -2,7 +2,10 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, Building2, Check } from "lucide-react";
-import { Badge, Button, Checkbox, Group, Modal, ScrollArea, Stack, Text, TextInput, notifications } from "@/components/ui";
+import { Badge } from "@/components/ui/badge";
+import { Button, Checkbox, Modal, TextInput, notifications } from "@/components/ui/form-controls";
+import { Group, Stack, Text } from "@/components/ui/layout-primitives";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type {
   GithubAvailableOrgsResponse,
   GithubWatchlistCandidate,
@@ -88,7 +91,7 @@ export function GithubWatchlistView(props: GithubWatchlistViewProps) {
           <Button size="compact-xs" variant="light" color="gray" onClick={props.onSelectNone}>{t("githubWatchlist.selectNone")}</Button>
         </Group>
 
-        <ScrollArea.Autosize mah={220} type="auto" mt={4}>
+        <ScrollArea className="my-1 h-[220px]">
           <Stack gap={2}>
             {visible.map((candidate) => (
               <div key={String(candidate.githubId)} data-slot="watchlist-repo-row">
@@ -111,7 +114,7 @@ export function GithubWatchlistView(props: GithubWatchlistViewProps) {
             ))}
             {visible.length === 0 && <Text size="xs" c="dimmed">{t("githubWatchlist.noCandidates")}</Text>}
           </Stack>
-        </ScrollArea.Autosize>
+        </ScrollArea>
 
         {unavailable.length > 0 && (
           <Stack gap={2} mt="xs" data-slot="watchlist-unavailable">

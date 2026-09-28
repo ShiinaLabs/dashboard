@@ -2,7 +2,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
-import { Card, Text } from "@mantine/core";
+import { Card } from "@/components/ui/card";
+import { Text } from "@/components/ui/layout-primitives";
 import { api, type TimelineData, type PaginatedTweets, type Tweet } from "@/lib/api";
 import { formatDateTime, formatDate } from "@/lib/client/datetime";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +27,8 @@ import { TimeRangeSelector } from "@/components/TimeRangeSelector";
 import { XFollowerGrowthChart } from "@/components/XFollowerGrowthChart";
 import { FetchRunHistory } from "@/components/FetchRunHistory";
 import { AccountActiveButton } from "@/components/AccountActiveButton";
-import { Button, Tabs } from "@/components/ui";
+import { Button } from "@/components/ui/form-controls";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEntityTitle } from "@/lib/client/document-title";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 
@@ -251,11 +253,11 @@ export default function XDetail() {
       {(tweets || replies) && (
         <Card className="detail-list-card" withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
           <div className="detail-list-card-header">
-            <Tabs value={tab} onChange={(value) => { if (value === "tweets" || value === "replies") setTab(value); }}>
-              <Tabs.List aria-label={t("xDetail.recentTweets")}>
-                <Tabs.Tab value="tweets">{t("xDetail.recentTweets")}</Tabs.Tab>
-                <Tabs.Tab value="replies">{t("xDetail.recentReplies")}</Tabs.Tab>
-              </Tabs.List>
+            <Tabs value={tab} onValueChange={(value) => { if (value === "tweets" || value === "replies") setTab(value); }}>
+              <TabsList aria-label={t("xDetail.recentTweets")}>
+                <TabsTrigger value="tweets">{t("xDetail.recentTweets")}</TabsTrigger>
+                <TabsTrigger value="replies">{t("xDetail.recentReplies")}</TabsTrigger>
+              </TabsList>
             </Tabs>
           </div>
           <div

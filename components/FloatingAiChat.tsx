@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Bot, X, MapPin } from "lucide-react";
 import { useAiChat } from "@/app/(dashboard)/overview/useAiChat";
 import { AiChatUI } from "./AiChatUI";
-import { ActionIcon } from "@/components/ui";
+import { ActionIcon } from "@/components/ui/form-controls";
 
 const PAGE_LABELS: Record<string, string> = {
   "/": "Overview",
