@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { MantineProvider } from "@mantine/core";
 import { renderToStaticMarkup } from "react-dom/server";
 
 vi.mock("react-i18next", () => ({
@@ -35,9 +34,9 @@ const SNAPSHOTS = [
 
 function renderChart(data: typeof SNAPSHOTS) {
   return renderToStaticMarkup(
-    <MantineProvider>
+
       <XFollowerGrowthChart data={data} />
-    </MantineProvider>,
+    ,
   );
 }
 

@@ -10,20 +10,32 @@ function projectSources(root: string): string[] {
   });
 }
 
-describe("Mantine UI smoke contracts", () => {
-  it("has one MantineProvider and no application-authored native controls", () => {
-    const sources = projectSources("app").concat(projectSources("components"));
-    const source = sources.map((path) => readFileSync(path, "utf8")).join("\n");
-
-    expect(source.match(/<MantineProvider\b/g)?.length).toBe(1);
-    expect(source).not.toMatch(/<(button|input|select|textarea)\b/);
+describe("shadcn UI architecture contracts", () => {
+  it("keeps React Router, React Query, and the existing API client boundary", () => {
+    const layout = readFileSync("components/layout/authenticated-layout.tsx", "utf8");
+    const route = readFileSync("app/(dashboard)/layout.tsx", "utf8");
+    expect(layout).toContain("@tanstack/react-query");
+    expect(layout).toContain("api.checkAuth()");
+    expect(layout).toContain("api.logout()");
+    expect(route).toContain("<Outlet />");
   });
 
-  it("keeps Mantine styles layered before Tailwind utilities without preflight", () => {
+  it("uses the donor sidebar shell with accessible shadcn primitives", () => {
+    const sources = projectSources("components");
+    const source = sources.map((path) => readFileSync(path, "utf8")).join("\n");
+    expect(source).toContain("SidebarProvider");
+    expect(source).toContain("SidebarInset");
+    expect(source).toContain("AlertDialog");
+    expect(source).toContain("SheetContent");
+  });
+
+  it("keeps Tailwind preflight, theme tokens, and motion styling in the root stylesheet", () => {
     const css = readFileSync("app/globals.css", "utf8");
-    expect(css).toContain('@import "@mantine/core/styles.layer.css";');
-    expect(css).toContain('@import "tailwindcss/theme.css" layer(theme);');
-    expect(css).toContain('@import "tailwindcss/utilities.css" layer(utilities);');
-    expect(css).not.toContain("tailwindcss/preflight.css");
+    const tokens = readFileSync("components/ui/theme.css", "utf8");
+    expect(css).toContain('@import "tailwindcss";');
+    expect(css).toContain('@import "tw-animate-css";');
+    for (const token of ["--background", "--foreground", "--card", "--popover", "--primary", "--sidebar-ring"]) {
+      expect(tokens).toContain(token);
+    }
   });
 });

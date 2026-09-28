@@ -1,59 +1,46 @@
-import { DEFAULT_THEME, mergeMantineTheme } from "@mantine/core";
-import { describe, expect, it } from "vitest";
-import { themes } from "@/lib/client/themes";
-import {
-  createDashboardMantineTheme,
-  dashboardCssVariablesResolver,
-  dashboardThemeTokens,
-  resolveColorScheme,
-} from "@/lib/client/mantine-theme";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { applyTheme, DEFAULT_SETTINGS, resolveTheme, themes } from "@/lib/client/themes";
+import { dashboardThemeTokens } from "@/lib/client/theme-tokens";
 
-function resolveThemeVariables(themeId: string) {
-  const theme = mergeMantineTheme(DEFAULT_THEME, createDashboardMantineTheme(themeId));
-  return dashboardCssVariablesResolver(theme);
-}
+describe("dashboard theme tokens", () => {
+  afterEach(() => vi.unstubAllGlobals());
 
-describe("dashboard Mantine theme bridge", () => {
-  it("maps every dashboard theme to Mantine tokens", () => {
-    expect(Object.keys(dashboardThemeTokens)).toHaveLength(12);
-
+  it("provides the shadcn token contract for every saved theme id", () => {
+    expect(themes).toHaveLength(12);
     for (const theme of themes) {
-      const resolved = createDashboardMantineTheme(theme.id);
-
-      expect(dashboardThemeTokens[theme.id]).toBeDefined();
-      expect(resolved.primaryColor).toBe("primary");
-      expect(resolved.colors?.primary).toHaveLength(10);
+      const tokens = dashboardThemeTokens[theme.id as keyof typeof dashboardThemeTokens];
+      expect(tokens.background).toBeTruthy();
+      expect(tokens.foreground).toBeTruthy();
+      expect(tokens.card).toBeTruthy();
+      expect(tokens.primary).toBeTruthy();
+      expect(tokens.chart).toHaveLength(5);
     }
   });
 
-  it("keeps dark state aligned with the dashboard theme", () => {
-    for (const theme of themes) {
-      expect(resolveColorScheme(theme.id)).toBe(theme.id.endsWith("-dark") ? "dark" : "light");
-    }
-  });
+  it("preserves existing settings ids and applies light and dark theme changes", () => {
+    expect(DEFAULT_SETTINGS).toEqual({ mode: "system", lightTheme: "default-light", darkTheme: "default-dark" });
+    expect(resolveTheme({ mode: "light", lightTheme: "rose-light", darkTheme: "default-dark" })).toBe("rose-light");
+    expect(resolveTheme({ mode: "dark", lightTheme: "default-light", darkTheme: "forest-dark" })).toBe("forest-dark");
 
-  it("puts Mantine semantic colors in the active scheme bucket", () => {
-    const light = resolveThemeVariables("default-light");
-    const dark = resolveThemeVariables("sky-dark");
+    const values: Record<string, string> = {};
+    const attributes: Record<string, string> = {};
+    const classes = new Set<string>();
+    const root = {
+      style: { setProperty: (name: string, value: string) => { values[name] = value; } },
+      classList: { toggle: (name: string, enabled: boolean) => enabled ? classes.add(name) : classes.delete(name) },
+      setAttribute: (name: string, value: string) => { attributes[name] = value; },
+    };
+    vi.stubGlobal("document", { documentElement: root });
 
-    expect(light.light).toMatchObject({
-      "--mantine-color-body": "#ffffff",
-      "--mantine-color-text": "#0f172a",
-      "--mantine-color-default": "#ffffff",
-      "--mantine-color-default-hover": "#f1f5f9",
-      "--mantine-color-default-border": "#e2e8f0",
-      "--mantine-color-placeholder": "#64748b",
-    });
-    expect(light.variables["--mantine-color-body"]).toBeUndefined();
+    applyTheme("default-light");
+    expect(attributes["data-theme"]).toBe("default-light");
+    expect(classes.has("dark")).toBe(false);
+    expect(values["--popover"]).toBe(dashboardThemeTokens["default-light"].card);
+    expect(values["--sidebar-border"]).toBe(dashboardThemeTokens["default-light"].border);
 
-    expect(dark.dark).toMatchObject({
-      "--mantine-color-body": "#0c1a2b",
-      "--mantine-color-text": "#d0e8f8",
-      "--mantine-color-default": "#152a40",
-      "--mantine-color-default-hover": "#152a40",
-      "--mantine-color-default-border": "#1e3a55",
-      "--mantine-color-placeholder": "#6a9abc",
-    });
-    expect(dark.variables["--mantine-color-body"]).toBeUndefined();
+    applyTheme("forest-dark");
+    expect(attributes["data-theme"]).toBe("forest-dark");
+    expect(classes.has("dark")).toBe(true);
+    expect(values["--chart-5"]).toBe(dashboardThemeTokens["forest-dark"].chart[4]);
   });
 });

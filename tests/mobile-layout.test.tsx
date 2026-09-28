@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MantineProvider } from "@mantine/core";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -16,28 +15,27 @@ function readProjectFile(path: string) {
 describe("mobile layout contracts", () => {
   it("makes the time range selector fill narrow screens with touch-sized options", () => {
     const html = renderToStaticMarkup(
-      <MantineProvider><TimeRangeSelector value={30} onChange={() => undefined} /></MantineProvider>,
+      <TimeRangeSelector value={30} onChange={() => undefined} />,
     );
 
-    expect(html).toContain("mantine-SegmentedControl-root");
-    expect(html).toContain("data-full-width=\"true\"");
+    expect(html).toContain("role=\"group\"");
+    expect(html).toContain("flex-1");
   });
 
   it("keeps sidebar navigation items touch-sized", () => {
-    const source = readProjectFile("components/Layout.tsx");
+    const source = readProjectFile("components/ui/sidebar.tsx");
 
-    expect(source).toContain("relative flex min-h-11 items-center gap-3");
-    expect(source).toContain("flex min-h-11 items-center gap-3");
+    expect(source).toContain("min-h-11");
   });
 
   it("hydrates the layout from a server-stable sidebar state", () => {
-    const source = readProjectFile("components/Layout.tsx");
+    const source = readProjectFile("components/layout/authenticated-layout.tsx");
 
     // SSR must render the open sidebar deterministically; the client then
     // reconciles via matchMedia / localStorage without a hydration flash.
-    expect(source).toContain("useState(() => {");
+    expect(source).toContain("useState(loadSidebarOpen)");
     expect(source).toContain('typeof window === "undefined"');
-    expect(source).toContain("loadVisible()");
+    expect(source).toContain("loadSidebarOpen()");
   });
 
   it("waits for the client before rendering detected translations", () => {
@@ -90,7 +88,7 @@ describe("mobile layout contracts", () => {
     }
 
     const metricGrid = readProjectFile("components/domain/shared/MetricGrid.tsx");
-    expect(metricGrid).toContain("four: { base: 2, sm: 4 }");
+    expect(metricGrid).toContain('four: "sm:grid-cols-4"');
   });
 
   it("separates account information from mobile card actions", () => {
@@ -124,8 +122,8 @@ describe("mobile layout contracts", () => {
 
     expect(login).toContain("p-5 sm:p-8");
     expect(login.match(/<(TextInput|PasswordInput|Button|Alert)\b/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
-    expect(confirmDialog).toContain("<Modal");
-    expect(confirmDialog).toContain("<TextInput");
+    expect(confirmDialog).toContain("<AlertDialog");
+    expect(confirmDialog).toContain("<Input");
   });
 
   it("keeps account editor fields and cookie controls touch-sized", () => {

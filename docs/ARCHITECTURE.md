@@ -8,7 +8,7 @@
 | **Framework** | React Router 7 (Framework Mode) |
 | **Backend** | React Router route handlers under `app/api/` (same process as frontend) |
 | **Frontend** | React 19 + TypeScript + Vite |
-| **Styling** | Mantine 9.6 theme/components + Tailwind CSS v4 layout utilities |
+| **Styling** | shadcn/ui + Radix UI + Tailwind CSS v4 |
 | **Charts** | Recharts |
 | **Icons** | lucide-react |
 | **Data Fetching** | @tanstack/react-query |
@@ -26,8 +26,8 @@ dashboard/
 │   ├── root.tsx                # Root layout: html shell, globals.css, Providers
 │   ├── routes.ts               # Declarative route table (pages + API)
 │   ├── auth-middleware.server.ts  # Session/auth middleware + lazy DB bootstrap
-│   ├── providers.tsx           # QueryClientProvider + single MantineProvider + ThemeProvider
-│   ├── globals.css             # Mantine layered styles + Tailwind theme/utilities + animations
+│   ├── providers.tsx           # QueryClientProvider + ThemeProvider + Sonner toaster
+│   ├── globals.css             # Tailwind v4 preflight, theme tokens and animations
 │   ├── (dashboard)/            # Dashboard layout + pages (overview, accounts, x, github, gitlab, reddit, settings, admin)
 │   ├── login/                  # Login page
 │   ├── api/                    # API route handlers, one file per endpoint
@@ -42,7 +42,7 @@ dashboard/
 │   ├── NavigatingOverlay.tsx   # Full-screen loading overlay
 │   ├── ThemeProvider.tsx       # Theme context provider
 │   ├── MockModeBanner.tsx      # MOCK MODE indicator when running on fixtures
-│   └── ui/                     # Mantine-backed wrappers and compatibility facades
+│   └── ui/                     # shadcn/ui primitives, Radix wrappers and theme tokens
 ├── db/
 │   ├── schema/                 # Drizzle ORM schema files
 │   │   ├── index.ts            # Re-exports all schemas
@@ -135,4 +135,4 @@ Browser requests flow through `app/auth-middleware.server.ts` (session check + l
 - **Per-platform fetchers** — Each platform has an independent fetcher module (X in `lib/fetcher.ts`, GitHub/GitLab/Reddit in `lib/fetchers/`). The scheduler dispatches per-platform with per-platform cooldowns (X 5 min, others 2 min) and a 60s cycle with jitter.
 - **Multi-user isolation** — `owner_id` on accounts links to `users.id`. Non-admin users only see their own accounts.
 - **Memory-constrained build** — Client and server bundles are built in separate passes (`build:client` with `RR_SKIP_SSR=1`, `build:server` with `RR_SKIP_CLIENT=1`), each with bounded Node heaps, to keep CI memory usage low.
-- **Mantine UI system** — `app/providers.tsx` mounts exactly one `MantineProvider` and one `Notifications` host. `lib/client/mantine-theme.ts` bridges all 12 dashboard themes into Mantine tokens while preserving `data-theme` for legacy CSS during migration. Tailwind preflight is disabled; Tailwind remains a layout utility layer.
+- **shadcn UI system** — `components/ui/` contains the UI primitives adapted from the pinned shadcn-admin donor. The dashboard keeps its 12 theme IDs and localStorage settings; `lib/client/theme-tokens.ts` applies shadcn CSS variables, while Sonner provides notifications. React Router, the API client, and React Query remain the page data boundary.

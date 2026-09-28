@@ -1,14 +1,14 @@
 # Frontend Architecture
 
-React Router 7 (Framework Mode) + React 19 + TypeScript + Mantine 9.6 + Tailwind CSS v4.
+React Router 7 (Framework Mode) + React 19 + TypeScript + shadcn/ui + Radix UI + Tailwind CSS v4.
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | Framework | React Router 7 (Framework Mode) + React 19 |
-| UI components | Mantine 9.6 (`@mantine/core`, `@mantine/notifications`) |
-| Styling | Mantine theme bridge + Tailwind CSS v4 layout utilities |
+| UI components | shadcn/ui primitives built on Radix UI |
+| Styling | shadcn CSS variables + Tailwind CSS v4 |
 | Charts | Recharts |
 | Icons | lucide-react |
 | Data Fetching | @tanstack/react-query |
@@ -47,7 +47,7 @@ components/
 ├── NavigatingOverlay.tsx  # Full-screen spinner overlay during navigation
 ├── ThemeProvider.tsx   # Theme context provider
 ├── MockModeBanner.tsx  # MOCK MODE indicator when running on fixtures
-└── ui/                 # Mantine-backed project wrappers and compatibility facades
+└── ui/                 # shadcn/ui primitives and dashboard controls
 lib/
 ├── api.ts              # API client functions + TypeScript interfaces
 ├── client/             # i18n, themes, useIsMobile, datetime, utils
@@ -102,22 +102,21 @@ Routes are declared in `app/routes.ts` (React Router Framework Mode). All pages 
 
 ## Layout & Sidebar
 
-The main layout (`components/Layout.tsx`) provides:
+The authenticated layout (`components/layout/authenticated-layout.tsx`) uses the shadcn-admin sidebar composition:
 
-- **Title bar** — 48px header with sidebar toggle button and dashboard title; safe-area-inset aware.
-- **Sidebar** — CSS-based with smooth width/transform transitions (0.3s ease)
-  - Desktop: push layout, sidebar slides in/out from left (state persisted to localStorage)
-  - Mobile (<768px): overlay drawer with backdrop, hamburger menu in title bar; opens as a modal dialog (`role="dialog"`, `aria-modal`), closes on Esc/backdrop/nav click, and traps focus while open
-- **Responsive detection** — `lib/client/useIsMobile.ts` for breakpoint-aware behavior
+- **Sidebar** — `SidebarProvider`, `AppSidebar` and `SidebarInset`; desktop collapse state remains persisted under `sidebar-state`.
+- **Header and content** — `Header` and `Main` preserve the safe area and page content width.
+- **Mobile navigation** — Radix Sheet overlay closes on Escape, backdrop click, or route selection; focus is managed by Radix.
+- **Navigation** — React Router links preserve existing route URLs and active-route behavior.
 
 ## Theming
 
-- `app/providers.tsx` owns the single `MantineProvider` and `Notifications` mount.
-- `lib/client/mantine-theme.ts` maps all 12 dashboard themes to typed tokens and ten-shade Mantine palettes.
-- `ThemeProvider` remains the dashboard settings context; `data-theme` and legacy CSS variables remain as a migration bridge.
-- `app/globals.css` imports Mantine's layered styles, Tailwind theme/utilities only, and intentionally omits Tailwind preflight.
+- `app/providers.tsx` owns the React Query client, dashboard `ThemeProvider`, and Sonner toaster.
+- `lib/client/theme-tokens.ts` maps all 12 saved dashboard theme IDs to the shadcn CSS variable contract.
+- `ThemeProvider` remains the dashboard settings context; `data-theme` and theme settings storage IDs are preserved.
+- `app/globals.css` imports Tailwind CSS v4, Preflight, theme tokens and `tw-animate-css`.
 - `components/domain/shared/MetricCard.tsx` and `MetricGrid.tsx` are the canonical metric-card contracts; numeric values are formatted inside the card. `ChartCard.tsx` is the canonical standalone chart container, with explicit title/description and padded plot body slots.
-- Tailwind is retained for page layout and responsive utilities, not as the source of component tokens or interactive controls.
+- Tailwind variables are the component token source; Radix provides accessible interaction behavior.
 
 ## Responsive Design
 

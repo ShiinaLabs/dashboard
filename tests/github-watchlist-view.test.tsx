@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MantineProvider } from "@mantine/core";
 import type { GithubWatchlistViewProps } from "@/components/domain/github/GithubWatchlistModal";
 
 // No jsdom in this repo, so the modal's content is rendered as static markup.
@@ -44,9 +43,9 @@ function render(overrides: Partial<GithubWatchlistViewProps> = {}): string {
     ...overrides,
   };
   return renderToStaticMarkup(
-    <MantineProvider>
+
       <GithubWatchlistView {...props} />
-    </MantineProvider>,
+    ,
   );
 }
 

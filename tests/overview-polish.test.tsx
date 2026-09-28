@@ -1,12 +1,11 @@
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MantineProvider } from "@mantine/core";
 import { describe, expect, it } from "vitest";
 import { MetricCard } from "@/components/domain/shared/MetricCard";
 import { SectionShell } from "@/components/domain/shared/SectionShell";
 
 function render(element: React.ReactElement) {
-  return renderToStaticMarkup(<MantineProvider>{element}</MantineProvider>);
+  return renderToStaticMarkup(<>{element}</>);
 }
 
 describe("overview visual contracts", () => {
@@ -152,8 +151,8 @@ describe("overview visual contracts", () => {
 
     expect(health).toContain("overview-health-issues");
     expect(health).toContain("overview-health-issue-row");
-    expect(css).toMatch(/\.overview-health-issues\s*\{[\s\S]*padding:/);
-    expect(css).toMatch(/(^|\n)p\s*\{\s*margin:\s*0;/);
+    expect(css).toMatch(/\.overview-health-issue-list\s*\{[\s\S]*padding:/);
+    expect(css).toContain('@import "tailwindcss";');
   });
 
   it("gives top-content rows a dedicated icon slot", () => {
@@ -227,20 +226,16 @@ describe("overview visual contracts", () => {
     const repoChip = readFileSync("components/ui/RepoChip.tsx", "utf8");
     const css = readFileSync("app/globals.css", "utf8");
 
-    expect(repoChip).toContain('className="repo-chip min-w-0"');
-    expect(repoChip).toContain('inner: "repo-chip-inner"');
-    expect(repoChip).toContain('label: "repo-chip-label"');
+    expect(repoChip).toContain('className="repo-chip h-auto min-w-0 justify-start px-3 py-2"');
     expect(repoChip).toContain("repo-chip-name");
     expect(repoChip).toContain("repo-chip-stats");
-    expect(css).toMatch(/\.repo-chip-inner\s*\{[\s\S]*width:\s*100%;[\s\S]*gap:/);
-    expect(css).toMatch(/\.repo-chip-label\s*\{[\s\S]*display:\s*flex;[\s\S]*align-items:\s*center;/);
+    expect(css).toMatch(/\.repo-chip\s*\{[\s\S]*display:\s*flex;[\s\S]*align-items:\s*center;[\s\S]*gap:/);
   });
 
   it("centers metric content within the card's vertical inset", () => {
     const metricCard = readFileSync("components/domain/shared/MetricCard.tsx", "utf8");
 
-    expect(metricCard).toContain('display: "flex"');
-    expect(metricCard).toContain('alignItems: "center"');
+    expect(metricCard).toContain('className="flex w-full min-w-0 items-center gap-3"');
     expect(metricCard).toContain('justifyContent: "center"');
   });
 });

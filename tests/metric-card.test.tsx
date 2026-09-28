@@ -1,17 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MantineProvider } from "@mantine/core";
 import type { ReactNode } from "react";
 import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";
 
-function renderWithMantine(element: ReactNode) {
-  return renderToStaticMarkup(<MantineProvider>{element}</MantineProvider>);
+function renderToHtml(element: ReactNode) {
+  return renderToStaticMarkup(<>{element}</>);
 }
 
 describe("MetricCard", () => {
   it("renders stable label, value, hint and icon slots", () => {
-    const html = renderWithMantine(
+    const html = renderToHtml(
       <MetricCard icon={<span>icon</span>} label="Followers" value={12345} hint="Today +12" />,
     );
 
@@ -23,11 +22,11 @@ describe("MetricCard", () => {
     expect(html).toContain("data-slot=\"metric-value\"");
     expect(html).toContain("data-slot=\"metric-hint\"");
     expect(html).toContain("min-height:108px");
-    expect(html).toContain("font-variant-numeric:tabular-nums");
+    expect(html).toContain("tabular-nums");
   });
 
   it("keeps loading geometry equivalent to the card", () => {
-    const html = renderWithMantine(<MetricCardSkeleton />);
+    const html = renderToHtml(<MetricCardSkeleton />);
 
     expect(html).toContain("data-slot=\"metric-skeleton-icon\"");
     expect(html).toContain("data-slot=\"metric-skeleton-value\"");
@@ -36,25 +35,25 @@ describe("MetricCard", () => {
   });
 
   it("preserves the four-column tablet breakpoint", () => {
-    const html = renderWithMantine(
+    const html = renderToHtml(
       <MetricGrid columns="four"><MetricCard icon={<span>icon</span>} label="Followers" value={1} /></MetricGrid>,
     );
 
     expect(html).toContain('data-slot="metric-grid"');
     expect(html).toContain('data-columns="four"');
-    expect(html).toContain("48em");
-    expect(html).toContain("--sg-cols:4");
+    expect(html).toContain("grid-cols-2");
+    expect(html).toContain("sm:grid-cols-4");
   });
 
   it("supports three-column detail summaries without a page-local grid", () => {
-    const html = renderWithMantine(
+    const html = renderToHtml(
       <MetricGrid columns="three">
         <MetricCard icon={<span>icon</span>} label="Followers" value={1} />
       </MetricGrid>,
     );
 
     expect(html).toContain('data-columns="three"');
-    expect(html).toContain("48em");
-    expect(html).toContain("--sg-cols:3");
+    expect(html).toContain("grid-cols-2");
+    expect(html).toContain("sm:grid-cols-3");
   });
 });
