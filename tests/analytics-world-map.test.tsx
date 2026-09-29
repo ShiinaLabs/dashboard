@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { AnalyticsWorldMap } from "@/components/domain/analytics/AnalyticsWorldMap";
-import { projectedCountryPaths, resolveCountryGeometryCode } from "@/components/domain/analytics/world-map/geometry";
+import { projectNaturalEarth1Coordinate, projectedCountryPaths, resolveCountryGeometryCode } from "@/components/domain/analytics/world-map/geometry";
 
 const labels = {
   countries: [{ country: "JP", views: 2 }, { country: "Unknown", views: 5 }],
@@ -13,9 +13,19 @@ const labels = {
   lessLabel: "Less",
   moreLabel: "More",
   viewsLabel: "Views",
+  zoomInLabel: "Zoom in",
+  zoomOutLabel: "Zoom out",
+  resetZoomLabel: "Reset map",
+  interactionHelp: "Scroll to zoom · drag to pan",
 };
 
 describe("AnalyticsWorldMap", () => {
+  it("uses the Natural Earth 1 projection instead of stretching raw longitude and latitude", () => {
+    expect(projectNaturalEarth1Coordinate([0, 0])).toEqual([0, 0]);
+    expect(projectNaturalEarth1Coordinate([30, 0])[0]).toBeCloseTo(0.4559, 4);
+    expect(projectNaturalEarth1Coordinate([0, 45])[1]).toBeCloseTo(0.7931, 4);
+  });
+
   it("maps common geometry identifiers to ISO alpha-2 features", () => {
     const codes = new Set(projectedCountryPaths.map(({ code }) => code));
     for (const code of ["JP", "US", "DE", "CN", "GB", "FR", "CA", "AU", "BR", "IN"]) {
@@ -28,11 +38,13 @@ describe("AnalyticsWorldMap", () => {
 
   it("highlights mapped traffic and keeps unknown and no-traffic countries inactive", () => {
     const markup = renderToStaticMarkup(createElement(AnalyticsWorldMap, labels));
-    expect(markup).toContain('role="img" aria-label="Visitor geography"');
+    expect(markup).toContain('role="group" aria-label="Visitor geography"');
     expect(markup).toContain('data-country-code="JP" data-active="true"');
     expect(markup).toContain('data-country-code="US" data-active="false"');
     expect(markup).not.toContain('data-country-code="Unknown"');
     expect(markup).toContain('aria-label="Japan, 2 views, 20%"');
+    expect(markup).toContain('aria-label="Zoom in"');
+    expect(markup).toContain('aria-label="Reset map"');
   });
 
   it("uses log-scaled intensity so a single view remains visible", () => {

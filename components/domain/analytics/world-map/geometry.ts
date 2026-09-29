@@ -20,21 +20,21 @@ export function resolveCountryGeometryCode(code: string): string | undefined {
 
 export const countryGeometries = countries as CountryGeometry[];
 
-const SQRT3 = Math.sqrt(3);
-
-function project([longitude, latitude]: number[]): [number, number] {
-  const phi = (Math.max(-90, Math.min(90, latitude)) * Math.PI) / 180;
+export function projectNaturalEarth1Coordinate([longitude, latitude]: number[]): [number, number] {
+  const clippedLatitude = Math.max(-90, Math.min(90, latitude));
+  const phi = (clippedLatitude * Math.PI) / 180;
   const lambda = (longitude * Math.PI) / 180;
-  const theta = Math.asin((SQRT3 / 2) * Math.sin(phi));
-  const theta2 = theta * theta;
-  const xFactor = 0.8707 + theta2 * (-0.131979 + theta2 * (-0.013791 + theta2 * (0.003971 - 0.001529 * theta2)));
-  const yFactor = 1.007226 + theta2 * (0.015085 + theta2 * (-0.044475 + theta2 * (0.028874 - 0.005916 * theta2)));
-  return [lambda * Math.cos(theta) * xFactor, theta * yFactor];
+  const phi2 = phi * phi;
+  const phi4 = phi2 * phi2;
+  // Natural Earth 1 raw projection polynomial, equivalent to d3-geo's geoNaturalEarth1.
+  const x = lambda * (0.8707 - 0.131979 * phi2 + phi4 * (-0.013791 + phi4 * (0.003971 * phi2 - 0.001529 * phi4)));
+  const y = phi * (1.007226 + phi2 * (0.015085 + phi4 * (-0.044475 + 0.028874 * phi2 - 0.005916 * phi4)));
+  return [x, y];
 }
 
 function ringPath(ring: number[][]): string {
   return ring.map((coordinate, index) => {
-    const [x, y] = project(coordinate);
+    const [x, y] = projectNaturalEarth1Coordinate(coordinate);
     return `${index === 0 ? "M" : "L"}${x.toFixed(4)},${(-y).toFixed(4)}`;
   }).join("") + "Z";
 }

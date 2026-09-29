@@ -180,6 +180,10 @@ export default function WebAnalyticsPage() {
             lessLabel={t("analytics.less")}
             moreLabel={t("analytics.more")}
             viewsLabel={t("analytics.views")}
+            zoomInLabel={t("analytics.zoomIn")}
+            zoomOutLabel={t("analytics.zoomOut")}
+            resetZoomLabel={t("analytics.resetMap")}
+            interactionHelp={t("analytics.mapInteractionHelp")}
           />
         </ChartCard> : null}
 
