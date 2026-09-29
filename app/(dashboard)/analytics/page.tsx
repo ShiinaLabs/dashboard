@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
+import { notifications } from "@/components/ui/notifications";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 
 const titleKey = "nav.analytics" satisfies PageTitleKey;
@@ -41,6 +42,22 @@ export default function WebAnalyticsPage() {
     enabled: Boolean(selectedSite),
     staleTime: 5 * 60 * 1000,
   });
+  const installationQuery = useQuery({
+    queryKey: ["analytics", "installation", selectedSite?.id],
+    queryFn: () => api.getAnalyticsInstallation(selectedSite!.id),
+    enabled: Boolean(selectedSite),
+  });
+  const collectorNotConfigured = installationQuery.error instanceof ApiError
+    && installationQuery.error.message === "Analytics collector is not configured";
+
+  async function copyTrackingCode() {
+    try {
+      await navigator.clipboard.writeText(installationQuery.data!.snippet);
+      notifications.show({ message: t("analytics.copySuccess"), color: "green" });
+    } catch {
+      notifications.show({ message: t("analytics.copyError"), color: "red" });
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -90,6 +107,23 @@ export default function WebAnalyticsPage() {
           <MetricCard icon={<MousePointerClick />} label={t("analytics.visits")} value={data.visits} />
         </MetricGrid>
       ) : null}
+
+      {selectedSite ? <section className="space-y-4 rounded-xl border bg-card p-5" aria-labelledby="analytics-tracking-setup">
+        <div>
+          <h2 id="analytics-tracking-setup" className="text-lg font-semibold">{t("analytics.trackingSetup")}</h2>
+          {!isPending && !isError ? <p className="mt-1 text-sm text-muted-foreground">{data?.views ? t("analytics.receivingData") : t("analytics.noData")}</p> : null}
+        </div>
+        {installationQuery.isPending ? <p className="text-sm text-muted-foreground">{t("analytics.installationLoading")}</p> : null}
+        {installationQuery.isError ? <Alert variant={collectorNotConfigured ? "default" : "destructive"}>
+          <AlertTitle>{collectorNotConfigured ? t("analytics.collectorNotConfigured") : t("analytics.loadErrorTitle")}</AlertTitle>
+          <AlertDescription>{collectorNotConfigured ? t("analytics.collectorNotConfiguredDescription") : t("analytics.installationLoadError")}</AlertDescription>
+        </Alert> : null}
+        {installationQuery.data ? <div className="space-y-3">
+          <p className="text-sm font-medium">{t("analytics.trackingCode")}</p>
+          <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs"><code>{installationQuery.data.snippet}</code></pre>
+          <Button variant="outline" onClick={copyTrackingCode}>{t("analytics.copyCode")}</Button>
+        </div> : null}
+      </section> : null}
     </div>
   );
 }

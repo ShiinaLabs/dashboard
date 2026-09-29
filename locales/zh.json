@@ -220,7 +220,18 @@
     "sitesLoadError": "无法加载网站，请重试。",
     "createError": "无法保存网站，请检查填写内容后重试。",
     "loadErrorTitle": "无法加载分析数据",
-    "loadErrorDescription": "无法读取已配置站点的数据。请检查 Cloudflare Analytics 配置后重试。"
+    "loadErrorDescription": "无法读取此网站的数据。请检查 Cloudflare Analytics 配置后重试。",
+    "trackingSetup": "追踪设置",
+    "trackingCode": "追踪代码",
+    "copyCode": "复制追踪代码",
+    "copySuccess": "已复制追踪代码",
+    "copyError": "无法复制追踪代码",
+    "receivingData": "正在接收数据",
+    "noData": "尚未收到数据",
+    "installationLoading": "正在加载追踪代码…",
+    "collectorNotConfigured": "尚未配置 Analytics Collector",
+    "collectorNotConfiguredDescription": "设置 ANALYTICS_COLLECTOR_URL 以启用追踪代码安装。",
+    "installationLoadError": "无法加载追踪代码，请重试。"
   },
   "x": {
     "heading": "X (Twitter)",

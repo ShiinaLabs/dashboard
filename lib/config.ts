@@ -159,6 +159,20 @@ export function cloudflareAnalyticsConfig(): CloudflareAnalyticsConfig | null {
   return { accountId, apiToken, dataset };
 }
 
+export function analyticsCollectorUrl(): string | null {
+  const value = process.env.ANALYTICS_COLLECTOR_URL?.trim();
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if ((url.protocol !== "https:" && url.protocol !== "http:") || url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+      return null;
+    }
+    return url.origin.replace(/\/+$/, "");
+  } catch {
+    return null;
+  }
+}
+
 // ── Encryption key ─────────────────────────────────────────────────
 
 export function loadOrGenerateKey(): string {

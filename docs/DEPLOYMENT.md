@@ -68,6 +68,20 @@ pnpm run start
 
 The production app runs as a single React Router process on port 3000 (`node server/index.mjs`).
 
+## Analytics Collector
+
+The optional tracking collector is an independent Cloudflare Worker in `analytics/collector`; it does not add public collection routes to the Node dashboard. It serves `/tracker.js` as a static asset and accepts events at `/collect`, writing to the existing `AnalyticsDataset` Analytics Engine dataset.
+
+Use the repository scripts from the project root:
+
+```bash
+pnpm analytics:collector:dev
+pnpm analytics:collector:check
+pnpm analytics:collector:deploy
+```
+
+Configure the Worker with the Cloudflare account's Analytics Engine access and set the dashboard's public `ANALYTICS_COLLECTOR_URL` to the deployed Worker origin. Deploying the Worker is a separate production infrastructure action from deploying the Node dashboard.
+
 ## Database
 
 ### PostgreSQL (Default)

@@ -59,6 +59,7 @@ Public API paths: `POST /auth/login`, `GET /auth/me`, `GET /reddit/callback`, `G
 | GET | `/analytics/sites` | List sites owned by the current user; admins see all sites |
 | POST | `/analytics/sites` | Create `{ name, host }`; ownership is assigned from the session and the server generates a globally unique Site ID |
 | GET | `/analytics/sites/:id/overview` | Get the selected site's last-seven-day views, visitors, and visits; only its owner or an admin can access it |
+| GET | `/analytics/sites/:id/installation` | Get the tracker URL and escaped installation snippet; only the site's owner or an admin can access it (`503 collector_not_configured` when no collector URL is configured) |
 
 ## Fetch API
 

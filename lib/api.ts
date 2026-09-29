@@ -33,6 +33,11 @@ export interface AnalyticsSite {
   updated_at: string;
 }
 
+export interface AnalyticsInstallation {
+  trackerUrl: string;
+  snippet: string;
+}
+
 export type {
   Account, AccountWithStats, AccountsResponse, OverviewStats,
   Tweet, PaginatedTweets, TimelineData, CalendarDay,
@@ -163,6 +168,7 @@ export const api = {
   createAnalyticsSite: (data: { name: string; host: string }) =>
     apiJson<AnalyticsSite>("/analytics/sites", { method: "POST", body: JSON.stringify(data) }),
   getAnalyticsOverview: (siteId: number) => apiJson<AnalyticsOverview>(`/analytics/sites/${siteId}/overview`),
+  getAnalyticsInstallation: (siteId: number) => apiJson<AnalyticsInstallation>(`/analytics/sites/${siteId}/installation`),
 
   // AI and Settings
   getAiStatus: () => apiJson<{ configured: boolean; quota: { used: number; limit: number } }>("/ai/chat"),

@@ -1,6 +1,6 @@
 # API Boundary Inventory
 
-This inventory mirrors the 57 API route registrations in `app/routes.ts`: 56 concrete route files plus the `/api/*` catch-all. The browser contract stays in `lib/api.ts`; its HTTP details are centralized in `lib/client/api-transport.ts`. The default API root is `/api`. `VITE_API_BASE_URL` is a build-time transport seam for an alternate API root; this step does not enable cross-origin cookie deployment.
+This inventory mirrors the 58 API route registrations in `app/routes.ts`: 57 concrete route files plus the `/api/*` catch-all. The browser contract stays in `lib/api.ts`; its HTTP details are centralized in `lib/client/api-transport.ts`. The default API root is `/api`. `VITE_API_BASE_URL` is a build-time transport seam for an alternate API root; this step does not enable cross-origin cookie deployment.
 
 Unless listed as public below, endpoints require the existing `dash_session` session. Endpoints that target account data additionally enforce the authorization checks present in their route adapter. Admin-only endpoints are marked **admin**.
 
@@ -14,6 +14,7 @@ Unless listed as public below, endpoints require the existing `dash_session` ses
 | `/api/accounts/:id` | GET, PUT, DELETE | session + owner | `getAccount`, `updateAccount`, `deleteAccount` | `accounts.getAccountDetails`, `updateAccountFromInput`, `deleteAccount` | Accounts, Twitter stats, fetch health; confirmation token validation |
 | `/api/analytics/sites` | GET, POST | session | `getAnalyticsSites`, `createAnalyticsSite` | `analytics.getAnalyticsSites`, `analytics.createAnalyticsSite` | Owner-scoped sites; POST owner comes from session |
 | `/api/analytics/sites/:id/overview` | GET | session + owner (admin global) | `getAnalyticsOverview` | `analytics.getAnalyticsOverviewForSite` | Site ownership checked before Cloudflare Analytics Engine query |
+| `/api/analytics/sites/:id/installation` | GET | session + owner (admin global) | `getAnalyticsInstallation` | `analytics.getAnalyticsInstallationForSite` | Site ownership checked before returning the collector tracker snippet; missing public collector URL is a service configuration error |
 | `/api/ai/chat` | GET, POST | session | `getAiStatus`, `streamAiChat` | `ai-analysis.getAiStatus`, `runAgentStream` | AI config/quota/model integration; POST streams a `Response` |
 | `/api/auth/change-password` | POST | session | `changePassword` | Existing auth handler | Auth/password implementation; cookie/session semantics unchanged |
 | `/api/auth/login` | POST | public | `login` | Existing auth handler | Auth implementation; rate limit and session cookie |

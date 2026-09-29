@@ -220,7 +220,18 @@
     "sitesLoadError": "Could not load your websites. Please try again.",
     "createError": "Could not save this website. Check the details and try again.",
     "loadErrorTitle": "Analytics unavailable",
-    "loadErrorDescription": "Could not load analytics for this site. Check the Cloudflare Analytics settings and try again."
+    "loadErrorDescription": "Could not load analytics for this site. Check the Cloudflare Analytics settings and try again.",
+    "trackingSetup": "Tracking Setup",
+    "trackingCode": "Tracking code",
+    "copyCode": "Copy tracking code",
+    "copySuccess": "Tracking code copied",
+    "copyError": "Could not copy the tracking code",
+    "receivingData": "Receiving data",
+    "noData": "No data received yet",
+    "installationLoading": "Loading tracking code…",
+    "collectorNotConfigured": "Analytics collector is not configured",
+    "collectorNotConfiguredDescription": "Set ANALYTICS_COLLECTOR_URL to enable tracker installation.",
+    "installationLoadError": "Could not load the tracking code. Please try again."
   },
   "x": {
     "heading": "X (Twitter)",

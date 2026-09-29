@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { cloudflareAnalyticsConfig, isMockMode } from "../config";
+import { analyticsCollectorUrl, cloudflareAnalyticsConfig, isMockMode } from "../config";
 import {
   createAnalyticsSite as createSite,
   getAnalyticsSiteById as findSite,
@@ -26,7 +26,7 @@ export interface AnalyticsViewer {
 }
 
 export class AnalyticsSiteError extends Error {
-  constructor(readonly code: "invalid_input" | "not_found" | "forbidden") {
+  constructor(readonly code: "invalid_input" | "not_found" | "forbidden" | "collector_not_configured") {
     super(code);
     this.name = "AnalyticsSiteError";
   }
@@ -77,4 +77,25 @@ export async function getAnalyticsOverviewForSite(siteId: number, viewer: Analyt
   const config = cloudflareAnalyticsConfig();
   if (!config) throw new Error("Cloudflare Analytics is not configured");
   return { period: "7d", ...await getTrafficSummary(config, site.site_key) };
+}
+
+export interface AnalyticsInstallation {
+  trackerUrl: string;
+  snippet: string;
+}
+
+function escapeHtmlAttribute(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/'/g, "&#39;");
+}
+
+export async function getAnalyticsInstallationForSite(siteId: number, viewer: AnalyticsViewer): Promise<AnalyticsInstallation> {
+  const site = await getAnalyticsSiteById(siteId);
+  if (!site) throw new AnalyticsSiteError("not_found");
+  if (viewer.role !== "admin" && site.owner_id !== viewer.id) throw new AnalyticsSiteError("forbidden");
+  const collectorUrl = analyticsCollectorUrl();
+  if (!collectorUrl) throw new AnalyticsSiteError("collector_not_configured");
+
+  const trackerUrl = `${collectorUrl}/tracker.js`;
+  const snippet = `<script defer src="${escapeHtmlAttribute(trackerUrl)}" data-site-id="${escapeHtmlAttribute(site.site_key)}" data-site-host="${escapeHtmlAttribute(site.host)}"></script>`;
+  return { trackerUrl, snippet };
 }

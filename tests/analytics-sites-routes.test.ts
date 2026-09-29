@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AnalyticsSiteError, createAnalyticsSite, getAnalyticsOverviewForSite, getAnalyticsSites } from "../lib/services/analytics";
+import { AnalyticsSiteError, createAnalyticsSite, getAnalyticsInstallationForSite, getAnalyticsOverviewForSite, getAnalyticsSites } from "../lib/services/analytics";
 import { loader as sitesLoader, action as sitesAction } from "../app/api/analytics/sites/route";
 import { loader as overviewLoader } from "../app/api/analytics/sites/[id]/overview/route";
+import { loader as installationLoader } from "../app/api/analytics/sites/[id]/installation/route";
 import { requireSession } from "../lib/auth-helpers";
 
 vi.mock("../lib/auth-helpers", () => ({
@@ -10,7 +11,7 @@ vi.mock("../lib/auth-helpers", () => ({
 }));
 vi.mock("../lib/services/analytics", async (importOriginal) => {
   const original = await importOriginal<typeof import("../lib/services/analytics")>();
-  return { ...original, getAnalyticsSites: vi.fn(), createAnalyticsSite: vi.fn(), getAnalyticsOverviewForSite: vi.fn() };
+  return { ...original, getAnalyticsSites: vi.fn(), createAnalyticsSite: vi.fn(), getAnalyticsOverviewForSite: vi.fn(), getAnalyticsInstallationForSite: vi.fn() };
 });
 
 const request = (method = "GET", body?: unknown) => new Request("http://localhost/api/analytics/sites", {
@@ -54,5 +55,28 @@ describe("analytics site routes", () => {
     const admin = await overviewLoader({ request: request(), params: { id: "20" }, context: {} } as never);
     expect(admin.status).toBe(200);
     expect(getAnalyticsOverviewForSite).toHaveBeenLastCalledWith(20, { id: 99, role: "admin" });
+  });
+
+  it("enforces installation ownership and allows admins to access the service", async () => {
+    authAs(10);
+    vi.mocked(getAnalyticsInstallationForSite).mockRejectedValueOnce(new AnalyticsSiteError("forbidden"));
+    const forbidden = await installationLoader({ request: request(), params: { id: "20" }, context: {} } as never);
+    expect(forbidden.status).toBe(403);
+    expect(getAnalyticsInstallationForSite).toHaveBeenLastCalledWith(20, { id: 10, role: "user" });
+
+    authAs(99, "admin");
+    vi.mocked(getAnalyticsInstallationForSite).mockResolvedValue({ trackerUrl: "https://collector.example/tracker.js", snippet: "<script></script>" });
+    const allowed = await installationLoader({ request: request(), params: { id: "20" }, context: {} } as never);
+    expect(allowed.status).toBe(200);
+    expect(getAnalyticsInstallationForSite).toHaveBeenLastCalledWith(20, { id: 99, role: "admin" });
+    await expect(allowed.json()).resolves.toMatchObject({ trackerUrl: "https://collector.example/tracker.js" });
+  });
+
+  it("returns an explicit collector configuration error", async () => {
+    authAs(10);
+    vi.mocked(getAnalyticsInstallationForSite).mockRejectedValue(new AnalyticsSiteError("collector_not_configured"));
+    const response = await installationLoader({ request: request(), params: { id: "20" }, context: {} } as never);
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ error: "Analytics collector is not configured", code: "collector_not_configured" });
   });
 });
