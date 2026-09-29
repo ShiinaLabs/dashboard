@@ -28,7 +28,13 @@ describe("Web Analytics boundaries", () => {
     expect(page).toContain("api.getAnalyticsSites");
     expect(page).toContain("api.getAnalyticsInstallation(selectedSite!.id)");
     expect(page).toContain("getAnalyticsDashboard(selectedSite!.id, selectedRange, timezone!)");
-    expect(page).toContain('["analytics", "dashboard", selectedSite?.id, selectedRange, timezone]');
+    expect(page).toContain('["analytics", "dashboard", selectedSiteId, selectedRange, timezone]');
+    expect(page).toContain('["analytics", "global-dashboard", selectedRange, timezone]');
+    expect(page).toContain('useState<"all" | number>("all")');
+    expect(page).not.toContain("?? sites[0]");
+    expect(page).toContain('selectedSiteId === "all"');
+    expect(page).toContain('value="all"');
+    expect(page).toContain("api.renameAnalyticsSite(selectedSite!.id, { name: siteName })");
     expect(page).not.toContain("api.getAnalyticsTraffic(");
     expect(page).not.toContain("getAnalyticsAcquisition(");
     expect(page).not.toContain("dimensionData?.referrers");
@@ -44,6 +50,32 @@ describe("Web Analytics boundaries", () => {
     expect(graphqlClient).toContain("export async function getAnalyticsDashboard");
     expect(graphqlClient).toContain("previousOverview { views visits visitorDays }");
     expect(graphqlClient).toContain("timeline { date views visitors visits }");
+    expect(graphqlClient).toContain("export async function getAnalyticsGlobalDashboard(");
+    expect(graphqlClient).toContain("globalDashboard(range: $range, timezone: $timezone)");
+  });
+
+  it("keeps the global dashboard as one owner-scoped SQL read without visitor or path aggregates", () => {
+    const repository = readFileSync("lib/repositories/analytics-events.ts", "utf8");
+    const start = repository.indexOf("export async function getAnalyticsGlobalDashboardReport(");
+    const globalQuery = repository.slice(start);
+    expect(globalQuery.match(/CURRENT_TIMESTAMP/g)).toHaveLength(1);
+    for (const cte of ["clock AS MATERIALIZED", "site_scope AS MATERIALIZED", "scoped_events AS MATERIALIZED", "current_events AS MATERIALIZED", "previous_events AS MATERIALIZED", "visit_events AS MATERIALIZED"]) {
+      expect(globalQuery).toContain(cte);
+    }
+    expect(globalQuery).toContain("INNER JOIN site_scope ON site_scope.id = event.site_id");
+    expect(globalQuery).toContain("GROUP BY site_id, site_name, site_host, utm_source, utm_medium, utm_campaign");
+    expect(globalQuery).not.toMatch(/top_pages|entry_pages|visitorDays|visitors/);
+  });
+
+  it("routes rename through the service and keeps the repository update name-only", () => {
+    const route = readFileSync("app/api/analytics/sites/[id]/route.ts", "utf8");
+    const service = readFileSync("lib/services/analytics.ts", "utf8");
+    const repository = readFileSync("lib/repositories/analytics-sites.ts", "utf8");
+    expect(route).toContain('request.method !== "PUT"');
+    expect(route).toContain("requireSession(request)");
+    expect(route).toContain("renameAnalyticsSite(id, { id: auth.user.id, role: auth.user.role }, { name })");
+    expect(service).toContain("viewer.role !== \"admin\" && site.owner_id !== viewer.id");
+    expect(repository).toContain(".set({ name, updated_at: new Date().toISOString() })");
   });
 
   it("keeps the public collector as an HTTP adapter and the exact tracker file allow-listed", () => {

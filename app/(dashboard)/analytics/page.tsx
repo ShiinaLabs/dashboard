@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useSyncExternalStore } from "react";
-import { Eye, MousePointerClick, Plus, UsersRound } from "lucide-react";
+import { Eye, Globe2, MousePointerClick, PanelsTopLeft, Plus, UsersRound } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -16,7 +16,7 @@ import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/Metri
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";
 import { ApiError, api } from "@/lib/api";
 import { compareAnalyticsPeriod } from "@/lib/client/analytics-comparison";
-import { getAnalyticsDashboard, type AnalyticsRange } from "@/lib/client/analytics-graphql";
+import { getAnalyticsDashboard, getAnalyticsGlobalDashboard, type AnalyticsRange } from "@/lib/client/analytics-graphql";
 import { getTimezone } from "@/lib/client/datetime";
 import { calcYAxisWidth } from "@/lib/client/utils";
 import { useIsMobile } from "@/lib/client/useIsMobile";
@@ -46,14 +46,18 @@ export default function WebAnalyticsPage() {
     getTimezone,
     () => null,
   );
-  const [selectedSiteId, setSelectedSiteId] = useState<number>();
+  const [selectedSiteId, setSelectedSiteId] = useState<"all" | number>("all");
   const [selectedRange, setSelectedRange] = useState<AnalyticsRange>("DAYS_7");
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [host, setHost] = useState("");
+  const [showRenameForm, setShowRenameForm] = useState(false);
+  const [siteName, setSiteName] = useState("");
   const sitesQuery = useQuery({ queryKey: ["analytics", "sites"], queryFn: api.getAnalyticsSites });
   const sites = sitesQuery.data?.sites ?? [];
-  const selectedSite = sites.find((site) => site.id === selectedSiteId) ?? sites[0];
+  const selectedSite = typeof selectedSiteId === "number"
+    ? sites.find((site) => site.id === selectedSiteId)
+    : undefined;
   const createSite = useMutation({
     mutationFn: api.createAnalyticsSite,
     onSuccess: async (site) => {
@@ -63,18 +67,32 @@ export default function WebAnalyticsPage() {
       await queryClient.invalidateQueries({ queryKey: ["analytics", "sites"] });
     },
   });
+  const renameSite = useMutation({
+    mutationFn: () => api.renameAnalyticsSite(selectedSite!.id, { name: siteName }),
+    onSuccess: async () => {
+      setShowRenameForm(false);
+      await queryClient.invalidateQueries({ queryKey: ["analytics"] });
+    },
+  });
+  const globalDashboardQuery = useQuery({
+    queryKey: ["analytics", "global-dashboard", selectedRange, timezone],
+    queryFn: () => getAnalyticsGlobalDashboard(selectedRange, timezone!),
+    enabled: sites.length > 0 && selectedSiteId === "all" && Boolean(timezone),
+    staleTime: 5 * 60 * 1000,
+  });
   const dashboardQuery = useQuery({
-    queryKey: ["analytics", "dashboard", selectedSite?.id, selectedRange, timezone],
+    queryKey: ["analytics", "dashboard", selectedSiteId, selectedRange, timezone],
     queryFn: () => getAnalyticsDashboard(selectedSite!.id, selectedRange, timezone!),
-    enabled: Boolean(selectedSite && timezone),
+    enabled: typeof selectedSiteId === "number" && Boolean(selectedSite && timezone),
     staleTime: 5 * 60 * 1000,
   });
   const dashboard = dashboardQuery.data;
+  const globalDashboard = globalDashboardQuery.data;
   const acquisition = dashboard?.acquisition;
   const installationQuery = useQuery({
     queryKey: ["analytics", "installation", selectedSite?.id],
     queryFn: () => api.getAnalyticsInstallation(selectedSite!.id),
-    enabled: Boolean(selectedSite),
+    enabled: typeof selectedSiteId === "number" && Boolean(selectedSite),
   });
   const publicOriginNotConfigured = installationQuery.error instanceof ApiError
     && installationQuery.error.message === "Analytics public URL is not configured";
@@ -93,6 +111,43 @@ export default function WebAnalyticsPage() {
   const topSource = dashboard?.acquisition.referrers[0];
   const topCountry = dashboard?.dimensions.countries[0];
   const topCampaign = dashboard?.acquisition.campaigns[0];
+  const topGlobalSite = globalDashboard?.sites[0];
+  const topGlobalSource = globalDashboard?.acquisition.referrers[0];
+  const topGlobalCountry = globalDashboard?.dimensions.countries[0];
+  const topGlobalCampaign = globalDashboard?.acquisition.campaigns[0];
+  const globalCampaignSourceMedium = `${topGlobalCampaign?.source || "—"} / ${topGlobalCampaign?.medium || "—"}`;
+  const globalGlanceItems = [
+    {
+      key: "site",
+      label: t("analytics.topSite"),
+      value: topGlobalSite?.name ?? "—",
+      detail: topGlobalSite ? `${topGlobalSite.host} · ${summaryNumber.format(topGlobalSite.views)} ${t("analytics.views")}` : undefined,
+      title: topGlobalSite?.name,
+    },
+    {
+      key: "source",
+      label: t("analytics.topSource"),
+      value: topGlobalSource ? (topGlobalSource.referrer === "" ? t("analytics.direct") : topGlobalSource.referrer) : "—",
+      detail: topGlobalSource ? `${summaryNumber.format(topGlobalSource.visits)} ${t("analytics.visits")}` : undefined,
+      title: topGlobalSource?.referrer || (topGlobalSource ? t("analytics.direct") : undefined),
+    },
+    {
+      key: "country",
+      label: t("analytics.topCountry"),
+      value: topGlobalCountry ? countryLabel(topGlobalCountry.country, countryLocale, t("analytics.unknown")) : "—",
+      detail: topGlobalCountry ? `${summaryNumber.format(topGlobalCountry.views)} ${t("analytics.views")}` : undefined,
+      title: topGlobalCountry ? countryLabel(topGlobalCountry.country, countryLocale, t("analytics.unknown")) : undefined,
+    },
+    {
+      key: "campaign",
+      label: t("analytics.topCampaign"),
+      value: topGlobalCampaign ? (topGlobalCampaign.campaign || globalCampaignSourceMedium) : "—",
+      detail: topGlobalCampaign
+        ? `${topGlobalCampaign.siteName} · ${globalCampaignSourceMedium} · ${summaryNumber.format(topGlobalCampaign.visits)} ${t("analytics.visits")}`
+        : t("analytics.noCampaignDataSummary"),
+      title: topGlobalCampaign ? `${topGlobalCampaign.siteHost} · ${topGlobalCampaign.campaign || globalCampaignSourceMedium}` : undefined,
+    },
+  ];
   const campaignSource = topCampaign?.source || "—";
   const campaignMedium = topCampaign?.medium || "—";
   const campaignSourceMedium = `${campaignSource} / ${campaignMedium}`;
@@ -163,11 +218,15 @@ export default function WebAnalyticsPage() {
       ) : null}
 
       {sites.length > 0 ? <div className="flex flex-wrap items-center gap-3">
-        {sites.length > 1 ? <Select value={String(selectedSite?.id ?? "")} onValueChange={(value) => setSelectedSiteId(Number(value))}>
+        <Select value={selectedSiteId === "all" ? "all" : String(selectedSiteId)} onValueChange={(value) => setSelectedSiteId(value === "all" ? "all" : Number(value))}>
           <SelectTrigger className="w-full sm:w-72" aria-label={t("analytics.selectSite")}><SelectValue placeholder={t("analytics.selectSite")} /></SelectTrigger>
-          <SelectContent>{sites.map((site) => <SelectItem key={site.id} value={String(site.id)}>{site.name} · {site.host}</SelectItem>)}</SelectContent>
-        </Select> : <div className="text-sm font-medium">{selectedSite?.name} <span className="text-muted-foreground">· {selectedSite?.host}</span></div>}
+          <SelectContent>
+            <SelectItem value="all">{t("analytics.allSites")}</SelectItem>
+            {sites.map((site) => <SelectItem key={site.id} value={String(site.id)}>{site.name} · {site.host}</SelectItem>)}
+          </SelectContent>
+        </Select>
         <Button variant="outline" onClick={() => setShowForm((visible) => !visible)}><Plus />{t("analytics.addSite")}</Button>
+        {selectedSite && !showRenameForm ? <Button variant="outline" onClick={() => { setSiteName(selectedSite.name); setShowRenameForm(true); }}>{t("analytics.renameSite")}</Button> : null}
       </div> : null}
 
       {sites.length > 0 ? <div className="flex items-center gap-1" role="group" aria-label={t("analytics.range")}>{([
@@ -187,6 +246,103 @@ export default function WebAnalyticsPage() {
         {createSite.isError ? <p className="text-sm text-destructive sm:col-span-3">{t("analytics.createError")}</p> : null}
         <div className="flex gap-2 sm:col-span-3"><Button type="submit" disabled={createSite.isPending}>{createSite.isPending ? t("analytics.saving") : t("analytics.saveSite")}</Button><Button type="button" variant="outline" onClick={() => setShowForm(false)}>{t("common.cancel")}</Button></div>
       </form> : null}
+
+      {showRenameForm && selectedSite ? <form className="grid gap-4 rounded-xl border bg-card p-5 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); renameSite.mutate(); }}>
+        <div className="space-y-2"><Label htmlFor="analytics-site-rename">{t("analytics.siteName")}</Label><Input id="analytics-site-rename" value={siteName} onChange={(event) => setSiteName(event.target.value)} required maxLength={200} /></div>
+        {renameSite.isError ? <p className="text-sm text-destructive sm:col-span-2">{t("analytics.renameError")}</p> : null}
+        <div className="flex gap-2 sm:col-span-2"><Button type="submit" disabled={renameSite.isPending}>{renameSite.isPending ? t("analytics.renaming") : t("analytics.renameSite")}</Button><Button type="button" variant="outline" onClick={() => setShowRenameForm(false)}>{t("common.cancel")}</Button></div>
+      </form> : null}
+
+      {selectedSiteId === "all" && sites.length > 0 ? <>
+        {globalDashboardQuery.isError ? <Alert variant="destructive">
+          <AlertTitle>{t("analytics.loadErrorTitle")}</AlertTitle>
+          <AlertDescription>{t("analytics.dashboardUnavailable")}</AlertDescription>
+        </Alert> : <>
+          {globalDashboard ? <MetricGrid columns="four">
+            <MetricCard icon={<Eye />} label={t("analytics.views")} value={globalDashboard.overview.views} hint={comparisonLabel(globalDashboard.overview.views, globalDashboard.previousOverview.views)} />
+            <MetricCard icon={<MousePointerClick />} label={t("analytics.visits")} value={globalDashboard.overview.visits} hint={comparisonLabel(globalDashboard.overview.visits, globalDashboard.previousOverview.visits)} />
+            <MetricCard icon={<Globe2 />} label={t("analytics.activeSites")} value={globalDashboard.overview.activeSites} />
+            <MetricCard icon={<PanelsTopLeft />} label={t("analytics.trackedSites")} value={globalDashboard.overview.trackedSites} />
+          </MetricGrid> : <MetricGrid columns="four">{Array.from({ length: 4 }, (_, index) => <MetricCardSkeleton key={index} />)}</MetricGrid>}
+
+          <AnalyticsAtAGlance
+            title={t("analytics.atAGlance")}
+            items={globalGlanceItems}
+            emptyMessage={t("analytics.noSiteTrafficInPeriod")}
+            loadingLabel={t("common.loading")}
+            empty={Boolean(globalDashboard && globalDashboard.overview.trackedSites === 0)}
+            loading={!globalDashboard}
+          />
+
+          <ChartCard title={t("analytics.trafficOverTime")}>
+            {globalDashboard ? <>
+              <div role="img" aria-label={t("analytics.trafficChartA11y")}>
+                <ResponsiveContainer width="100%" height={isMobile ? 210 : 280}>
+                  <LineChart data={globalDashboard.timeline} margin={{ top: 6, right: 8, bottom: 4, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis dataKey="date" interval="preserveStartEnd" minTickGap={24} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} tickFormatter={(date: string) => date.slice(5)} />
+                    <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={calcYAxisWidth(globalDashboard.timeline, "views", "visits")} />
+                    <Tooltip labelFormatter={(date) => String(date)} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "12px" }} />
+                    <Line type="monotone" dataKey="views" name={t("analytics.views")} stroke="var(--chart-1)" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="visits" name={t("analytics.visits")} stroke="var(--chart-2)" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 pt-3 text-xs text-muted-foreground">
+                {[["var(--chart-1)", t("analytics.views")], ["var(--chart-2)", t("analytics.visits")]].map(([color, label]) => <span key={label} className="inline-flex items-center gap-2"><span aria-hidden="true" className="size-2 rounded-full" style={{ backgroundColor: color }} />{label}</span>)}
+              </div>
+            </> : <div className="flex h-[210px] items-center justify-center text-sm text-muted-foreground">{t("common.loading")}</div>}
+          </ChartCard>
+
+          {globalDashboard ? <ChartCard title={t("analytics.visitorGeography")}>
+            <AnalyticsWorldMap
+              countries={globalDashboard.dimensions.countries}
+              totalViews={globalDashboard.overview.views}
+              locale={countryLocale}
+              title={t("analytics.visitorGeography")}
+              emptyMessage={t("analytics.noGeographicData")}
+              lessLabel={t("analytics.less")}
+              moreLabel={t("analytics.more")}
+              viewsLabel={t("analytics.views")}
+              zoomInLabel={t("analytics.zoomIn")}
+              zoomOutLabel={t("analytics.zoomOut")}
+              resetZoomLabel={t("analytics.resetMap")}
+              interactionHelp={t("analytics.mapInteractionHelp")}
+            />
+          </ChartCard> : null}
+
+          <ChartCard title={t("analytics.topSites")}>
+            {globalDashboard && globalDashboard.overview.views === 0 ? <p className="mb-3 text-sm text-muted-foreground">{t("analytics.noSiteTrafficInPeriod")}</p> : null}
+            {globalDashboard?.sites.length ? <ol className="divide-y">
+              {globalDashboard.sites.slice(0, 10).map((site, index) => <li key={site.id} className="flex min-w-0 items-center gap-3 py-3 first:pt-0 last:pb-0">
+                <span className="w-6 shrink-0 text-right text-sm text-muted-foreground">{index + 1}</span>
+                <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium" title={site.name}>{site.name}</p><p className="truncate text-xs text-muted-foreground" title={site.host}>{site.host}</p></div>
+                <div className="shrink-0 text-right text-sm tabular-nums"><p>{summaryNumber.format(site.views)} {t("analytics.views")}</p><p className="text-xs text-muted-foreground">{summaryNumber.format(site.visits)} {t("analytics.visits")}</p></div>
+              </li>)}
+            </ol> : <p className="text-sm text-muted-foreground">{t("analytics.noSites")}</p>}
+          </ChartCard>
+
+          <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+            <AnalyticsDimensionCard totalValue={globalDashboard?.overview.views ?? 0} metricLabel={t("analytics.views")} shareLabel={t("analytics.share")} loadingLabel={t("common.loading")} loading={!globalDashboard} title={t("analytics.countries")} itemLabel={t("analytics.country")} emptyMessage={t("analytics.noCountryData")} items={(globalDashboard?.dimensions.countries ?? []).slice(0, 10).map((item) => ({ key: item.country, label: countryLabel(item.country, countryLocale, t("analytics.unknown")), title: item.country, value: item.views }))} />
+            <AnalyticsDimensionCard totalValue={globalDashboard?.overview.views ?? 0} metricLabel={t("analytics.views")} shareLabel={t("analytics.share")} loadingLabel={t("common.loading")} loading={!globalDashboard} title={t("analytics.browsers")} itemLabel={t("analytics.browser")} emptyMessage={t("analytics.noBrowserData")} items={(globalDashboard?.dimensions.browsers ?? []).map((item) => ({ key: item.browser, label: item.browser, value: item.views }))} />
+            <AnalyticsDimensionCard totalValue={globalDashboard?.overview.views ?? 0} metricLabel={t("analytics.views")} shareLabel={t("analytics.share")} loadingLabel={t("common.loading")} loading={!globalDashboard} title={t("analytics.operatingSystems")} itemLabel={t("analytics.operatingSystem")} emptyMessage={t("analytics.noOperatingSystemData")} items={(globalDashboard?.dimensions.operatingSystems ?? []).map((item) => ({ key: item.os, label: item.os, value: item.views }))} />
+            <AnalyticsDimensionCard totalValue={globalDashboard?.overview.views ?? 0} metricLabel={t("analytics.views")} shareLabel={t("analytics.share")} loadingLabel={t("common.loading")} loading={!globalDashboard} title={t("analytics.devices")} itemLabel={t("analytics.device")} emptyMessage={t("analytics.noDeviceData")} items={(globalDashboard?.dimensions.devices ?? []).map((item) => ({ key: item.device, label: item.device, value: item.views }))} />
+          </div>
+
+          <section className="min-w-0 space-y-3" aria-labelledby="analytics-acquisition-heading">
+            <h2 id="analytics-acquisition-heading" className="text-lg font-semibold">{t("analytics.acquisition")}</h2>
+            <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+              <AnalyticsDimensionCard title={t("analytics.referrers")} itemLabel={t("analytics.referrer")} metricLabel={t("analytics.visits")} totalValue={globalDashboard?.acquisition.totalVisits ?? 0} shareLabel={t("analytics.share")} emptyMessage={t("analytics.noAcquisitionReferrerData")} loadingLabel={t("common.loading")} loading={!globalDashboard} items={(globalDashboard?.acquisition.referrers ?? []).map((item) => ({ key: item.referrer || "direct", label: item.referrer === "" ? t("analytics.direct") : item.referrer, title: item.referrer, value: item.visits }))} />
+              <AnalyticsDimensionCard title={t("analytics.campaigns")} itemLabel={t("analytics.campaign")} metricLabel={t("analytics.visits")} totalValue={globalDashboard?.acquisition.totalVisits ?? 0} shareLabel={t("analytics.share")} emptyMessage={t("analytics.noCampaignData")} loadingLabel={t("common.loading")} loading={!globalDashboard} items={(globalDashboard?.acquisition.campaigns ?? []).map((item) => {
+                const source = item.source || "—";
+                const medium = item.medium || "—";
+                const label = `${item.campaign || `${source} / ${medium}`} · ${item.siteName}`;
+                return { key: `${item.siteId}\u0000${item.source}\u0000${item.medium}\u0000${item.campaign}`, label, title: `${item.siteHost} · ${label}`, value: item.visits };
+              })} />
+            </div>
+          </section>
+        </>}
+      </> : null}
 
       {selectedSite ? <>
         {dashboardQuery.isError ? <Alert variant="destructive">

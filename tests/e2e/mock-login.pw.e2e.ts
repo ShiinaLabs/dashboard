@@ -9,6 +9,12 @@ async function logIn(page: import("@playwright/test").Page) {
   await expect(page).toHaveURL(/\/overview$/);
 }
 
+async function selectSite(page: import("@playwright/test").Page, name: string) {
+  const selector = page.getByRole("combobox", { name: "Select a website" });
+  await selector.click();
+  await page.getByRole("option", { name: new RegExp(name) }).click();
+}
+
 test("mock login keeps its session and opens the requested route", async ({ page }) => {
   await logIn(page);
   await expect(page.getByRole("link", { name: "Overview" })).toBeVisible();
@@ -170,6 +176,89 @@ test("Top Sites limits rows to five and reports the remaining site count", async
   await expect(section.getByText("Site 6", { exact: true })).toHaveCount(0);
 });
 
+test("Analytics defaults to All Sites, issues one global query, and switches cleanly to and from a site", async ({ page }) => {
+  await logIn(page);
+  const analyticsRequests: string[] = [];
+  const installationRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/graphql") && request.method() === "POST") {
+      const body = request.postDataJSON() as { query?: string };
+      if (body.query?.includes("query AnalyticsGlobalDashboard(")) analyticsRequests.push("global");
+      if (body.query?.includes("query AnalyticsDashboard(")) analyticsRequests.push("site");
+    }
+    if (request.url().includes("/api/analytics/sites/") && request.url().endsWith("/installation")) installationRequests.push(request.url());
+  });
+  await page.goto("/analytics");
+  const selector = page.getByRole("combobox", { name: "Select a website" });
+  await expect(selector).toContainText("All Sites");
+  await expect(page.getByText("Active Sites", { exact: true })).toBeVisible();
+  await expect(page.getByText("Tracked Sites", { exact: true })).toBeVisible();
+  await expect(page.getByText("Average Daily Visitors", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Visitors", { exact: true })).toHaveCount(0);
+  const glance = page.getByRole("heading", { name: "At a glance", level: 2 }).locator("xpath=../..");
+  for (const label of ["Top Site", "Top Source", "Top Country", "Top Campaign"]) await expect(glance.getByText(label, { exact: true })).toBeVisible();
+  for (const title of ["Top Sites", "Visitor geography", "Countries", "Browsers", "Operating Systems", "Devices", "Referrers", "Campaigns"]) {
+    await expect(page.getByRole("heading", { name: title, level: 2 })).toBeVisible();
+  }
+  await expect(page.getByRole("heading", { name: "Top Pages", level: 2 })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Entry Pages", level: 2 })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Tracking Setup", level: 2 })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Rename Site" })).toHaveCount(0);
+  for (const site of ["WiFi Lens", "Tazuki", "ShiinaPlay"]) await expect(page.getByText(site, { exact: true }).first()).toBeVisible();
+  expect(analyticsRequests).toEqual(["global"]);
+  expect(installationRequests).toEqual([]);
+
+  await selectSite(page, "WiFi Lens");
+  await expect(page.getByText("Average Daily Visitors", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tracking Setup" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Rename Site" })).toBeVisible();
+  await expect.poll(() => analyticsRequests).toEqual(["global", "site"]);
+  expect(installationRequests).toHaveLength(1);
+
+  const allSitesOption = page.getByRole("combobox", { name: "Select a website" });
+  await allSitesOption.click();
+  await page.getByRole("option", { name: "All Sites", exact: true }).click();
+  await expect(page.getByText("Tracked Sites", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tracking Setup", level: 2 })).toHaveCount(0);
+  await expect.poll(() => analyticsRequests).toEqual(["global", "site"]);
+  expect(installationRequests).toHaveLength(1);
+  for (const width of [390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(page.getByRole("combobox", { name: "Select a website" })).toContainText("All Sites");
+    await expect(page.getByRole("heading", { name: "Top Sites", level: 2 })).toBeVisible();
+    const dimensions = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }));
+    expect(dimensions.content, `All Sites at ${width}px`).toBeLessThanOrEqual(dimensions.viewport);
+  }
+});
+
+test("Analytics keeps All Sites available with one site and skips the global query with no sites", async ({ page }) => {
+  await logIn(page);
+  const site = { id: 12, name: "One Site", site_key: "one-site-key", host: "one.example", created_at: "2026-01-01", updated_at: "2026-01-01" };
+  await page.route("**/api/analytics/sites", (route) => route.fulfill({ json: { sites: [site] } }));
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/graphql") && request.method() === "POST") {
+      requests.push((request.postDataJSON() as { query?: string }).query?.includes("query AnalyticsGlobalDashboard(") ? "global" : "site");
+    }
+  });
+  await page.goto("/analytics");
+  const selector = page.getByRole("combobox", { name: "Select a website" });
+  await expect(selector).toContainText("All Sites");
+  await selector.click();
+  await expect(page.getByRole("option")).toHaveCount(2);
+  await expect(page.getByRole("option", { name: "All Sites", exact: true })).toBeVisible();
+  await expect(page.getByRole("option", { name: /One Site · one\.example/ })).toBeVisible();
+  await expect.poll(() => requests).toEqual(["global"]);
+  await page.unroute("**/api/analytics/sites");
+  await page.route("**/api/analytics/sites", (route) => route.fulfill({ json: { sites: [] } }));
+  requests.length = 0;
+  await page.goto("/analytics");
+  await expect(page.getByRole("heading", { name: "No websites yet" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Select a website" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Add Site" })).toBeVisible();
+  expect(requests).toEqual([]);
+});
+
 test("Web Analytics adds and selects sites, then switches the complete dashboard across ranges", async ({ page }) => {
   await logIn(page);
   await page.getByRole("link", { name: "Web Analytics" }).click();
@@ -191,13 +280,26 @@ test("Web Analytics adds and selects sites, then switches the complete dashboard
   await expect(code).toContainText(createdSite.site_key);
   await expect(code).toContainText("https://dashboard.example/a/t.js");
   await expect(page.getByText("Receiving data")).toBeVisible();
+  await page.getByRole("button", { name: "Rename Site" }).click();
+  await page.getByLabel("Site name").fill("Playwright Site Renamed");
+  const renameResponse = page.waitForResponse((response) => response.url().endsWith(`/api/analytics/sites/${createdSite.id}`) && response.request().method() === "PUT");
+  await page.locator("form").filter({ has: page.getByLabel("Site name") }).getByRole("button", { name: "Rename Site" }).click();
+  const renamedResponse = await renameResponse;
+  expect(renamedResponse.status()).toBe(200);
+  const renamedSite = await renamedResponse.json();
+  expect(renamedSite).toMatchObject({ name: "Playwright Site Renamed", host: "playwright.example", site_key: createdSite.site_key });
+  await expect(page.getByRole("combobox", { name: "Select a website" })).toContainText("Playwright Site Renamed");
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.getByRole("button", { name: "Copy tracking code" }).click();
   await expect(page.getByText("Tracking code copied", { exact: true })).toBeVisible();
   const selector = page.getByRole("combobox", { name: "Select a website" });
-  await expect(selector).toBeVisible();
   await selector.click();
-  await page.getByRole("option", { name: /Example Site/ }).click();
+  await page.getByRole("option", { name: "All Sites", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Top Sites", level: 2 })).toBeVisible();
+  await expect(page.getByText("Playwright Site Renamed", { exact: true }).first()).toBeVisible();
+  await selector.click();
+  await page.getByRole("option", { name: /WiFi Lens/ }).click();
+  await expect(selector).toBeVisible();
   await expect(page.getByText("Last 7 days")).toBeVisible();
   await expect(page.getByText("Views").first()).toBeVisible();
   await expect(page.getByText("Average Daily Visitors").first()).toBeVisible();
@@ -328,11 +430,11 @@ test("Web Analytics adds and selects sites, then switches the complete dashboard
   await expect(page.getByRole("button", { name: "90D" })).toHaveAttribute("aria-pressed", "true");
 });
 
-test("Analytics card headers have the shared vertical inset", async ({ page }) => {
+test("All Sites Analytics card headers have the shared vertical inset", async ({ page }) => {
   await logIn(page);
   await page.goto("/analytics");
   await page.setViewportSize({ width: 1440, height: 1000 });
-  for (const title of ["Traffic over time", "Visitor geography", "Top Pages", "Countries", "Browsers", "Operating Systems", "Devices", "Referrers", "Entry Pages", "Campaigns"]) {
+  for (const title of ["Traffic over time", "Visitor geography", "Top Sites", "Countries", "Browsers", "Operating Systems", "Devices", "Referrers", "Campaigns"]) {
     const heading = page.locator('[data-slot="card-title"]').filter({ hasText: title }).first();
     const card = heading.locator("xpath=ancestor::*[@data-slot='card'][1]");
     const cardBounds = await card.boundingBox();
@@ -351,16 +453,16 @@ test("dashboard failures are reported while tracking setup remains available", a
     body: JSON.stringify({ errors: [{ message: "Internal server error", extensions: { code: "INTERNAL_SERVER_ERROR" } }] }),
   }));
   await page.goto("/analytics");
+  await selectSite(page, "WiFi Lens");
   await expect(page.getByText("Analytics data unavailable")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Tracking Setup" })).toBeVisible();
 });
 
 test("dashboard shows separate acquisition empty states when the selected site has no visits", async ({ page }) => {
   await logIn(page);
-  await page.route("**/api/graphql", (route) => route.fulfill({
-    status: 200,
-    contentType: "application/json",
-    body: JSON.stringify({ data: { analytics: { dashboard: {
+  await page.route("**/api/graphql", (route) => {
+    const request = route.request().postDataJSON() as { query?: string };
+    const dashboard = {
       period: { days: 7, timezone: "UTC", startDate: "2026-09-23", endDate: "2026-09-29" },
       previousPeriod: { days: 7, timezone: "UTC", startDate: "2026-09-16", endDate: "2026-09-22" },
       overview: { views: 0, visits: 0, visitorDays: 0 },
@@ -369,9 +471,22 @@ test("dashboard shows separate acquisition empty states when the selected site h
       topPages: [],
       dimensions: { countries: [], browsers: [], operatingSystems: [], devices: [] },
       acquisition: { totalVisits: 0, referrers: [], entryPages: [], campaigns: [] },
-    } } } }),
-  }));
+    };
+    const globalDashboard = {
+      ...dashboard,
+      overview: { trackedSites: 3, activeSites: 0, views: 0, visits: 0 },
+      previousOverview: { views: 0, visits: 0 },
+      timeline: dashboard.timeline.map(({ date }) => ({ date, views: 0, visits: 0 })),
+      sites: [{ id: 1, name: "WiFi Lens", host: "wifi-lens.app", views: 0, visits: 0 }],
+      acquisition: { totalVisits: 0, referrers: [], campaigns: [] },
+    };
+    const data = request.query?.includes("query AnalyticsGlobalDashboard(")
+      ? { analytics: { globalDashboard } }
+      : { analytics: { dashboard } };
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data }) });
+  });
   await page.goto("/analytics");
+  await selectSite(page, "WiFi Lens");
   await expect(page.getByText("No acquisition referrer data in this period")).toBeVisible();
   await expect(page.getByText("No entry page data in this period")).toBeVisible();
   await expect(page.getByText("No campaign data in this period")).toBeVisible();
@@ -389,6 +504,7 @@ test("At a glance keeps its campaign cell when campaign data is empty", async ({
     await route.fulfill({ response, body: JSON.stringify(payload) });
   });
   await page.goto("/analytics");
+  await selectSite(page, "WiFi Lens");
   const glance = page.getByRole("heading", { name: "At a glance", level: 2 }).locator("xpath=../..");
   await expect(glance.getByText("Top Campaign", { exact: true })).toBeVisible();
   await expect(glance.getByText("—", { exact: true })).toBeVisible();
@@ -410,6 +526,7 @@ test("At a glance truncates long summary values without mobile overflow", async 
   });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/analytics");
+  await selectSite(page, "WiFi Lens");
   const glance = page.getByRole("heading", { name: "At a glance", level: 2 }).locator("xpath=../..");
   await expect(glance.getByTitle("/this/is/a/very/long/page/path/that/should/truncate")).toBeVisible();
   await expect(glance.getByTitle("a-very-long-source-hostname.example")).toBeVisible();
