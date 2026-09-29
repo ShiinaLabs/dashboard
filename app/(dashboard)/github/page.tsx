@@ -23,7 +23,6 @@ export default function GitHub() {
       icon={GithubIcon}
       emptyIcon={<GithubIcon size={32} />}
       emptyText={t("github.emptyState")}
-      cardBorderAccent="var(--chart-1)"
       renderBadge={() => (
         <Badge className="bg-[var(--chart-1)]/15 text-[var(--chart-1)] font-medium">
           {t("badge.github")}

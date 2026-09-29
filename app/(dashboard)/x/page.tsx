@@ -20,7 +20,6 @@ export default function X() {
       }
       icon={XIcon}
       emptyText={t("x.emptyState")}
-      cardBorderAccent="var(--chart-5)"
       renderMeta={(account) => account.stats ? (
         <>
           <span>{t("x.accountCard.followers", { count: account.stats.followers_count.toLocaleString() })}</span>

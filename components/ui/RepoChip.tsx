@@ -7,11 +7,11 @@ export function RepoChip({ name, language, stars, forks, onClick }: {
 }) {
   return (
     <Button onClick={onClick} variant="outline" size="sm"
-      className="repo-chip h-auto min-w-0 justify-start px-3 py-2"
+      className="flex min-h-10 w-full min-w-0 items-center gap-2.5 text-left h-auto min-w-0 justify-start px-3 py-2"
     >
       {language && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: languageColor(language) }} />}
-      <span className="repo-chip-name text-xs font-medium truncate">{name}</span>
-      <span className="repo-chip-stats text-[11px] text-[var(--muted-foreground)] shrink-0">
+      <span className="min-w-0 flex-1 truncate text-xs font-medium truncate">{name}</span>
+      <span className="ml-auto inline-flex shrink-0 items-center gap-3 text-[11px] text-[var(--muted-foreground)] shrink-0">
         <span className="flex items-center gap-0.5"><Star size={10} /> {stars.toLocaleString()}</span>
         <span className="flex items-center gap-0.5"><GitFork size={10} /> {forks.toLocaleString()}</span>
       </span>

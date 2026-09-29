@@ -53,7 +53,7 @@ function TweetListItem({ tweet, screenName }: { tweet: Tweet; screenName: string
       href={`https://x.com/${screenName}/status/${tweet.id}`}
       target="_blank"
       rel="noopener noreferrer"
-      className="detail-list-row block rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] transition-colors space-y-2 group"
+      className="min-w-0 rounded-md p-3 block rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] transition-colors space-y-2 group"
     >
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm whitespace-pre-wrap break-words">{tweet.full_text}</p>
@@ -119,8 +119,8 @@ export default function XDetail() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="detail-header">
-          <div className="detail-header-body">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
             <Skeleton className="h-11 w-11 rounded-lg shrink-0" />
             <div className="flex-1"><Skeleton className="h-6 w-32 mb-2" /><Skeleton className="h-3 w-48" /></div>
           </div>
@@ -146,8 +146,8 @@ export default function XDetail() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="detail-header">
-        <div className="detail-header-body">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
         <Button onClick={() => navigate("/x")} variant="subtle" color="gray" size="lg" px="xs" title={t("xDetail.backToX")} aria-label={t("xDetail.backToX")}>
           <ArrowLeft size={20} />
         </Button>
@@ -162,7 +162,7 @@ export default function XDetail() {
           </p>
         </div>
         </div>
-        <div className="detail-header-actions">
+        <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 sm:justify-end">
           <TriggerPanel accountId={accountId} platform="twitter" />
           <AccountActiveButton accountId={accountId} isActive={!!account.is_active} />
           <Button
@@ -192,7 +192,7 @@ export default function XDetail() {
         </MetricGrid>
       )}
 
-      <div className="mobile-detail-controls">
+      <div className="flex w-full items-center sm:ml-auto sm:w-auto sm:justify-end">
         <TimeRangeSelector value={days} onChange={setDays} />
       </div>
 
@@ -251,8 +251,8 @@ export default function XDetail() {
       )}
 
       {(tweets || replies) && (
-        <Card className="detail-list-card" withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
-          <div className="detail-list-card-header">
+        <Card className="overflow-hidden rounded-lg border bg-card" withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
+          <div className="min-w-0 border-b px-5 py-4">
             <Tabs value={tab} onValueChange={(value) => { if (value === "tweets" || value === "replies") setTab(value); }}>
               <TabsList aria-label={t("xDetail.recentTweets")}>
                 <TabsTrigger value="tweets">{t("xDetail.recentTweets")}</TabsTrigger>
@@ -261,7 +261,7 @@ export default function XDetail() {
             </Tabs>
           </div>
           <div
-            className="detail-list-card-body"
+            className="min-w-0 p-5"
             role="tabpanel"
             id={tab === "tweets" ? "panel-tweets" : "panel-replies"}
             aria-labelledby={tab === "tweets" ? "tab-tweets" : "tab-replies"}

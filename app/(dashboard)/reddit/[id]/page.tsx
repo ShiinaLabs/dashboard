@@ -106,8 +106,8 @@ export default function RedditDetail() {
   if (accountLoading) {
     return (
       <div className="space-y-6">
-        <div className="detail-header">
-          <div className="detail-header-body">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
             <Skeleton className="h-11 w-11 rounded-lg shrink-0" />
             <div className="flex-1"><Skeleton className="h-6 w-32 mb-2" /><Skeleton className="h-3 w-48" /></div>
           </div>
@@ -131,8 +131,8 @@ export default function RedditDetail() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="detail-header">
-        <div className="detail-header-body">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
         <Button onClick={() => navigate("/reddit")} variant="subtle" color="gray" size="lg" px="xs" title={t("redditDetail.backToReddit")} aria-label={t("redditDetail.backToReddit")}>
           <ArrowLeft size={20} />
         </Button>
@@ -150,7 +150,7 @@ export default function RedditDetail() {
           </div>
         </div>
         </div>
-        <div className="detail-header-actions">
+        <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 sm:justify-end">
           <TriggerPanel accountId={accountId} platform="reddit" />
 <AccountActiveButton accountId={accountId} isActive={!!account.is_active} />
           <Button onClick={() => setShowDeleteDialog(true)} variant="light" color="danger" size="sm" leftSection={<Trash2 size={14} />} title={t("redditDetail.delete")} aria-label={t("redditDetail.delete")}>{t("redditDetail.delete")}</Button>
@@ -169,7 +169,7 @@ export default function RedditDetail() {
         <div className="text-center py-12 text-[var(--muted-foreground)]">{t("redditDetail.loadingData")}</div>
       ) : overview ? (
         <>
-          <div className="mobile-detail-controls">
+          <div className="flex w-full items-center sm:ml-auto sm:w-auto sm:justify-end">
             <TimeRangeSelector value={days} onChange={setDays} />
           </div>
 
@@ -274,18 +274,18 @@ export default function RedditDetail() {
             )}
           </div>
 
-          <Card className="detail-list-card" withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
-            <div className="detail-list-card-header">
+          <Card className="overflow-hidden rounded-lg border bg-card" withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
+            <div className="min-w-0 border-b px-5 py-4">
               <Stack gap={4}>
                 <Group gap="xs"><TrendingUp size={18} /><Text component="h3" fz="lg" fw={600}>{t("redditDetail.topPosts")}</Text></Group>
                 <Text size="sm" c="dimmed">{t("redditDetail.topPostsDesc")}</Text>
               </Stack>
             </div>
-            <div className="detail-list-card-body">
+            <div className="min-w-0 p-5">
               {postsData?.data && postsData.data.length > 0 ? (
                 <div className="detail-list">
                   {postsData.data.slice(0, 10).map((post: RedditPost) => (
-                    <div key={post.id} className="detail-list-row flex items-start gap-3 rounded-lg bg-[var(--muted)]">
+                    <div key={post.id} className="min-w-0 rounded-md p-3 flex items-start gap-3 rounded-lg bg-[var(--muted)]">
                       <ThumbsUp size={16} className="text-[var(--chart-4)] mt-1 shrink-0" />
                       <div className="min-w-0 flex-1">
                         <a href={`https://reddit.com${post.permalink}`} target="_blank" rel="noopener noreferrer" className="min-h-11 text-sm font-medium hover:underline line-clamp-2">{post.title}</a>
@@ -306,18 +306,18 @@ export default function RedditDetail() {
             </div>
           </Card>
 
-          <Card className="detail-list-card" withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
-            <div className="detail-list-card-header">
+          <Card className="overflow-hidden rounded-lg border bg-card" withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
+            <div className="min-w-0 border-b px-5 py-4">
               <Stack gap={4}>
                 <Group gap="xs"><MessageSquare size={18} /><Text component="h3" fz="lg" fw={600}>{t("redditDetail.recentComments")}</Text></Group>
                 <Text size="sm" c="dimmed">{t("redditDetail.recentCommentsDesc")}</Text>
               </Stack>
             </div>
-            <div className="detail-list-card-body">
+            <div className="min-w-0 p-5">
               {commentsData?.data && commentsData.data.length > 0 ? (
                 <div className="detail-list">
                   {commentsData.data.slice(0, 10).map((comment: RedditComment) => (
-                    <div key={comment.id} className="detail-list-row flex items-start gap-3 rounded-lg bg-[var(--muted)]">
+                    <div key={comment.id} className="min-w-0 rounded-md p-3 flex items-start gap-3 rounded-lg bg-[var(--muted)]">
                       <MessageSquare size={16} className="text-[var(--chart-1)] mt-1 shrink-0" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm line-clamp-3">{comment.body}</p>

@@ -518,8 +518,8 @@ export default function RepoDetail() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="detail-header">
-        <div className="detail-header-body">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
         <Button onClick={() => navigate(`/github/${aid}`)} variant="subtle" color="gray" size="lg" px="xs" title={t("repoDetail.backToAccount")} aria-label={t("repoDetail.backToAccount")}>
           <ArrowLeft size={20} />
         </Button>
@@ -533,12 +533,12 @@ export default function RepoDetail() {
         </div>
         </div>
         <a href={`https://github.com/${repo.full_name}`} target="_blank" rel="noopener noreferrer"
-          className="detail-header-actions flex items-center gap-1.5 px-3 py-2.5 min-h-11 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] transition-colors text-xs">
+          className="flex shrink-0 flex-wrap items-center justify-start gap-2 sm:justify-end flex items-center gap-1.5 px-3 py-2.5 min-h-11 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] transition-colors text-xs">
           <ExternalLink size={12} /> {t("repoDetail.open")}
         </a>
       </div>
 
-      <div className="mobile-detail-controls">
+      <div className="flex w-full items-center sm:ml-auto sm:w-auto sm:justify-end">
         <TimeRangeSelector value={days} onChange={setDays} />
       </div>
 

@@ -24,7 +24,6 @@ export default function Reddit() {
       icon={RedditIcon}
       emptyIcon={<RedditIcon size={32} />}
       emptyText={t("reddit.emptyState")}
-      cardBorderAccent="var(--chart-4)"
       renderBadge={(account: Account) => (
         <>
           <Badge className="text-[11px] px-1.5 bg-[var(--chart-4)]/15 text-[var(--chart-4)]">{t("badge.reddit")}</Badge>

@@ -159,8 +159,8 @@ export default function GitLabDetail() {
   if (accountLoading) {
     return (
       <div className="space-y-6">
-        <div className="detail-header">
-          <div className="detail-header-body">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
             <Skeleton className="h-11 w-11 rounded-lg shrink-0" />
             <div className="flex-1"><Skeleton className="h-6 w-32 mb-2" /><Skeleton className="h-3 w-48" /></div>
           </div>
@@ -184,8 +184,8 @@ export default function GitLabDetail() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="detail-header">
-        <div className="detail-header-body">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
         <Button onClick={() => navigate("/gitlab")} variant="subtle" color="gray" size="lg" px="xs" title={t("gitlabDetail.backToGitLab")} aria-label={t("gitlabDetail.backToGitLab")}>
           <ArrowLeft size={20} />
         </Button>
@@ -203,7 +203,7 @@ export default function GitLabDetail() {
           </div>
         </div>
         </div>
-        <div className="detail-header-actions">
+        <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 sm:justify-end">
           <TriggerPanel accountId={accountId} platform="gitlab" />
 <AccountActiveButton accountId={accountId} isActive={!!account.is_active} />
           <Button onClick={() => setShowDeleteDialog(true)} variant="light" color="danger" size="sm" leftSection={<Trash2 size={14} />} title={t("gitlabDetail.delete")} aria-label={t("gitlabDetail.delete")}>{t("gitlabDetail.delete")}</Button>
@@ -229,8 +229,8 @@ export default function GitLabDetail() {
             <MetricCard label={t("gitlabDetail.followers")} value={overview.stats.followers} icon={<Users size={20} />} />
           </MetricGrid>
 
-          <Card className="detail-list-card" withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
-            <div className="detail-list-card-header">
+          <Card className="overflow-hidden rounded-lg border bg-card" withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
+            <div className="min-w-0 border-b px-5 py-4">
               <Stack gap={4}>
                 <Group justify="space-between" gap="sm">
                   <Group gap="xs"><BookOpen size={18} /><Text component="h3" fz="lg" fw={600}>{t("gitlabDetail.projectsHeading")}</Text></Group>
@@ -248,13 +248,13 @@ export default function GitLabDetail() {
               </Text>
               </Stack>
             </div>
-            <div className="detail-list-card-body">
+            <div className="min-w-0 p-5">
               {overview.projects.length > 0 ? (
                 <div className="detail-list">
                   {overview.projects.map((p: GitlabProject) => (
                     <Link key={p.id}
                       to={`/gitlab/${accountId}/projects/${p.project_id}`}
-                      className="detail-list-row flex items-center gap-3 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] cursor-pointer transition-colors"
+                      className="min-w-0 rounded-md p-3 flex items-center gap-3 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] cursor-pointer transition-colors"
                     >
                       <BookOpen size={16} className="text-[var(--muted-foreground)] shrink-0" />
                       <div className="min-w-0 flex-1">

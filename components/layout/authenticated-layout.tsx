@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { api } from "@/lib/api";
-import { useBingWallpaper } from "@/lib/client/useBingWallpaper";
 import { useIsMobile } from "@/lib/client/useIsMobile";
 import { FloatingAiChat } from "@/components/FloatingAiChat";
 import { NavigationProgress } from "@/components/NavigationProgress";
@@ -23,7 +22,6 @@ export function AuthenticatedLayout({ children }: { children: React.ReactNode })
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const queryClient = useQueryClient();
-  const { url } = useBingWallpaper();
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(loadSidebarOpen);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -51,10 +49,14 @@ export function AuthenticatedLayout({ children }: { children: React.ReactNode })
     <SidebarProvider open={open} onOpenChange={setSidebarOpen}>
       <NavigationProgress />
       <NavigatingOverlay />
-      <AppSidebar isAdmin={authData?.role === "admin"} loggingOut={loggingOut} onLogout={handleLogout} />
+      <AppSidebar
+        isAdmin={authData?.role === "admin"}
+        username={authData?.username ?? ""}
+        role={authData?.role ?? "user"}
+        loggingOut={loggingOut}
+        onLogout={handleLogout}
+      />
       <SidebarInset className="min-h-svh overflow-hidden">
-        <img src={url} alt="" className="pointer-events-none fixed inset-0 h-full w-full object-cover" />
-        <div className="pointer-events-none fixed inset-0 bg-background/95" />
         <Header />
         <Main>{children}</Main>
       </SidebarInset>
