@@ -5,13 +5,12 @@ const config = {
   accountId: "account-id",
   apiToken: "test-token",
   dataset: "AnalyticsDataset",
-  siteId: "site'key",
 };
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Cloudflare Analytics integration", () => {
-  it("parses the configured site's PV, UV, and visit totals", () => {
+  it("parses PV, UV, and visit totals", () => {
     expect(parseTrafficSummary({ data: [{ views: "100", visitors: 25, visits: "40" }] })).toEqual({
       views: 100,
       visitors: 25,
@@ -29,7 +28,7 @@ describe("Cloudflare Analytics integration", () => {
     }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(getTrafficSummary(config)).resolves.toEqual({ views: 100, visitors: 25, visits: 40 });
+    await expect(getTrafficSummary(config, "site'key")).resolves.toEqual({ views: 100, visitors: 25, visits: 40 });
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.cloudflare.com/client/v4/accounts/account-id/analytics_engine/sql");
@@ -41,13 +40,13 @@ describe("Cloudflare Analytics integration", () => {
 
   it("surfaces Cloudflare API failures", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("unavailable", { status: 503 })));
-    await expect(getTrafficSummary(config)).rejects.toThrow("HTTP 503");
+    await expect(getTrafficSummary(config, "site'key")).rejects.toThrow("HTTP 503");
   });
 
   it("rejects an unsafe dataset identifier before making a request", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    await expect(getTrafficSummary({ ...config, dataset: "dataset; DROP TABLE" })).rejects.toThrow("SQL identifier");
+    await expect(getTrafficSummary({ ...config, dataset: "dataset; DROP TABLE" }, "site-key")).rejects.toThrow("SQL identifier");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

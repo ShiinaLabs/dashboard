@@ -52,6 +52,14 @@ Public API paths: `POST /auth/login`, `GET /auth/me`, `GET /reddit/callback`, `G
 | DELETE | `/accounts/:id` | Delete account + all related data (requires `{ confirmToken }`) |
 | GET | `/accounts/:id` response includes `recentFetchRuns[]` | Latest attempt status, trigger, timing, errors, and capability gaps |
 
+## Web Analytics
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/analytics/sites` | List sites owned by the current user; admins see all sites |
+| POST | `/analytics/sites` | Create `{ name, siteKey, host }`; ownership is always assigned from the session |
+| GET | `/analytics/sites/:id/overview` | Get the selected site's last-seven-day views, visitors, and visits; only its owner or an admin can access it |
+
 ## Fetch API
 
 | Method | Path | Description |

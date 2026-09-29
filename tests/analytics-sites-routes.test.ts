@@ -1,0 +1,56 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { AnalyticsSiteError, createAnalyticsSite, getAnalyticsOverviewForSite, getAnalyticsSites } from "../lib/services/analytics";
+import { loader as sitesLoader, action as sitesAction } from "../app/api/analytics/sites/route";
+import { loader as overviewLoader } from "../app/api/analytics/sites/[id]/overview/route";
+import { requireSession } from "../lib/auth-helpers";
+
+vi.mock("../lib/auth-helpers", () => ({
+  requireSession: vi.fn(),
+  getOwnerId: (user: { id: number; role: string }) => user.role === "admin" ? undefined : user.id,
+}));
+vi.mock("../lib/services/analytics", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../lib/services/analytics")>();
+  return { ...original, getAnalyticsSites: vi.fn(), createAnalyticsSite: vi.fn(), getAnalyticsOverviewForSite: vi.fn() };
+});
+
+const request = (method = "GET", body?: unknown) => new Request("http://localhost/api/analytics/sites", {
+  method, headers: body === undefined ? undefined : { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body),
+});
+const authAs = (id: number, role = "user") => vi.mocked(requireSession).mockResolvedValue({ user: { id, username: `u${id}`, role } } as never);
+
+beforeEach(() => vi.clearAllMocks());
+
+describe("analytics site routes", () => {
+  it("scopes regular user lists and gives admins global scope", async () => {
+    authAs(10);
+    await sitesLoader({ request: request(), params: {}, context: {} } as never);
+    expect(getAnalyticsSites).toHaveBeenLastCalledWith(10);
+    authAs(99, "admin");
+    await sitesLoader({ request: request(), params: {}, context: {} } as never);
+    expect(getAnalyticsSites).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it("always creates for the authenticated user even when body supplies ownerId", async () => {
+    authAs(10);
+    vi.mocked(createAnalyticsSite).mockResolvedValue({ id: 3, name: "A", site_key: "a", host: "a.example", created_at: "now", updated_at: "now" });
+    const response = await sitesAction({ request: request("POST", { ownerId: 999, name: "A", siteKey: "a", host: "a.example" }), params: {}, context: {} } as never);
+    expect(response.status).toBe(201);
+    expect(createAnalyticsSite).toHaveBeenCalledWith(10, { name: "A", siteKey: "a", host: "a.example" });
+  });
+
+  it("maps inaccessible and missing overview sites to 403 and 404", async () => {
+    authAs(10);
+    vi.mocked(getAnalyticsOverviewForSite).mockRejectedValueOnce(new AnalyticsSiteError("forbidden"));
+    const forbidden = await overviewLoader({ request: request(), params: { id: "20" }, context: {} } as never);
+    expect(forbidden.status).toBe(403);
+    expect(getAnalyticsOverviewForSite).toHaveBeenLastCalledWith(20, { id: 10, role: "user" });
+    vi.mocked(getAnalyticsOverviewForSite).mockRejectedValueOnce(new AnalyticsSiteError("not_found"));
+    const missing = await overviewLoader({ request: request(), params: { id: "20" }, context: {} } as never);
+    expect(missing.status).toBe(404);
+    authAs(99, "admin");
+    vi.mocked(getAnalyticsOverviewForSite).mockResolvedValue({ period: "7d", views: 1, visitors: 1, visits: 1 });
+    const admin = await overviewLoader({ request: request(), params: { id: "20" }, context: {} } as never);
+    expect(admin.status).toBe(200);
+    expect(getAnalyticsOverviewForSite).toHaveBeenLastCalledWith(20, { id: 99, role: "admin" });
+  });
+});

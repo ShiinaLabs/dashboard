@@ -30,6 +30,7 @@ import {
 import { getTopContent } from "../lib/services/top-content";
 import { SyncTelemetry } from "../lib/application/usecases/SyncTelemetry";
 import { createUser } from "../lib/services/users";
+import { createAnalyticsSite, getAnalyticsSiteById, getAnalyticsSites } from "../lib/repositories/analytics-sites";
 
 beforeAll(async () => {
   const databaseConfig = getTestDatabaseConfig();
@@ -120,6 +121,26 @@ describe("users queries", () => {
     const revived = await createUser(testUsername, "a-longer-test-password", "user");
     expect(revived).toBeDefined();
     expect(revived.username).toBe(testUsername);
+  });
+});
+
+describe("analytics site queries", () => {
+  it("scopes by owner, supports global lists, and excludes soft-deleted sites", async () => {
+    const suffix = Date.now();
+    const ownerA = await usersQ.insertUser({ username: `analytics_a_${suffix}`, password_hash: "hash", role: "user" });
+    const ownerB = await usersQ.insertUser({ username: `analytics_b_${suffix}`, password_hash: "hash", role: "user" });
+    const siteA = await createAnalyticsSite({ owner_id: ownerA.id, name: "Site A", site_key: `same-${suffix}`, host: "a.example" });
+    const siteB = await createAnalyticsSite({ owner_id: ownerB.id, name: "Site B", site_key: `same-${suffix}`, host: "b.example" });
+
+    expect((await getAnalyticsSites(ownerA.id)).map((site) => site.id)).toEqual([siteA.id]);
+    expect((await getAnalyticsSites(ownerB.id)).map((site) => site.id)).toEqual([siteB.id]);
+    expect(await getAnalyticsSites()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: siteA.id }), expect.objectContaining({ id: siteB.id }),
+    ]));
+
+    await getTestPool().query("UPDATE analytics_sites SET deleted_at = NOW() WHERE id = $1", [siteA.id]);
+    expect((await getAnalyticsSites(ownerA.id)).map((site) => site.id)).toEqual([]);
+    await expect(getAnalyticsSiteById(siteA.id)).resolves.toBeUndefined();
   });
 });
 

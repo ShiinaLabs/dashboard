@@ -209,8 +209,19 @@
     "views": "Views",
     "visitors": "Visitors",
     "visits": "Visits",
+    "emptyTitle": "No websites yet",
+    "emptyDescription": "Add a website to view its traffic for the last 7 days.",
+    "addSite": "Add Site",
+    "selectSite": "Select a website",
+    "name": "Name",
+    "siteId": "Site ID",
+    "host": "Host",
+    "saveSite": "Save Site",
+    "saving": "Saving…",
+    "sitesLoadError": "Could not load your websites. Please try again.",
+    "createError": "Could not save this website. Check the details and try again.",
     "loadErrorTitle": "Analytics unavailable",
-    "loadErrorDescription": "Could not load analytics for the configured site. Check the Cloudflare Analytics settings and try again."
+    "loadErrorDescription": "Could not load analytics for this site. Check the Cloudflare Analytics settings and try again."
   },
   "x": {
     "heading": "X (Twitter)",

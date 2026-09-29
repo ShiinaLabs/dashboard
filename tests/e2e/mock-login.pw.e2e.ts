@@ -25,11 +25,23 @@ test("mock login keeps its session and opens the requested route", async ({ page
   });
 });
 
-test("Web Analytics displays the configured 7-day metrics through mock mode", async ({ page }) => {
+test("Web Analytics adds and selects sites before showing 7-day metrics", async ({ page }) => {
   await logIn(page);
   await page.getByRole("link", { name: "Web Analytics" }).click();
   await expect(page).toHaveURL(/\/analytics$/);
   await expect(page.getByRole("heading", { name: "Web Analytics", level: 1 })).toBeVisible();
+  await page.getByRole("button", { name: "Add Site" }).click();
+  await page.getByLabel("Name").fill("Playwright Site");
+  await page.getByLabel("Site ID").fill("playwright-site");
+  await page.getByLabel("Host").fill("playwright.example");
+  const createResponse = page.waitForResponse((response) => response.url().endsWith("/api/analytics/sites") && response.request().method() === "POST");
+  await page.getByRole("button", { name: "Save Site" }).click();
+  expect((await createResponse).status()).toBe(201);
+  await expect(page.getByText("Playwright Site", { exact: false })).toBeVisible();
+  const selector = page.getByRole("combobox", { name: "Select a website" });
+  await expect(selector).toBeVisible();
+  await selector.click();
+  await page.getByRole("option", { name: /Example Site/ }).click();
   await expect(page.getByText("Last 7 days")).toBeVisible();
   await expect(page.getByText("Views")).toBeVisible();
   await expect(page.getByText("Visitors")).toBeVisible();

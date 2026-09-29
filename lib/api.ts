@@ -24,6 +24,15 @@ export interface AnalyticsOverview {
   visits: number;
 }
 
+export interface AnalyticsSite {
+  id: number;
+  name: string;
+  site_key: string;
+  host: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export type {
   Account, AccountWithStats, AccountsResponse, OverviewStats,
   Tweet, PaginatedTweets, TimelineData, CalendarDay,
@@ -149,8 +158,13 @@ export const api = {
   deleteUser: (id: number, confirmToken: string) =>
     apiJson<{ ok: boolean }>(`/users/${id}`, { method: "DELETE", body: JSON.stringify({ confirmToken }) }),
 
+  // Web Analytics
+  getAnalyticsSites: () => apiJson<{ sites: AnalyticsSite[] }>("/analytics/sites"),
+  createAnalyticsSite: (data: { name: string; siteKey: string; host: string }) =>
+    apiJson<AnalyticsSite>("/analytics/sites", { method: "POST", body: JSON.stringify(data) }),
+  getAnalyticsOverview: (siteId: number) => apiJson<AnalyticsOverview>(`/analytics/sites/${siteId}/overview`),
+
   // AI and Settings
-  getAnalyticsOverview: () => apiJson<AnalyticsOverview>("/analytics/overview"),
   getAiStatus: () => apiJson<{ configured: boolean; quota: { used: number; limit: number } }>("/ai/chat"),
   streamAiChat: (messages: { role: "user" | "assistant"; content: string }[]) =>
     apiRequest("/ai/chat", { method: "POST", body: JSON.stringify({ messages }) }),

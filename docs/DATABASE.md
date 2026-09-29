@@ -20,6 +20,7 @@ All Drizzle ORM schemas live in `db/schema/` and are re-exported from `db/schema
 |------|--------|
 | `users.ts` | `users` |
 | `accounts.ts` | `accounts` |
+| `analytics.ts` | `analytics_sites` |
 | `fetch-runs.ts` | `fetch_runs` |
 | `twitter.ts` | `tweets`, `user_stats` |
 | `github.ts` | `github_stats`, `github_repos`, `github_repo_snapshots`, `github_traffic_clones`, `github_traffic_views`, `github_referrers`, `github_paths`, `github_releases`, `github_release_assets`, `github_contributions` |
@@ -76,7 +77,7 @@ Migrations are idempotent `CREATE TABLE IF NOT EXISTS` statements executed by `b
 
 ## Multi-User Isolation
 
-The `owner_id` column on `accounts` links to `users.id`. All account queries filter by `owner_id` for non-admin users. Admin users (role=`admin`) see all accounts.
+The `owner_id` column on `accounts` links to `users.id`. All account queries filter by `owner_id` for non-admin users. Admin users (role=`admin`) see all accounts. `analytics_sites.owner_id` links to `users.id`; sites are similarly owner-scoped, with a per-owner unique `(owner_id, site_key)` constraint and soft deletion.
 
 ## Soft-Delete Pattern
 

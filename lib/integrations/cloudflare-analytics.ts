@@ -31,7 +31,7 @@ export function parseTrafficSummary(payload: AnalyticsSqlResponse): TrafficSumma
   };
 }
 
-export async function getTrafficSummary(config: CloudflareAnalyticsConfig): Promise<TrafficSummary> {
+export async function getTrafficSummary(config: CloudflareAnalyticsConfig, siteKey: string): Promise<TrafficSummary> {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(config.dataset)) {
     throw new Error("Cloudflare Analytics dataset must be a valid SQL identifier");
   }
@@ -42,7 +42,7 @@ export async function getTrafficSummary(config: CloudflareAnalyticsConfig): Prom
     "  SUM(_sample_interval * double1) AS visitors,",
     "  SUM(_sample_interval * double2) AS visits",
     `FROM ${config.dataset}`,
-    `WHERE timestamp >= NOW() - INTERVAL '7' DAY AND blob1 = ${sqlString(config.siteId)}`,
+    `WHERE timestamp >= NOW() - INTERVAL '7' DAY AND blob1 = ${sqlString(siteKey)}`,
   ].join("\n");
 
   const response = await fetch(
