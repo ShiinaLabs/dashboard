@@ -10,6 +10,7 @@
   },
   "common": {
     "dashboard": "Data Hub",
+    "platforms": "Platforms",
     "loading": "Loading...",
     "cancel": "Cancel",
     "delete": "Delete",
@@ -27,6 +28,7 @@
     "loggingIn": "Logging in…",
     "invalidPassword": "Invalid password",
     "tagline": "Track your X, GitHub, GitLab, and Reddit activity in one place.",
+    "supportingCopy": "Connect accounts across platforms and review their activity from a single workspace.",
     "mockHint": "Mock mode: any username / password works, password may be empty"
   },
   "confirm": {
@@ -60,6 +62,7 @@
   },
   "overview": {
     "heading": "Overview",
+    "platformsDescription": "A closer look at each connected platform.",
     "pulse": {
       "heading": "Business Pulse",
       "activePlatforms": "Active platforms",
@@ -130,6 +133,8 @@
       "repos": "Repos",
       "projects": "Projects",
       "totalStars": "Stars",
+      "totalKarma": "Reddit Karma",
+      "trackedAccounts": "Tracked accounts",
       "totalForks": "Forks",
       "today": "{{count}} today",
       "perTweet": "per tweet",

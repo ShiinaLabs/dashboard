@@ -25,7 +25,7 @@ export function FetchHealthSection() {
   if (isLoading) {
     return (
       <SectionShell icon={<CheckCircle2 size={16} />} title={t("overview.health.heading")}>
-        <MetricGrid>
+        <MetricGrid className="sm:grid-cols-2">
           {Array.from({ length: 4 }).map((_, index) => <MetricCardSkeleton key={index} />)}
         </MetricGrid>
       </SectionShell>
@@ -77,7 +77,7 @@ export function FetchHealthSection() {
 
   return (
     <SectionShell icon={<CheckCircle2 size={16} />} title={t("overview.health.heading")}>
-      <MetricGrid>
+      <MetricGrid className="sm:grid-cols-2">
         {cards.map((card) => <MetricCard key={card.label} {...card} />)}
       </MetricGrid>
 
@@ -98,12 +98,12 @@ export function FetchHealthSection() {
           withBorder
           radius="md"
           p={0}
-          className="overview-health-issues"
+          className="overflow-hidden"
           style={{ background: "var(--card)", color: "var(--card-foreground)" }}
         >
-            <div className="overview-health-issue-list">
+            <div className="grid content-start gap-2 p-4">
               {data.issues.slice(0, 5).map((issue) => (
-                <div key={issue.accountId} className="overview-health-issue-row transition-colors hover:bg-[var(--muted)] active:bg-[var(--border)]/50">
+                <div key={issue.accountId} className="min-w-0 rounded-md p-3 transition-colors hover:bg-[var(--muted)] active:bg-[var(--border)]/50">
                   <div className="flex items-start justify-between gap-3">
                     <p className="min-h-5 min-w-0 truncate text-sm leading-5 font-medium">
                       {issue.screenName}
@@ -126,7 +126,7 @@ export function FetchHealthSection() {
               ))}
             </div>
             {data.issues.length > 5 && (
-              <p className="overview-health-more text-[11px] text-[var(--muted-foreground)]">
+              <p className="mx-4 mb-4 text-[11px] text-[var(--muted-foreground)]">
                 {t("overview.health.moreIssues", { count: data.issues.length - 5 })}
               </p>
             )}

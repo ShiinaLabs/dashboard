@@ -44,8 +44,8 @@ export function XSection({ stats, timeline, topLiked, xAccounts }: Props) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <Card withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
-          <div className="overview-chart-title"><Text size="xs" fw={600} c="dimmed">{t("overview.charts.tweetActivity")}</Text></div>
-          <div className="overview-chart-body">
+          <div className="px-5 pt-5 pb-1"><Text size="xs" fw={600} c="dimmed">{t("overview.charts.tweetActivity")}</Text></div>
+          <div className="min-w-0 overflow-hidden px-4 pb-4 sm:px-5 sm:pb-5">
             {timeline?.dailyTweets && timeline.dailyTweets.length > 0 ? (
               <div role="img" aria-label={t("overview.charts.tweetActivity")}>
               <ResponsiveContainer width="100%" height={CHART_H}>
@@ -64,8 +64,8 @@ export function XSection({ stats, timeline, topLiked, xAccounts }: Props) {
           </div>
         </Card>
         <Card withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
-          <div className="overview-chart-title"><Text size="xs" fw={600} c="dimmed">{t("overview.charts.dailyEngagement")}</Text></div>
-          <div className="overview-chart-body">
+          <div className="px-5 pt-5 pb-1"><Text size="xs" fw={600} c="dimmed">{t("overview.charts.dailyEngagement")}</Text></div>
+          <div className="min-w-0 overflow-hidden px-4 pb-4 sm:px-5 sm:pb-5">
             {timeline?.dailyTweets && timeline.dailyTweets.length > 0 ? (
               <div role="img" aria-label={t("overview.charts.dailyEngagement")}>
               <ResponsiveContainer width="100%" height={CHART_H}>
@@ -87,8 +87,8 @@ export function XSection({ stats, timeline, topLiked, xAccounts }: Props) {
       </div>
       <div className="grid grid-cols-1 gap-3">
         <Card withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
-          <div className="overview-chart-title"><Text size="xs" fw={600} c="dimmed">{t("overview.charts.dailyViews")}</Text></div>
-          <div className="overview-chart-body">
+          <div className="px-5 pt-5 pb-1"><Text size="xs" fw={600} c="dimmed">{t("overview.charts.dailyViews")}</Text></div>
+          <div className="min-w-0 overflow-hidden px-4 pb-4 sm:px-5 sm:pb-5">
             {timeline?.dailyTweets && timeline.dailyTweets.length > 0 ? (
               <div role="img" aria-label={t("overview.charts.dailyViews")}>
               <ResponsiveContainer width="100%" height={CHART_H}>

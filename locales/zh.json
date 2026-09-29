@@ -10,6 +10,7 @@
   },
   "common": {
     "dashboard": "数据聚合中心",
+    "platforms": "平台",
     "loading": "加载中...",
     "cancel": "取消",
     "delete": "删除",
@@ -27,6 +28,7 @@
     "loggingIn": "登录中…",
     "invalidPassword": "密码错误",
     "tagline": "在一个地方追踪你的 X、GitHub、GitLab 和 Reddit 动态。",
+    "supportingCopy": "连接不同平台的账户，在一个工作区查看近期动态。",
     "mockHint": "模拟模式：任意用户名 / 密码均可登录，密码可留空"
   },
   "confirm": {
@@ -60,6 +62,7 @@
   },
   "overview": {
     "heading": "概览",
+    "platformsDescription": "查看各个平台的详细数据。",
     "pulse": {
       "heading": "业务脉搏",
       "activePlatforms": "活跃平台",
@@ -130,6 +133,8 @@
       "repos": "仓库",
       "projects": "项目",
       "totalStars": "星标",
+      "totalKarma": "Reddit Karma",
+      "trackedAccounts": "追踪账户",
       "totalForks": "Fork",
       "today": "今日 {{count}}",
       "perTweet": "每推文",

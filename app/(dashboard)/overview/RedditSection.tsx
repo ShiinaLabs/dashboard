@@ -43,8 +43,8 @@ export function RedditSection({ postKarma, commentKarma, totalPosts, totalCommen
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <Card withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
-          <div className="overview-chart-title"><Text size="xs" fw={600} c="dimmed">{t("overview.charts.redditKarma")}</Text></div>
-          <div className="overview-chart-body">
+          <div className="px-5 pt-5 pb-1"><Text size="xs" fw={600} c="dimmed">{t("overview.charts.redditKarma")}</Text></div>
+          <div className="min-w-0 overflow-hidden px-4 pb-4 sm:px-5 sm:pb-5">
             {karmaTimeline.length > 0 ? (
               <div role="img" aria-label={t("overview.charts.redditKarma")}>
               <div className={`flex flex-wrap gap-x-3 gap-y-0.5 mb-1 ${isMobile ? "text-[11px]" : "text-xs"}`}>
@@ -69,8 +69,8 @@ export function RedditSection({ postKarma, commentKarma, totalPosts, totalCommen
         </Card>
 
         <Card withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
-          <div className="overview-chart-title"><Text size="xs" fw={600} c="dimmed">{t("overview.charts.redditActivity")}</Text></div>
-          <div className="overview-chart-body">
+          <div className="px-5 pt-5 pb-1"><Text size="xs" fw={600} c="dimmed">{t("overview.charts.redditActivity")}</Text></div>
+          <div className="min-w-0 overflow-hidden px-4 pb-4 sm:px-5 sm:pb-5">
             {dailyActivity.length > 0 ? (
               <div role="img" aria-label={t("overview.charts.redditActivity")}>
               <ResponsiveContainer width="100%" height={CHART_H}>
@@ -93,8 +93,8 @@ export function RedditSection({ postKarma, commentKarma, totalPosts, totalCommen
 
       {mergedSubreddits.length > 0 && (
         <Card withBorder radius="md" p={0} style={{ background: "var(--card)", color: "var(--card-foreground)" }}>
-          <div className="overview-chart-title"><Text size="xs" fw={600} c="dimmed">{t("overview.charts.redditSubreddits")}</Text></div>
-          <div className="overview-chart-body">
+          <div className="px-5 pt-5 pb-1"><Text size="xs" fw={600} c="dimmed">{t("overview.charts.redditSubreddits")}</Text></div>
+          <div className="min-w-0 overflow-hidden px-4 pb-4 sm:px-5 sm:pb-5">
             <div role="img" aria-label={t("overview.charts.redditSubreddits")}>
             <ResponsiveContainer width="100%" height={PIE_H}>
               <PieChart>

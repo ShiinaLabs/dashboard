@@ -1,29 +1,32 @@
+import { useState } from "react";
+import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { XIcon, GithubIcon, GitlabIcon, RedditIcon } from "@/components/BrandIcons";
-import { ChartCardSkeleton, Skeleton } from "@/components/Skeleton";
-import { MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
+import { ArrowUpRight, Layers3, MessageSquareText, Star, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";
-import { useOverviewData } from "./useOverviewData";
+import { ChartCardSkeleton, Skeleton } from "@/components/Skeleton";
+import { GithubIcon, GitlabIcon, RedditIcon, XIcon } from "@/components/BrandIcons";
+import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
+import { isSupportedPlatform } from "@/lib/platforms";
 import { FetchHealthSection } from "./FetchHealthSection";
-import { PulseSection } from "./PulseSection";
-import { TopContentSection } from "./TopContentSection";
-import { XSection } from "./XSection";
 import { GitHubSection } from "./GitHubSection";
 import { GitLabSection } from "./GitLabSection";
+import { PulseSection } from "./PulseSection";
 import { RedditSection } from "./RedditSection";
-import { isSupportedPlatform } from "@/lib/platforms";
-import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
+import { TopContentSection } from "./TopContentSection";
+import { XSection } from "./XSection";
+import { useOverviewData } from "./useOverviewData";
 
 const titleKey = "nav.overview" satisfies PageTitleKey;
-
 export const meta = pageMeta(titleKey);
 export const handle = { titleKey } satisfies TitleHandle;
 
 export default function Overview() {
   const { t } = useTranslation();
   const data = useOverviewData();
+  const [selectedPlatform, setSelectedPlatform] = useState("");
   const {
     stats, timeline, topLiked, allAccounts,
     xAccounts, ghAccounts, glAccounts, redditAccounts,
@@ -33,107 +36,104 @@ export default function Overview() {
     isLoading,
   } = data;
 
+  const ghFollowers = ghOverviews.reduce((sum, overview) => sum + (overview.data?.stats?.followers ?? 0), 0);
+  const glFollowers = glOverviews.reduce((sum, overview) => sum + (overview.data?.stats?.followers ?? 0), 0);
+  const redditPostKarma = redditOverviews.reduce((sum, overview) => sum + (overview.data?.stats?.post_karma ?? 0), 0);
+  const redditCommentKarma = redditOverviews.reduce((sum, overview) => sum + (overview.data?.stats?.comment_karma ?? 0), 0);
+  const redditTotalPosts = redditOverviews.reduce((sum, overview) => sum + (overview.data?.totalPosts ?? 0), 0);
+  const redditTotalComments = redditOverviews.reduce((sum, overview) => sum + (overview.data?.totalComments ?? 0), 0);
+  const monitoredAccounts = allAccounts.filter((account) => isSupportedPlatform(account.platform));
+
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div><Skeleton className="h-6 w-32 mb-1" /></div>
-        </div>
-        <MetricGrid columns="five">
-          {Array.from({ length: 5 }).map((_, i) => <MetricCardSkeleton key={i} />)}
-        </MetricGrid>
-        <MetricGrid>
-          {Array.from({ length: 4 }).map((_, i) => <MetricCardSkeleton key={i} />)}
-        </MetricGrid>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          <ChartCardSkeleton /><ChartCardSkeleton />
-        </div>
+      <div className="space-y-8" aria-label={t("overview.heading")}>
+        <div className="space-y-2"><Skeleton className="h-8 w-40" /><Skeleton className="h-4 w-72 max-w-full" /></div>
+        <MetricGrid>{Array.from({ length: 4 }, (_, index) => <MetricCardSkeleton key={index} />)}</MetricGrid>
+        <div className="grid gap-4 xl:grid-cols-2"><ChartCardSkeleton /><ChartCardSkeleton /></div>
         <ChartCardSkeleton />
       </div>
     );
   }
 
-  const ghFollowers = ghOverviews.reduce((s, o) => s + (o.data?.stats?.followers ?? 0), 0);
-  const glFollowers = glOverviews.reduce((s, o) => s + (o.data?.stats?.followers ?? 0), 0);
-  const redditPostKarma = redditOverviews.reduce((s, o) => s + (o.data?.stats?.post_karma ?? 0), 0);
-  const redditCommentKarma = redditOverviews.reduce((s, o) => s + (o.data?.stats?.comment_karma ?? 0), 0);
-  const redditTotalPosts = redditOverviews.reduce((s, o) => s + (o.data?.totalPosts ?? 0), 0);
-  const redditTotalComments = redditOverviews.reduce((s, o) => s + (o.data?.totalComments ?? 0), 0);
-  const monitoredAccounts = allAccounts.filter((acc) => isSupportedPlatform(acc.platform));
-
-  const showSepX_GH = xAccounts.length > 0 && ghAccounts.length > 0;
-  const showSepGH_GL = (xAccounts.length > 0 || ghAccounts.length > 0) && glAccounts.length > 0;
-  const showSepGL_Reddit = (xAccounts.length > 0 || ghAccounts.length > 0 || glAccounts.length > 0) && redditAccounts.length > 0;
+  const platformTabs = [
+    { value: "x", label: t("nav.x"), icon: <XIcon />, enabled: xAccounts.length > 0 },
+    { value: "github", label: t("nav.github"), icon: <GithubIcon />, enabled: ghAccounts.length > 0 },
+    { value: "gitlab", label: t("nav.gitlab"), icon: <GitlabIcon />, enabled: glAccounts.length > 0 },
+    { value: "reddit", label: t("nav.reddit"), icon: <RedditIcon />, enabled: redditAccounts.length > 0 },
+  ].filter((platform) => platform.enabled);
+  const activePlatform = platformTabs.some((platform) => platform.value === selectedPlatform)
+    ? selectedPlatform
+    : platformTabs[0]?.value ?? "";
+  const followers = (stats?.followersCount ?? 0) + ghFollowers + glFollowers;
+  const codeStars = ghTotalStars + glTotalStars;
+  const redditKarma = redditPostKarma + redditCommentKarma;
 
   return (
-    <div className="overview-page space-y-7">
-      <div className="overview-page-header">
-        <div>
-          <p className="overview-page-kicker">{t("common.dashboard")}</p>
-          <h2 className="overview-page-title">{t("overview.heading")}</h2>
-          {monitoredAccounts.length === 0 && (
-            <p className="overview-page-description">{t("overview.description_addPrompt")}</p>
-          )}
+    <div className="space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1.5">
+          <h1 className="text-2xl font-semibold tracking-tight">{t("overview.heading")}</h1>
+          <p className="max-w-2xl text-sm text-muted-foreground">
+            {monitoredAccounts.length === 0 ? t("overview.description_addPrompt") : t("login.tagline")}
+          </p>
         </div>
-        {monitoredAccounts.length > 0 && (
-          <div className="overview-account-list">
-            {monitoredAccounts.map((acc: { id: number; platform: string; screen_name: string; error_message?: string | null }) => (
-              <Badge
-                key={acc.id}
-                className="overview-account-chip"
-                leftSection={acc.platform === "twitter" ? <XIcon /> : acc.platform === "github" ? <GithubIcon /> : acc.platform === "gitlab" ? <GitlabIcon /> : <RedditIcon />}
-                rightSection={acc.error_message ? <span className="overview-account-alert">!</span> : undefined}
-              >
-                {acc.platform === "twitter" ? `@${acc.screen_name}` : acc.screen_name}
-              </Badge>
-            ))}
-          </div>
-        )}
+        <Button asChild variant="outline" className="w-full shrink-0 sm:w-auto">
+          <Link to="/accounts">{t("nav.accounts")}<ArrowUpRight aria-hidden="true" /></Link>
+        </Button>
       </div>
 
-      <FetchHealthSection />
-      <PulseSection />
-      <TopContentSection />
-      <XSection stats={stats} timeline={timeline} topLiked={topLiked} xAccounts={xAccounts} />
+      <section aria-label={t("overview.heading")} className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-medium text-muted-foreground">{t("common.dashboard")}</h2>
+          <span className="text-xs text-muted-foreground">{t("overview.stats.trackedAccounts")}: {monitoredAccounts.length}</span>
+        </div>
+        <MetricGrid>
+          <MetricCard icon={<Layers3 />} label={t("overview.stats.trackedAccounts")} value={monitoredAccounts.length} />
+          <MetricCard icon={<Users />} label={t("overview.stats.followers")} value={followers} />
+          <MetricCard icon={<Star />} label={t("overview.stats.totalStars")} value={codeStars} />
+          <MetricCard icon={<MessageSquareText />} label={t("overview.stats.totalKarma")} value={redditKarma} hint={`${redditTotalPosts.toLocaleString()} ${t("overview.stats.redditPosts")} · ${redditTotalComments.toLocaleString()} ${t("overview.stats.redditComments")}`} />
+        </MetricGrid>
+      </section>
 
-      {showSepX_GH && <Separator />}
+      <section aria-label={t("overview.pulse.heading")} className="grid min-w-0 gap-4 xl:grid-cols-2 [&>*]:min-w-0">
+        <PulseSection />
+        <FetchHealthSection />
+      </section>
 
-      <GitHubSection
-        ghAllRepos={ghAllRepos}
-        ghPinned={ghPinned}
-        ghTotalStars={ghTotalStars}
-        ghTotalForks={ghTotalForks}
-        ghFollowers={ghFollowers}
-        ghAccounts={ghAccounts}
-      />
+      <section aria-label={t("overview.topContent.heading")}>
+        <TopContentSection />
+      </section>
 
-      {showSepGH_GL && <Separator />}
-
-      <GitLabSection
-        glAllProjects={glAllProjects}
-        glPinned={glPinned}
-        glTotalStars={glTotalStars}
-        glTotalForks={glTotalForks}
-        glFollowers={glFollowers}
-        glAccounts={glAccounts}
-      />
-
-      {showSepGL_Reddit && <Separator />}
-
-      {redditAccounts.length > 0 && (
-        <RedditSection
-          postKarma={redditPostKarma}
-          commentKarma={redditCommentKarma}
-          totalPosts={redditTotalPosts}
-          totalComments={redditTotalComments}
-          karmaTimeline={redditKarmaTimeline}
-          dailyActivity={redditDailyActivity}
-          mergedSubreddits={mergedSubreddits}
-        />
+      {platformTabs.length > 0 && (
+        <section className="space-y-4" aria-label={t("common.platforms")}>
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold tracking-tight">{t("common.platforms")}</h2>
+            <p className="text-sm text-muted-foreground">{t("overview.platformsDescription")}</p>
+          </div>
+          <Tabs value={activePlatform} onValueChange={setSelectedPlatform}>
+            <div className="w-full overflow-x-auto pb-1">
+              <TabsList className="w-max min-w-full justify-start sm:min-w-0">
+                {platformTabs.map((platform) => (
+                  <TabsTrigger key={platform.value} value={platform.value} className="gap-2 px-3">
+                    {platform.icon}<span>{platform.label}</span>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
+            {xAccounts.length > 0 && <TabsContent value="x" className="mt-4"><XSection stats={stats} timeline={timeline} topLiked={topLiked} xAccounts={xAccounts} /></TabsContent>}
+            {ghAccounts.length > 0 && <TabsContent value="github" className="mt-4"><GitHubSection ghAllRepos={ghAllRepos} ghPinned={ghPinned} ghTotalStars={ghTotalStars} ghTotalForks={ghTotalForks} ghFollowers={ghFollowers} ghAccounts={ghAccounts} /></TabsContent>}
+            {glAccounts.length > 0 && <TabsContent value="gitlab" className="mt-4"><GitLabSection glAllProjects={glAllProjects} glPinned={glPinned} glTotalStars={glTotalStars} glTotalForks={glTotalForks} glFollowers={glFollowers} glAccounts={glAccounts} /></TabsContent>}
+            {redditAccounts.length > 0 && <TabsContent value="reddit" className="mt-4"><RedditSection postKarma={redditPostKarma} commentKarma={redditCommentKarma} totalPosts={redditTotalPosts} totalComments={redditTotalComments} karmaTimeline={redditKarmaTimeline} dailyActivity={redditDailyActivity} mergedSubreddits={mergedSubreddits} /></TabsContent>}
+          </Tabs>
+        </section>
       )}
 
       {monitoredAccounts.length === 0 && (
-        <p className="text-xs text-[var(--muted-foreground)] italic">{t("overview.noAccounts")}</p>
+        <div className="rounded-lg border border-dashed p-6 text-center sm:p-10">
+          <p className="font-medium">{t("overview.noAccounts")}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{t("overview.description_addPrompt")}</p>
+          <Button asChild className="mt-4"><Link to="/accounts">{t("nav.accounts")}</Link></Button>
+        </div>
       )}
     </div>
   );

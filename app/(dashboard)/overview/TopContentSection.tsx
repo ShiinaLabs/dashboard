@@ -90,9 +90,9 @@ function TopContentRow({ item }: { item: TopContentItem }) {
   return (
     <TableRow className="transition-colors active:bg-[var(--border)]/50">
       <TableCell style={{ width: "100%" }}>
-        <div className="top-content-row">
-          <span className="top-content-icon" aria-hidden="true"><PlatformIcon platform={item.platform} /></span>
-          <div className="top-content-primary">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="grid size-7 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground" aria-hidden="true"><PlatformIcon platform={item.platform} /></span>
+          <div className="min-w-0 flex-1">
             {item.route ? (
               <Link to={item.route} className="block line-clamp-1 text-sm leading-5 hover:underline">{item.title}</Link>
             ) : (

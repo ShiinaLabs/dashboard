@@ -74,7 +74,7 @@ export function PulseSection() {
     >
       {isLoading ? (
         <div className="space-y-2">
-          <MetricGrid>
+          <MetricGrid className="sm:grid-cols-2">
             {Array.from({ length: 4 }).map((_, index) => <MetricCardSkeleton density="compact" key={index} />)}
           </MetricGrid>
           <ChartCardSkeleton />
@@ -89,7 +89,7 @@ export function PulseSection() {
         </Card>
       ) : (
         <>
-          <MetricGrid>
+          <MetricGrid className="sm:grid-cols-2">
             <MetricCard
               density="compact"
               icon={<Layers size={16} />}
@@ -163,7 +163,7 @@ export function PulseSection() {
           </div>
 
           <div
-            className="overview-highlight-grid"
+            className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3"
             style={{ "--highlight-columns": Math.min(
             (data.content.tweets.length > 0 ? 1 : 0) +
             (data.content.redditPosts.length > 0 || data.content.redditComments.length > 0 ? 1 : 0) +
