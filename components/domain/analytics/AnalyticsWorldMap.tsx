@@ -93,6 +93,7 @@ export function AnalyticsWorldMap({
             style={{
               fill: active ? `color-mix(in srgb, var(--chart-1) ${20 + intensity * 12}%, var(--muted))` : "var(--muted)",
               stroke: "var(--border)",
+              strokeWidth: 0.008,
             }}
             className="outline-none transition-colors focus-visible:stroke-foreground focus-visible:stroke-[0.02px]"
           />;
