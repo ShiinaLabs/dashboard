@@ -46,7 +46,7 @@ build:
 
 test:
   stage: test
-  image: reg.mikumikumi.xyz/mirror/node:20
+  image: reg.mikumikumi.xyz/mirror/node:22-bookworm-slim
   services:
     - name: postgres:16-alpine
       alias: postgres

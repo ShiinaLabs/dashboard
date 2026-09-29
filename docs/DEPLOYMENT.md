@@ -38,8 +38,8 @@ docker compose up -d
 ```
 
 The Dockerfile uses a multi-stage build:
-1. **Stage 1** (`node:20-slim`): installs dependencies and builds React Router output (client + SSR in separate memory-bounded passes)
-2. **Stage 2** (`node:20-slim`): installs production dependencies only, then runs `server/index.mjs` on port 3000 as a non-root user
+1. **Stage 1** (`node:22-bookworm-slim`): installs dependencies and builds React Router output (client + SSR in separate memory-bounded passes)
+2. **Stage 2** (`node:22-bookworm-slim`): installs production dependencies only, then runs `server/index.mjs` on port 3000 as a non-root user
 
 Type checking is intentionally skipped inside the Docker image build because the full `tsc --noEmit` pass exceeds the container memory budget; run typecheck in CI instead.
 
@@ -47,7 +47,7 @@ Type checking is intentionally skipped inside the Docker image build because the
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 22.12+
 - pnpm
 - PostgreSQL
 
@@ -110,7 +110,7 @@ pg_dump -U dashboard dashboard > backup.sql
 
 A GitLab CI pipeline (`.gitlab-ci.yml`) builds and deploys to a Kubernetes cluster:
 
-1. **Build**: Kaniko builds the Docker image, pushes to `reg.mikumikumi.xyz/kaoru/dashboard`
+1. **Build**: Kaniko builds `Dockerfile.ci` with the mirrored `reg.mikumikumi.xyz/mirror/node:22-bookworm-slim` base image, then pushes to `reg.mikumikumi.xyz/kaoru/dashboard`
 2. **Deploy**: kubectl updates the StatefulSet image
 
 ## Reverse Proxy
