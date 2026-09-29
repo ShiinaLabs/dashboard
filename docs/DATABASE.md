@@ -77,7 +77,7 @@ Migrations are idempotent `CREATE TABLE IF NOT EXISTS` statements executed by `b
 
 ## Multi-User Isolation
 
-The `owner_id` column on `accounts` links to `users.id`. All account queries filter by `owner_id` for non-admin users. Admin users (role=`admin`) see all accounts. `analytics_sites.owner_id` links to `users.id`; site listings are owner-scoped, `site_key` is globally unique, and sites use soft deletion. `analytics_events` stores normalized page events by `site_id` and `recorded_at`; it does not duplicate the site key or store IP addresses, raw user agents, or full referrer URLs. Its only secondary index is `(site_id, recorded_at DESC)`.
+The `owner_id` column on `accounts` links to `users.id`. All account queries filter by `owner_id` for non-admin users. Admin users (role=`admin`) see all accounts. `analytics_sites.owner_id` links to `users.id`; site listings are owner-scoped, `site_key` is globally unique, and sites use soft deletion. `analytics_events` stores normalized page events by `site_id` and `recorded_at`; it does not duplicate the site key or store IP addresses, raw user agents, full referrer URLs, or complete query strings. Its `utm_source`, `utm_medium`, and `utm_campaign` fields default to empty text and contain only normalized values from explicit allow-listed query parameters on `visit = true` entry events. Its only secondary index is `(site_id, recorded_at DESC)`.
 
 ## Soft-Delete Pattern
 

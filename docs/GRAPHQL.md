@@ -52,3 +52,9 @@ query AnalyticsAcquisition($siteId: Int!, $timezone: String!) {
 ```
 
 The existing REST traffic contract and `analytics.traffic.dimensions.referrers` remain views-based and unchanged. The standalone Acquisition field and helper also remain available for compatibility.
+
+## Campaign attribution
+
+The ranged `analytics.dashboard.acquisition.campaigns` field groups only explicit `utm_source`, `utm_medium`, and `utm_campaign` values on `visit = true` entry events. It uses the selected dashboard range and returns at most 10 groups ordered by visits descending, then campaign, source, and medium ascending. The complete source/medium/campaign tuple defines a group; a visit with all three fields blank is un-attributed and is excluded. The campaign UI reports Visits and divides each campaign's visits by all dashboard Visits.
+
+The tracker reads only those three allow-listed query parameters. It never sends or stores the full query string, any other parameter, or a full landing URL. UTM values are decoded, trimmed, and limited to 200 characters; the collector treats malformed values as empty. UTM fields are persisted only on visit-entry events. Referrers are independent data and are never used to infer UTM attribution. The compatibility `analytics.acquisition` field remains unchanged.
