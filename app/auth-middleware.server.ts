@@ -58,6 +58,11 @@ async function authMiddleware({ request }: { request: Request }): Promise<Respon
     return;
   }
 
+  // The tracker is a public static asset served by the production Node server.
+  if (pathname === "/a/t.js" && (request.method === "GET" || request.method === "HEAD")) {
+    return;
+  }
+
   // Public browser analytics collector; event integrity is validated by its service.
   if (pathname === "/a/e" && (request.method === "POST" || request.method === "OPTIONS")) {
     return;

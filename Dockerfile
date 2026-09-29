@@ -53,6 +53,7 @@ RUN pnpm install --prod --frozen-lockfile --child-concurrency=1 --network-concur
 
 # React Router build output + minimal HTTP entry.
 COPY --from=base --chown=dashboard:nodejs /app/build ./build
+COPY --from=base --chown=dashboard:nodejs /app/public/a/t.js ./build/client/a/t.js
 COPY --from=base --chown=dashboard:nodejs /app/server ./server
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 

@@ -11,9 +11,11 @@ stages:
   - db/**/*
   - scripts/**/*
   - locales/**/*
+  - public/**/*
   - server/**/*
   - patches/**/*
   - Dockerfile
+  - Dockerfile.ci
   - .dockerignore
   - package.json
   - pnpm-lock.yaml
