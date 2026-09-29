@@ -113,6 +113,13 @@ The authenticated layout (`components/layout/authenticated-layout.tsx`) follows 
 - **Overview** — cross-platform KPI cards lead into Business Pulse and Fetch Health, followed by Top Content and tabs for connected platforms.
 - **Page surfaces** — management and detail pages use consistent page headings, bordered cards, compact metric grids and responsive action groups. The authenticated shell has no wallpaper background.
 
+## UI Adapters and Form Controls
+
+- `components/ui/form-controls.tsx` is a temporary bridge for remaining legacy call sites. New UI should import shadcn primitives directly; known size, spacing, tone and layout props must map to static utilities or inline styles and must not build Tailwind class names at runtime.
+- `components/ui/searchable-select.tsx` composes Popover and Command for searchable options. The Settings timezone control uses this keyboard-operable combobox and persists a selection while updating immediately.
+- Radix Select triggers are not native form controls. Forms that submit a Select value keep that value in React state and include it explicitly in the API payload instead of reading it from `FormData`.
+- The legacy adapter no longer exports unused `Select`, `Drawer`, `NativeSelect`, `AlertBox`, `Code` or `Divider` wrappers. Remaining compatibility props are limited to active consumers and should be removed as those call sites move to native shadcn APIs.
+
 ## Theming
 
 - `app/providers.tsx` owns the React Query client, dashboard `ThemeProvider`, and Sonner toaster.

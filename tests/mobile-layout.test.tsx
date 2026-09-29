@@ -60,7 +60,9 @@ describe("mobile layout contracts", () => {
     const repoDetail = readProjectFile("app/(dashboard)/github/[accountId]/repos/[repoId]/page.tsx");
 
     expect(xDetail).toContain("flex shrink-0 flex-wrap items-center justify-start gap-2 sm:justify-end");
-    expect(repoDetail).toContain("flex shrink-0 flex-wrap items-center justify-start gap-2 sm:justify-end");
+    expect(repoDetail).toContain("min-h-11 shrink-0 flex-wrap items-center justify-start gap-1.5");
+    expect(repoDetail).toContain("sm:justify-end");
+    expect(repoDetail).not.toContain("justify-start gap-2 sm:justify-end flex items-center");
   });
 
   it("balances the four repository metrics in a two-column layout", () => {

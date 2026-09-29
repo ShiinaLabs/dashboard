@@ -63,3 +63,94 @@ test("mobile navigation opens, closes, and logout returns to login", async ({ pa
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
 });
+
+test("timezone selector filters and selects options with the keyboard", async ({ page }) => {
+  await logIn(page);
+  await page.goto("/settings");
+
+  const timezone = page.getByRole("combobox", { name: "Timezone" });
+  await timezone.click();
+  const search = page.getByPlaceholder("Search timezones...");
+  await search.fill("Tokyo");
+  await expect(page.getByRole("option", { name: /Asia\/Tokyo/ })).toBeVisible();
+  await expect(page.getByRole("option", { name: /Asia\/Shanghai/ })).toHaveCount(0);
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("option", { name: /Asia\/Tokyo/ })).toHaveAttribute("data-selected", "true");
+  await page.keyboard.press("Enter");
+  await expect(timezone).toContainText("Asia/Tokyo");
+  await expect(search).toBeHidden();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("timezone"))).toBe("Asia/Tokyo");
+});
+
+test("admin role selection is sent from controlled state, not FormData", async ({ page }) => {
+  await logIn(page);
+  let createPayload: { username?: string; password?: string; role?: string } | undefined;
+  await page.route("**/api/users", async (route) => {
+    if (route.request().method() === "POST") {
+      createPayload = route.request().postDataJSON();
+      await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ users: [] }) });
+  });
+  await page.goto("/admin");
+  await page.getByLabel("Username").fill("new-member");
+  await page.getByLabel("Password", { exact: true }).fill("ValidPassphrase!2026");
+  await page.getByLabel("Confirm password").fill("ValidPassphrase!2026");
+  const role = page.getByRole("combobox");
+  await role.click();
+  await page.getByRole("option", { name: "User" }).click();
+  await page.getByRole("button", { name: "Create user" }).click();
+  await expect.poll(() => createPayload).toMatchObject({ username: "new-member", role: "user" });
+});
+
+test("password visibility can be toggled through keyboard focus", async ({ page }) => {
+  await page.goto("/login");
+  const password = page.getByLabel("Password", { exact: true });
+  await password.focus();
+  await page.keyboard.press("Tab");
+  const showButton = page.getByRole("button", { name: "Show password" });
+  await expect(showButton).toBeFocused();
+  await expect(showButton).toHaveAccessibleName("Show password");
+  await page.keyboard.press("Enter");
+  await expect(password).toHaveAttribute("type", "text");
+  await page.getByRole("button", { name: "Hide password" }).focus();
+  await page.keyboard.press("Space");
+  await expect(password).toHaveAttribute("type", "password");
+});
+
+test("theme tokens remain applied across the requested light and dark themes", async ({ page }) => {
+  await logIn(page);
+  await page.goto("/settings");
+  const cases = [
+    { mode: "Light", theme: "Default Light", id: "default-light" },
+    { mode: "Dark", theme: "Default Dark", id: "default-dark" },
+    { mode: "Light", theme: "Sepia Light", id: "sepia-light" },
+    { mode: "Dark", theme: "Sepia Dark", id: "sepia-dark" },
+    { mode: "Dark", theme: "Cyber Dark", id: "cyber-dark" },
+    { mode: "Dark", theme: "Forest Dark", id: "forest-dark" },
+    { mode: "Light", theme: "Sky Light", id: "sky-light" },
+    { mode: "Dark", theme: "Rose Dark", id: "rose-dark" },
+  ];
+
+  for (const item of cases) {
+    await page.getByRole("button", { name: item.mode, exact: true }).click();
+    await page.getByRole("combobox", { name: "Theme" }).click();
+    await page.getByRole("option", { name: item.theme, exact: true }).click();
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe(item.id);
+    await page.goto("/overview");
+    const surfaces = await page.evaluate(() => {
+      const card = document.querySelector<HTMLElement>("[data-slot=card]");
+      const sidebar = document.querySelector<HTMLElement>("[data-sidebar=sidebar]");
+      return {
+        cardBackground: card ? getComputedStyle(card).backgroundColor : "",
+        sidebarBackground: sidebar ? getComputedStyle(sidebar).backgroundColor : "",
+        border: getComputedStyle(document.documentElement).getPropertyValue("--border").trim(),
+      };
+    });
+    expect(surfaces.cardBackground, item.id).not.toBe("");
+    expect(surfaces.sidebarBackground, item.id).not.toBe("");
+    expect(surfaces.border, item.id).not.toBe("");
+    await page.goto("/settings");
+  }
+});

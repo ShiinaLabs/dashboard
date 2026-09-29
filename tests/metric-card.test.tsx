@@ -35,6 +35,25 @@ describe("MetricCard", () => {
     expect(html).toContain("data-slot=\"metric-skeleton-hint\"");
   });
 
+  it("uses semantic value tones while keeping neutral metrics neutral", () => {
+    const positive = renderToHtml(<MetricCard icon={<span />} label="Growth" value={2} tone="success" />);
+    const negative = renderToHtml(<MetricCard icon={<span />} label="Errors" value={1} tone="danger" />);
+    const neutral = renderToHtml(<MetricCard icon={<span />} label="Accounts" value={8} />);
+
+    expect(positive).toContain("text-[var(--success)]");
+    expect(negative).toContain("text-[var(--danger)]");
+    expect(neutral).toContain("text-foreground");
+    expect(neutral).not.toContain("text-[var(--success)]");
+    expect(neutral).not.toContain("text-[var(--danger)]");
+  });
+
+  it("keeps success and danger tone semantics theme-token based in dark and light themes", () => {
+    const html = renderToHtml(<div className="dark"><MetricCard icon={<span />} label="Growth" value={2} tone="success" /><MetricCard icon={<span />} label="Errors" value={1} tone="danger" /></div>);
+
+    expect(html).toContain("text-[var(--success)]");
+    expect(html).toContain("text-[var(--danger)]");
+  });
+
   it("preserves the four-column tablet breakpoint", () => {
     const html = renderToHtml(
       <MetricGrid columns="four"><MetricCard icon={<span>icon</span>} label="Followers" value={1} /></MetricGrid>,
