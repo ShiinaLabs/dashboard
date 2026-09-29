@@ -27,6 +27,7 @@ export const PAGE_TITLES = {
   "nav.github": en.nav.github,
   "nav.gitlab": en.nav.gitlab,
   "nav.reddit": en.nav.reddit,
+  "nav.analytics": en.nav.analytics,
   "nav.ai": en.nav.ai,
   "nav.settings": en.nav.settings,
   "nav.admin": en.nav.admin,

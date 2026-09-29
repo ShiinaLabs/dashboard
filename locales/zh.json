@@ -41,6 +41,7 @@
     "github": "GitHub",
     "gitlab": "GitLab",
     "reddit": "Reddit",
+    "analytics": "网站分析",
     "admin": "管理",
     "settings": "设置",
     "ai": "AI",
@@ -201,6 +202,15 @@
       "error": "获取响应失败",
       "clear": "清空对话"
     }
+  },
+  "analytics": {
+    "heading": "网站分析",
+    "period": "最近 7 天",
+    "views": "浏览量",
+    "visitors": "访客",
+    "visits": "访问次数",
+    "loadErrorTitle": "无法加载分析数据",
+    "loadErrorDescription": "无法读取已配置站点的数据。请检查 Cloudflare Analytics 配置后重试。"
   },
   "x": {
     "heading": "X (Twitter)",

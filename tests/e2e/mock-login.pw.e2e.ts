@@ -25,12 +25,26 @@ test("mock login keeps its session and opens the requested route", async ({ page
   });
 });
 
+test("Web Analytics displays the configured 7-day metrics through mock mode", async ({ page }) => {
+  await logIn(page);
+  await page.getByRole("link", { name: "Web Analytics" }).click();
+  await expect(page).toHaveURL(/\/analytics$/);
+  await expect(page.getByRole("heading", { name: "Web Analytics", level: 1 })).toBeVisible();
+  await expect(page.getByText("Last 7 days")).toBeVisible();
+  await expect(page.getByText("Views")).toBeVisible();
+  await expect(page.getByText("Visitors")).toBeVisible();
+  await expect(page.getByText("Visits")).toBeVisible();
+  await expect(page.getByText("12,842")).toBeVisible();
+  await expect(page.getByText("2,931")).toBeVisible();
+  await expect(page.getByText("4,102")).toBeVisible();
+});
+
 test("dashboard routes render without horizontal overflow at desktop and tablet widths", async ({ page }) => {
   await logIn(page);
   const routes = [
     "/overview", "/accounts", "/x", "/x/1", "/github", "/github/2",
     "/github/2/repos/1001", "/gitlab", "/gitlab/3", "/gitlab/3/projects/2001",
-    "/reddit", "/reddit/4", "/ai", "/settings", "/admin",
+    "/reddit", "/reddit/4", "/analytics", "/ai", "/settings", "/admin",
   ];
 
   for (const width of [390, 768, 1440]) {

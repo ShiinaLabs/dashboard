@@ -17,6 +17,13 @@ import type {
   LoginResponse, AuthCheckResponse, UserPublic,
 } from "@/shared/types";
 
+export interface AnalyticsOverview {
+  period: "7d";
+  views: number;
+  visitors: number;
+  visits: number;
+}
+
 export type {
   Account, AccountWithStats, AccountsResponse, OverviewStats,
   Tweet, PaginatedTweets, TimelineData, CalendarDay,
@@ -143,6 +150,7 @@ export const api = {
     apiJson<{ ok: boolean }>(`/users/${id}`, { method: "DELETE", body: JSON.stringify({ confirmToken }) }),
 
   // AI and Settings
+  getAnalyticsOverview: () => apiJson<AnalyticsOverview>("/analytics/overview"),
   getAiStatus: () => apiJson<{ configured: boolean; quota: { used: number; limit: number } }>("/ai/chat"),
   streamAiChat: (messages: { role: "user" | "assistant"; content: string }[]) =>
     apiRequest("/ai/chat", { method: "POST", body: JSON.stringify({ messages }) }),

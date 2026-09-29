@@ -109,6 +109,17 @@ DATABASE_URL=postgresql://user:password@host:5432/dbname
 
 AI settings can also be configured via the admin Settings page after deployment.
 
+### Web Analytics spike (optional)
+
+| Variable | Description |
+|----------|-------------|
+| `CLOUDFLARE_ANALYTICS_ACCOUNT_ID` | Cloudflare account that owns the Analytics Engine dataset |
+| `CLOUDFLARE_ANALYTICS_API_TOKEN` | Server-side API token with Account Analytics Read permission |
+| `CLOUDFLARE_ANALYTICS_DATASET` | Analytics Engine dataset name (SQL identifier) |
+| `CLOUDFLARE_ANALYTICS_SITE_ID` | Site key stored in the dataset's `blob1` field |
+
+When all four variables are set, `/analytics` queries the configured site's views, visitors, and visits for the last seven days. `pnpm run mock` uses local fixture values and does not contact Cloudflare.
+
 ## Mock / Debug Mode
 
 | Variable | Description |

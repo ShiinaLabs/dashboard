@@ -1,6 +1,6 @@
 # API Boundary Inventory
 
-This inventory mirrors the 55 API route registrations in `app/routes.ts`: 54 concrete route files plus the `/api/*` catch-all. The browser contract stays in `lib/api.ts`; its HTTP details are centralized in `lib/client/api-transport.ts`. The default API root is `/api`. `VITE_API_BASE_URL` is a build-time transport seam for an alternate API root; this step does not enable cross-origin cookie deployment.
+This inventory mirrors the 56 API route registrations in `app/routes.ts`: 55 concrete route files plus the `/api/*` catch-all. The browser contract stays in `lib/api.ts`; its HTTP details are centralized in `lib/client/api-transport.ts`. The default API root is `/api`. `VITE_API_BASE_URL` is a build-time transport seam for an alternate API root; this step does not enable cross-origin cookie deployment.
 
 Unless listed as public below, endpoints require the existing `dash_session` session. Endpoints that target account data additionally enforce the authorization checks present in their route adapter. Admin-only endpoints are marked **admin**.
 
@@ -12,6 +12,7 @@ Unless listed as public below, endpoints require the existing `dash_session` ses
 |---|---|---|---|---|---|
 | `/api/accounts` | GET, POST | session | `getAccounts`, `createAccount` | `accounts.getAccountsOverview`, `accounts.createAccount` | Accounts + Twitter repositories; account create validation |
 | `/api/accounts/:id` | GET, PUT, DELETE | session + owner | `getAccount`, `updateAccount`, `deleteAccount` | `accounts.getAccountDetails`, `updateAccountFromInput`, `deleteAccount` | Accounts, Twitter stats, fetch health; confirmation token validation |
+| `/api/analytics/overview` | GET | session | `getAnalyticsOverview` | `analytics.getAnalyticsOverview` | Cloudflare Analytics Engine SQL integration; fixed configured site and seven-day period |
 | `/api/ai/chat` | GET, POST | session | `getAiStatus`, `streamAiChat` | `ai-analysis.getAiStatus`, `runAgentStream` | AI config/quota/model integration; POST streams a `Response` |
 | `/api/auth/change-password` | POST | session | `changePassword` | Existing auth handler | Auth/password implementation; cookie/session semantics unchanged |
 | `/api/auth/login` | POST | public | `login` | Existing auth handler | Auth implementation; rate limit and session cookie |

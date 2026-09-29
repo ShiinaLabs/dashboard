@@ -41,6 +41,7 @@
     "github": "GitHub",
     "gitlab": "GitLab",
     "reddit": "Reddit",
+    "analytics": "Web Analytics",
     "admin": "Admin",
     "settings": "Settings",
     "ai": "AI",
@@ -201,6 +202,15 @@
       "error": "Failed to get response",
       "clear": "Clear chat"
     }
+  },
+  "analytics": {
+    "heading": "Web Analytics",
+    "period": "Last 7 days",
+    "views": "Views",
+    "visitors": "Visitors",
+    "visits": "Visits",
+    "loadErrorTitle": "Analytics unavailable",
+    "loadErrorDescription": "Could not load analytics for the configured site. Check the Cloudflare Analytics settings and try again."
   },
   "x": {
     "heading": "X (Twitter)",

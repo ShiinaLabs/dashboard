@@ -1,4 +1,4 @@
-import { Bot, LayoutDashboard, LogOut, Settings, Shield, Users, UserRound } from "lucide-react";
+import { Bot, ChartNoAxesColumnIncreasing, LayoutDashboard, LogOut, Settings, Shield, Users, UserRound } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   Sidebar,
@@ -20,6 +20,7 @@ export function AppSidebar({ isAdmin, username, role, loggingOut, onLogout }: { 
     { to: "/github", label: t("nav.github"), icon: GithubIcon },
     { to: "/gitlab", label: t("nav.gitlab"), icon: GitlabIcon },
     { to: "/reddit", label: t("nav.reddit"), icon: RedditIcon },
+    { to: "/analytics", label: t("nav.analytics"), icon: ChartNoAxesColumnIncreasing },
     { to: "/ai", label: t("nav.ai"), icon: Bot },
   ];
   const managementItems: NavEntry[] = [
