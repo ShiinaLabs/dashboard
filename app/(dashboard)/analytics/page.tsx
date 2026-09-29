@@ -14,7 +14,8 @@ import { ChartCard } from "@/components/domain/shared/ChartCard";
 import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";
 import { ApiError, api } from "@/lib/api";
-import { getAnalyticsAcquisition } from "@/lib/client/analytics-graphql";
+import { compareAnalyticsPeriod } from "@/lib/client/analytics-comparison";
+import { getAnalyticsDashboard, type AnalyticsRange } from "@/lib/client/analytics-graphql";
 import { getTimezone } from "@/lib/client/datetime";
 import { calcYAxisWidth } from "@/lib/client/utils";
 import { useIsMobile } from "@/lib/client/useIsMobile";
@@ -45,6 +46,7 @@ export default function WebAnalyticsPage() {
     () => null,
   );
   const [selectedSiteId, setSelectedSiteId] = useState<number>();
+  const [selectedRange, setSelectedRange] = useState<AnalyticsRange>("DAYS_7");
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [host, setHost] = useState("");
@@ -60,20 +62,14 @@ export default function WebAnalyticsPage() {
       await queryClient.invalidateQueries({ queryKey: ["analytics", "sites"] });
     },
   });
-  const trafficQuery = useQuery({
-    queryKey: ["analytics", "traffic", selectedSite?.id, timezone],
-    queryFn: () => api.getAnalyticsTraffic(selectedSite!.id, timezone!),
+  const dashboardQuery = useQuery({
+    queryKey: ["analytics", "dashboard", selectedSite?.id, selectedRange, timezone],
+    queryFn: () => getAnalyticsDashboard(selectedSite!.id, selectedRange, timezone!),
     enabled: Boolean(selectedSite && timezone),
     staleTime: 5 * 60 * 1000,
   });
-  const traffic = trafficQuery.data;
-  const acquisitionQuery = useQuery({
-    queryKey: ["analytics", "acquisition", selectedSite?.id, timezone],
-    queryFn: () => getAnalyticsAcquisition(selectedSite!.id, timezone!),
-    enabled: Boolean(selectedSite && timezone),
-    staleTime: 5 * 60 * 1000,
-  });
-  const acquisition = acquisitionQuery.data;
+  const dashboard = dashboardQuery.data;
+  const acquisition = dashboard?.acquisition;
   const installationQuery = useQuery({
     queryKey: ["analytics", "installation", selectedSite?.id],
     queryFn: () => api.getAnalyticsInstallation(selectedSite!.id),
@@ -81,16 +77,23 @@ export default function WebAnalyticsPage() {
   });
   const publicOriginNotConfigured = installationQuery.error instanceof ApiError
     && installationQuery.error.message === "Analytics public URL is not configured";
-  const totalViews = traffic?.overview.views ?? 0;
+  const totalViews = dashboard?.overview.views ?? 0;
   const dimensionCardLabels = {
     totalValue: totalViews,
     metricLabel: t("analytics.views"),
     shareLabel: t("analytics.share"),
     loadingLabel: t("common.loading"),
-    loading: !traffic,
+    loading: !dashboard,
   };
-  const dimensionData = traffic?.dimensions;
+  const dimensionData = dashboard?.dimensions;
   const countryLocale = i18n.resolvedLanguage ?? i18n.language;
+
+  function comparisonLabel(current: number, previous: number): string {
+    const comparison = compareAnalyticsPeriod(current, previous);
+    if (comparison.kind === "new") return t("analytics.newVsPrevious");
+    if (comparison.kind === "no-change") return t("analytics.noChangeVsPrevious");
+    return t("analytics.changeVsPrevious", { percentage: comparison.percentage });
+  }
 
   async function copyTrackingCode() {
     try {
@@ -105,7 +108,7 @@ export default function WebAnalyticsPage() {
     <div className="space-y-6">
       <header className="space-y-1.5">
         <h1 className="text-2xl font-semibold tracking-tight">{t("analytics.heading")}</h1>
-        <p className="text-sm text-muted-foreground">{t("analytics.period")}</p>
+        <p className="text-sm text-muted-foreground">{t("analytics.period", { days: selectedRange === "DAYS_7" ? 7 : selectedRange === "DAYS_30" ? 30 : 90 })}</p>
       </header>
 
       {sitesQuery.isError ? <Alert variant="destructive"><AlertTitle>{t("analytics.loadErrorTitle")}</AlertTitle><AlertDescription>{t("analytics.sitesLoadError")}</AlertDescription></Alert> : null}
@@ -126,6 +129,17 @@ export default function WebAnalyticsPage() {
         <Button variant="outline" onClick={() => setShowForm((visible) => !visible)}><Plus />{t("analytics.addSite")}</Button>
       </div> : null}
 
+      {sites.length > 0 ? <div className="flex items-center gap-1" role="group" aria-label={t("analytics.range")}>{([
+        ["DAYS_7", "7D"], ["DAYS_30", "30D"], ["DAYS_90", "90D"],
+      ] as const).map(([range, label]) => <Button
+        key={range}
+        type="button"
+        size="sm"
+        variant={selectedRange === range ? "default" : "outline"}
+        aria-pressed={selectedRange === range}
+        onClick={() => setSelectedRange(range)}
+      >{label}</Button>)}</div> : null}
+
       {showForm ? <form className="grid gap-4 rounded-xl border bg-card p-5 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); createSite.mutate({ name, host }); }}>
         <div className="space-y-2"><Label htmlFor="analytics-site-name">{t("analytics.name")}</Label><Input id="analytics-site-name" value={name} onChange={(event) => setName(event.target.value)} required /></div>
         <div className="space-y-2"><Label htmlFor="analytics-site-host">{t("analytics.host")}</Label><Input id="analytics-site-host" value={host} onChange={(event) => setHost(event.target.value)} placeholder="example.com" required /></div>
@@ -134,27 +148,27 @@ export default function WebAnalyticsPage() {
       </form> : null}
 
       {selectedSite ? <>
-        {trafficQuery.isError ? <Alert variant="destructive">
+        {dashboardQuery.isError ? <Alert variant="destructive">
           <AlertTitle>{t("analytics.loadErrorTitle")}</AlertTitle>
-          <AlertDescription>{t("analytics.trafficUnavailable")}</AlertDescription>
+          <AlertDescription>{t("analytics.dashboardUnavailable")}</AlertDescription>
         </Alert> : <>
-        {traffic ? <MetricGrid columns="three">
-          <MetricCard icon={<Eye />} label={t("analytics.views")} value={traffic.overview.views} />
-          <MetricCard icon={<UsersRound />} label={t("analytics.visitors")} value={traffic.overview.visitors} />
-          <MetricCard icon={<MousePointerClick />} label={t("analytics.visits")} value={traffic.overview.visits} />
+        {dashboard ? <MetricGrid columns="three">
+          <MetricCard icon={<Eye />} label={t("analytics.views")} value={dashboard.overview.views} hint={comparisonLabel(dashboard.overview.views, dashboard.previousOverview.views)} />
+          <MetricCard icon={<UsersRound />} label={t("analytics.averageDailyVisitors")} value={Math.round(dashboard.overview.visitorDays / dashboard.period.days)} hint={comparisonLabel(dashboard.overview.visitorDays / dashboard.period.days, dashboard.previousOverview.visitorDays / dashboard.previousPeriod.days)} />
+          <MetricCard icon={<MousePointerClick />} label={t("analytics.visits")} value={dashboard.overview.visits} hint={comparisonLabel(dashboard.overview.visits, dashboard.previousOverview.visits)} />
         </MetricGrid> : <MetricGrid columns="three">
           {Array.from({ length: 3 }, (_, index) => <MetricCardSkeleton key={index} />)}
         </MetricGrid>}
 
         <ChartCard title={t("analytics.trafficOverTime")}>
-          {traffic ? (
+          {dashboard ? (
             <>
               <div role="img" aria-label={t("analytics.trafficChartA11y")}>
               <ResponsiveContainer width="100%" height={isMobile ? 210 : 280}>
-                <LineChart data={traffic.timeline} margin={{ top: 6, right: 8, bottom: 4, left: 0 }}>
+                <LineChart data={dashboard.timeline} margin={{ top: 6, right: 8, bottom: 4, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} tickFormatter={(date: string) => date.slice(5)} />
-                  <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={calcYAxisWidth(traffic.timeline, "views", "visitors", "visits")} />
+                  <XAxis dataKey="date" interval="preserveStartEnd" minTickGap={24} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} tickFormatter={(date: string) => date.slice(5)} />
+                  <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={calcYAxisWidth(dashboard.timeline, "views", "visitors", "visits")} />
                   <Tooltip
                     labelFormatter={(date) => String(date)}
                     contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "12px" }}
@@ -178,7 +192,7 @@ export default function WebAnalyticsPage() {
           ) : <div className="flex h-[210px] items-center justify-center text-sm text-muted-foreground">{t("common.loading")}</div>}
         </ChartCard>
 
-        {traffic ? <ChartCard title={t("analytics.visitorGeography")}>
+        {dashboard ? <ChartCard title={t("analytics.visitorGeography")}>
           <AnalyticsWorldMap
             countries={dimensionData?.countries ?? []}
             totalViews={totalViews}
@@ -201,7 +215,7 @@ export default function WebAnalyticsPage() {
             title={t("analytics.topPages")}
             itemLabel={t("analytics.page")}
             emptyMessage={t("analytics.noPageViews")}
-            items={(traffic?.topPages ?? []).map((page) => ({ key: page.path, label: page.path, title: page.path, value: page.views }))}
+            items={(dashboard?.topPages ?? []).map((page) => ({ key: page.path, label: page.path, title: page.path, value: page.views }))}
           />
           <AnalyticsDimensionCard
             {...dimensionCardLabels}
@@ -247,10 +261,7 @@ export default function WebAnalyticsPage() {
 
         <section className="min-w-0 space-y-3" aria-labelledby="analytics-acquisition-heading">
           <h2 id="analytics-acquisition-heading" className="text-lg font-semibold">{t("analytics.acquisition")}</h2>
-          {acquisitionQuery.isError ? <Alert variant="destructive">
-            <AlertTitle>{t("analytics.loadErrorTitle")}</AlertTitle>
-            <AlertDescription>{t("analytics.acquisitionUnavailable")}</AlertDescription>
-          </Alert> : <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+          <div className="grid min-w-0 gap-4 lg:grid-cols-2">
             <AnalyticsDimensionCard
               title={t("analytics.referrers")}
               itemLabel={t("analytics.referrer")}
@@ -259,7 +270,7 @@ export default function WebAnalyticsPage() {
               shareLabel={t("analytics.share")}
               emptyMessage={t("analytics.noAcquisitionReferrerData")}
               loadingLabel={t("common.loading")}
-              loading={acquisitionQuery.isPending}
+              loading={!dashboard}
               items={(acquisition?.referrers ?? []).map((item) => ({
                 key: item.referrer,
                 label: item.referrer === "" ? t("analytics.direct") : item.referrer,
@@ -275,7 +286,7 @@ export default function WebAnalyticsPage() {
               shareLabel={t("analytics.share")}
               emptyMessage={t("analytics.noEntryPageData")}
               loadingLabel={t("common.loading")}
-              loading={acquisitionQuery.isPending}
+              loading={!dashboard}
               items={(acquisition?.entryPages ?? []).map((item) => ({
                 key: item.path,
                 label: item.path,
@@ -283,13 +294,13 @@ export default function WebAnalyticsPage() {
                 value: item.visits,
               }))}
             />
-          </div>}
+          </div>
         </section>
 
         <section className="min-w-0 space-y-4 rounded-xl border bg-card p-5" aria-labelledby="analytics-tracking-setup">
           <div>
             <h2 id="analytics-tracking-setup" className="text-lg font-semibold">{t("analytics.trackingSetup")}</h2>
-            {traffic ? <p className="mt-1 text-sm text-muted-foreground">{traffic.overview.views ? t("analytics.receivingData") : t("analytics.noData")}</p> : null}
+            {dashboard ? <p className="mt-1 text-sm text-muted-foreground">{dashboard.overview.views ? t("analytics.receivingData") : t("analytics.noData")}</p> : null}
           </div>
           {installationQuery.isPending ? <p className="text-sm text-muted-foreground">{t("analytics.installationLoading")}</p> : null}
           {installationQuery.isError ? <Alert variant={publicOriginNotConfigured ? "default" : "destructive"}>
