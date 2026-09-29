@@ -73,17 +73,19 @@ export default function Admin() {
   }
 
   return (
-    <div className="space-y-8 max-w-lg">
-      <div>
-        <h2 className="text-xl font-semibold">{t("admin.heading")}</h2>
-        <p className="text-sm text-[var(--muted-foreground)]">{t("admin.description")}</p>
+    <div className="space-y-8">
+      <div className="space-y-1.5">
+        <h1 className="text-2xl font-semibold tracking-tight">{t("admin.heading")}</h1>
+        <p className="max-w-2xl text-sm text-muted-foreground">{t("admin.description")}</p>
       </div>
 
-      <section className="space-y-4">
-        <h3 className="text-sm font-semibold flex items-center gap-1.5">
-          <Plus size={14} /> {t("admin.createUser")}
-        </h3>
-        <div className="admin-create-card rounded-xl border border-[var(--border)] bg-[var(--card)]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
+      <section className="overflow-hidden rounded-lg border bg-card">
+        <div className="flex items-center gap-2 border-b px-5 py-4">
+          <Plus size={16} className="text-muted-foreground" />
+          <h2 className="text-sm font-semibold">{t("admin.createUser")}</h2>
+        </div>
+        <div className="p-5">
           <form onSubmit={handleCreateUser} className="flex flex-col gap-3">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <TextInput name="username" label={t("admin.username")} required />
@@ -110,17 +112,19 @@ export default function Admin() {
         </div>
       </section>
 
-      <section className="space-y-4">
-        <h3 className="text-sm font-semibold flex items-center gap-1.5">
-          <Users size={14} /> {t("admin.userList")}
-        </h3>
-        <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--card)]">
+      <section className="overflow-hidden rounded-lg border bg-card">
+        <div className="flex items-center gap-2 border-b px-5 py-4">
+          <Users size={16} className="text-muted-foreground" />
+          <h2 className="text-sm font-semibold">{t("admin.userList")}</h2>
+          <span className="ml-auto text-xs text-muted-foreground">{users.length}</span>
+        </div>
+        <div className="p-5">
           {users.length === 0 ? (
             <p className="text-sm text-[var(--muted-foreground)]">{t("admin.noUsers")}</p>
           ) : (
-            <div className="space-y-1">
+            <div className="divide-y">
               {users.map((u) => (
-                <div key={u.id} className="flex items-center justify-between py-2 border-t border-[var(--border)] first:border-0">
+                <div key={u.id} className="flex min-h-12 items-center justify-between gap-3 py-2">
                   <span className="text-sm">
                     {u.username}
                     <span className="text-[11px] text-[var(--muted-foreground)] ml-1.5">({u.role})</span>
@@ -142,6 +146,7 @@ export default function Admin() {
           )}
         </div>
       </section>
+      </div>
 
       <ConfirmDialog
         open={deleteUserId !== null}

@@ -1,7 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useAiChat } from "../overview/useAiChat";
 import { AiChatUI } from "@/components/AiChatUI";
-import { useIsMobile } from "@/lib/client/useIsMobile";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 
 const titleKey = "nav.ai" satisfies PageTitleKey;
@@ -12,26 +11,12 @@ export const handle = { titleKey } satisfies TitleHandle;
 export default function AiPage() {
   const { t } = useTranslation();
   const chat = useAiChat();
-  const isMobile = useIsMobile();
-
-  // Counteract parent padding so the chat fills the viewport.
-  // Title bar = 48px + env(safe-area-inset-top); content padding = 12px (mobile) or 24px (desktop).
-  const negTop = isMobile ? "-mt-3" : "-mt-6";
-  const negX = isMobile ? "-mx-4" : "-mx-8";
-
   return (
-    <div className={`flex flex-col ${negTop} ${negX}`}
-      style={{
-        height: `calc(100dvh - 48px - env(safe-area-inset-top) - ${isMobile ? 24 : 48}px - env(safe-area-inset-bottom))`,
-      }}
-    >
-      {/* Header */}
-      <div className="shrink-0 px-4 py-3 border-b border-[var(--border)]">
-        <h2 className="text-lg font-semibold">{t("overview.aiAgent.heading")}</h2>
+    <div className="space-y-5">
+      <div className="space-y-1.5">
+        <h1 className="text-2xl font-semibold tracking-tight">{t("overview.aiAgent.heading")}</h1>
       </div>
-
-      {/* Chat content */}
-      <div className="flex-1 min-h-0">
+      <div className="flex h-[calc(100dvh-11rem)] min-h-[28rem] flex-col overflow-hidden rounded-lg border bg-card shadow-sm">
         <AiChatUI
           messages={chat.messages}
           input={chat.input}

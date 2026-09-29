@@ -30,12 +30,12 @@ export function AiChatUI({
 
   if (status && !status.configured) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-3 p-6 text-center">
-        <Bot size={32} className="text-[var(--muted-foreground)] opacity-40" />
-        <p className="text-sm font-medium text-[var(--muted-foreground)]">
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+        <span className="grid size-12 place-items-center rounded-full bg-muted text-muted-foreground"><Bot size={22} /></span>
+        <p className="text-sm font-medium">
           {t("overview.aiAgent.heading")}
         </p>
-        <p className="text-xs text-[var(--muted-foreground)]">
+        <p className="max-w-sm text-sm text-muted-foreground">
           {t("overview.aiAgent.configureHint") || "Go to Settings → AI Analysis to configure your API endpoint."}
         </p>
       </div>
@@ -43,27 +43,28 @@ export function AiChatUI({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-2">
-            <Bot size={32} className="text-[var(--muted-foreground)] opacity-40" />
-            <p className="text-sm text-[var(--muted-foreground)] text-center">
+          <div className="mx-auto flex h-full max-w-md flex-col items-center justify-center gap-4 text-center">
+            <span className="grid size-12 place-items-center rounded-full bg-muted text-muted-foreground"><Bot size={22} /></span>
+            <p className="text-sm leading-6 text-muted-foreground">
               {t("overview.aiAgent.welcome") || "Ask me anything about your data. I can analyze trends, check fetch health, and more."}
             </p>
           </div>
         ) : (
           <>
             {messages.map((msg, i) => (
-              <div key={i} className={`text-sm p-3 rounded-lg ${
+              <div key={i} className={`mx-auto mb-4 flex max-w-3xl ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div className={`min-w-0 max-w-[min(90%,48rem)] rounded-xl border px-4 py-3 text-sm leading-6 ${
                 msg.role === "user"
-                  ? "bg-[var(--primary)] text-[var(--primary-foreground)] ml-8"
-                  : "bg-[var(--muted)] mr-8"
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "bg-card text-card-foreground"
               }`}>
                 {msg.role === "assistant" ? (
                   <div
-                    className="prose prose-sm dark:prose-invert max-w-none [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-[var(--background)] [&_code]:text-xs"
+                    className="prose prose-sm dark:prose-invert max-w-none break-words [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-background [&_pre]:p-3 [&_code]:text-xs"
                     dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
                   />
                 ) : (
@@ -72,6 +73,7 @@ export function AiChatUI({
                 {msg.role === "assistant" && isStreaming && i === messages.length - 1 && msg.content === "" && (
                   <span className="inline-block w-2 h-4 bg-[var(--foreground)] animate-pulse ml-0.5" />
                 )}
+              </div>
               </div>
             ))}
             <div ref={messagesEndRef} />
@@ -92,8 +94,8 @@ export function AiChatUI({
       )}
 
       {/* Input */}
-      <div className="border-t border-[var(--border)] p-3">
-        <form onSubmit={handleSubmit} className="flex gap-2">
+      <div className="border-t bg-background/80 p-3 sm:p-4">
+        <form onSubmit={handleSubmit} className="mx-auto flex max-w-3xl items-end gap-2">
           {messages.length > 0 && onClear && (
             <ActionIcon
               type="button"
@@ -113,7 +115,7 @@ export function AiChatUI({
             onChange={(e) => setInput(e.currentTarget.value)}
             placeholder={t("overview.aiAgent.placeholder")}
             disabled={isStreaming}
-            style={{ flex: 1 }}
+            className="min-w-0 flex-1"
           />
           <Button
             type="submit"

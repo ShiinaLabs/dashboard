@@ -13,6 +13,7 @@ import { Pencil, Plus, PlayCircle, PauseCircle, Trash2, AlertCircle, ArrowUpRigh
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TriggerPanel } from "@/components/TriggerPanel";
 import { ActionIcon, Button, PasswordInput, TextInput } from "@/components/ui/form-controls";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 
 const titleKey = "nav.accounts" satisfies PageTitleKey;
@@ -75,12 +76,12 @@ export default function AccountsPage() {
   const showForm = adding || editing;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold">{t("settings.accounts")}</h2>
-          <p className="text-sm text-[var(--muted-foreground)]">{t("settings.accountsDesc")}</p>
+        <div className="space-y-1.5">
+          <h1 className="text-2xl font-semibold tracking-tight">{t("settings.accounts")}</h1>
+          <p className="text-sm text-muted-foreground">{t("settings.accountsDesc")}</p>
         </div>
         <Button
           onClick={() => { setEditing(null); setAdding(true); }}
@@ -91,14 +92,13 @@ export default function AccountsPage() {
       </div>
 
       {/* platform tabs */}
-      <div className="mobile-tab-strip -mx-4 flex snap-x gap-1 overflow-x-auto border-b border-[var(--border)] px-4">
-        {TABS.map(({ key, headingKey, Icon }) => (
-          <Button key={key} onClick={() => { setTab(key); setAdding(false); setEditing(null); }}
-            variant={tab === key ? "light" : "subtle"} color={tab === key ? "primary" : "gray"} size="sm"
-            leftSection={<Icon size={14} />} className="shrink-0"
-          >{t(headingKey)}</Button>
-        ))}
-      </div>
+      <Tabs value={tab} onValueChange={(value) => { setTab(value as Platform); setAdding(false); setEditing(null); }}>
+        <div className="w-full overflow-x-auto pb-1">
+          <TabsList className="w-max min-w-full justify-start sm:min-w-0">
+            {TABS.map(({ key, headingKey, Icon }) => <TabsTrigger key={key} value={key} className="gap-2 px-3"><Icon size={15} />{t(headingKey)}</TabsTrigger>)}
+          </TabsList>
+        </div>
+      </Tabs>
 
       {/* inline form — uses key to force remount when editing target changes */}
       {showForm && (
@@ -115,12 +115,12 @@ export default function AccountsPage() {
       )}
 
       {/* account list — full width */}
-      <div>
-        <h3 className="text-sm font-semibold mb-3">
+      <section className="space-y-3">
+        <h2 className="text-sm font-medium text-muted-foreground">
           {accounts.length > 0 ? `${accounts.length} accounts` : t("settings.noAccounts")}
-        </h3>
+        </h2>
         {accounts.length > 0 ? (
-          <div className="space-y-3">
+          <div className="grid gap-3">
             {accounts.map((account: Account) => {
               const lastFetched = account.last_fetched_at ? new Date(account.last_fetched_at) : null;
               const isStale = staleMap.get(account.id) ?? false;
@@ -128,12 +128,24 @@ export default function AccountsPage() {
               return (
                 <Card key={account.id}
                   className={`group ${!account.is_active ? "opacity-60 " : ""}cursor-pointer hover:border-[var(--primary)]/50 transition-colors`}
-                  onClick={() => navigate(`${currentTab.basePath}/${account.id}`)}
+                  role="link"
+                  tabIndex={0}
+                  aria-label={`${currentTab.formatUsername(account)} — ${t("common.openDetails", { defaultValue: "Open details" })}`}
+                  onClick={(event) => {
+                    if ((event.target as HTMLElement).closest("[data-account-actions]")) return;
+                    navigate(`${currentTab.basePath}/${account.id}`);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
+                      event.preventDefault();
+                      navigate(`${currentTab.basePath}/${account.id}`);
+                    }
+                  }}
                 >
-                  <CardContent className="account-card-content">
-                    <div className="mobile-account-card justify-between gap-4">
-                      <div className="account-card-main">
-                        <div className="account-card-header">
+                  <CardContent className="p-5 sm:p-6">
+                    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+                      <div className="flex min-w-0 flex-1 flex-col gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="min-w-0 break-all text-base font-semibold">{currentTab.formatUsername(account)}</span>
                           <ArrowUpRight size={14} className="text-[var(--muted-foreground)] hover-reveal-icon" />
                           {!account.is_active && <Badge>{t("badge.inactive")}</Badge>}
@@ -144,17 +156,17 @@ export default function AccountsPage() {
                             <Badge className="bg-[var(--warn)]/10 text-[var(--warn)]">{t("badge.stale")}</Badge>
                           )}
                         </div>
-                        <div className="account-card-meta text-sm text-[var(--muted-foreground)]">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                           <span>{t("settings.autoSchedule")}</span>
                           {lastFetched && <span>{t("settings.lastFetched", { date: formatDateTime(lastFetched) })}</span>}
                         </div>
                         {account.error_message && (
-                          <div className="account-card-error text-xs text-[var(--danger)]">
+                          <div className="mt-1 flex items-start gap-2 text-xs text-destructive">
                             <AlertCircle size={12} /> {account.error_message}
                           </div>
                         )}
                       </div>
-                      <div className="account-card-actions shrink-0">
+                      <div data-account-actions className="flex w-full shrink-0 items-center justify-end gap-1 rounded-lg border bg-muted/50 p-1 sm:w-auto">
                         <ActionIcon
                           onClick={(e) => { e.stopPropagation(); setEditing(account); setAdding(false); }}
                           variant="light" color="gray"
@@ -193,7 +205,7 @@ export default function AccountsPage() {
             </CardContent>
           </Card>
         )}
-      </div>
+      </section>
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}

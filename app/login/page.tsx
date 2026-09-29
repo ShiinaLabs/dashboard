@@ -2,10 +2,9 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { LayoutDashboard, LogIn, Eye, EyeOff } from "lucide-react";
+import { AudioLines, LogIn } from "lucide-react";
 import { Alert, Button, PasswordInput, TextInput } from "@/components/ui/form-controls";
 import { api } from "@/lib/api";
-import { useBingWallpaper } from "@/lib/client/useBingWallpaper";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 
 const titleKey = "login.login" satisfies PageTitleKey;
@@ -17,7 +16,6 @@ export default function Login() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { url } = useBingWallpaper();
   const [searchParams] = useSearchParams();
   // Mock /api/auth/me reports the mock admin user even before a session cookie
   // exists. Keep the login form available in mock mode so the login endpoint
@@ -75,82 +73,57 @@ export default function Login() {
   };
 
   return (
-    <div className="relative min-h-dvh flex items-center justify-center bg-[var(--background)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
-      {/* Bing wallpaper background */}
-      <div className="absolute inset-0">
-        {/* /api/bing-wallpaper 302-redirects to bing.com; cross-origin img */}
-        <img
-          src={url}
-          alt=""
-          className="w-full h-full object-cover"
-          loading="eager"
-        />
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
-      </div>
+    <main className="grid min-h-dvh bg-background md:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)]">
+      <aside className="relative hidden overflow-hidden border-r bg-muted/40 p-10 md:flex md:flex-col md:justify-between lg:p-14">
+        <div className="absolute -right-24 -top-24 size-96 rounded-full border border-primary/10" aria-hidden="true" />
+        <div className="absolute -right-8 -top-8 size-64 rounded-full border border-primary/10" aria-hidden="true" />
+        <div className="relative flex items-center gap-3 font-semibold tracking-tight">
+          <span className="grid size-10 place-items-center rounded-xl bg-primary text-primary-foreground"><AudioLines size={20} /></span>
+          <span>{t("common.dashboard")}</span>
+        </div>
+        <div className="relative max-w-lg space-y-4">
+          <p className="text-sm font-medium text-primary">{t("common.dashboard")}</p>
+          <h2 className="text-3xl font-semibold tracking-tight lg:text-4xl">{t("login.tagline")}</h2>
+          <p className="max-w-md text-sm leading-6 text-muted-foreground">{t("login.supportingCopy")}</p>
+        </div>
+        <p className="relative text-xs text-muted-foreground">{t("common.copyright")}</p>
+      </aside>
 
-      {/* Form card */}
-      <div className="relative z-10 w-full max-w-md sm:mx-4">
-        <div className="rounded-2xl border border-white/20 bg-white/10 p-5 sm:p-8 shadow-2xl backdrop-blur-xl">
-          {/* Branding */}
-          <div className="flex items-center gap-3 mb-8 justify-center">
-            <div className="p-2.5 rounded-xl bg-white/15">
-              <LayoutDashboard size={24} className="text-white" />
-            </div>
+      <section className="flex min-h-dvh items-center justify-center px-5 py-10 sm:px-8">
+        <div className="w-full max-w-sm space-y-8">
+          <div className="space-y-2 text-center md:text-left">
+            <div className="mx-auto mb-6 grid size-11 place-items-center rounded-xl bg-primary text-primary-foreground md:hidden"><AudioLines size={21} /></div>
+            <h1 className="text-2xl font-semibold tracking-tight">{t("login.login")}</h1>
+            <p className="text-sm text-muted-foreground">{t("login.tagline")}</p>
           </div>
-          <h1 className="text-xl font-semibold text-white text-center mb-1">
-            {t("common.dashboard")}
-          </h1>
-          <p className="text-sm text-white/60 text-center mb-8">
-            {t("login.tagline")}
-          </p>
 
-          <h2 className="text-base font-medium text-white/90 mb-4">{t("login.login")}</h2>
+          <form onSubmit={handleSubmit} className="grid gap-5">
+            <TextInput
+              label={t("login.username")}
+              value={username}
+              onChange={(e) => setUsername(e.currentTarget.value)}
+              placeholder="admin"
+              autoComplete="username"
+              aria-label={t("login.username")}
+            />
+            <PasswordInput
+              label={t("login.password")}
+              value={password}
+              onChange={(e) => setPassword(e.currentTarget.value)}
+              autoComplete="current-password"
+              autoFocus
+              aria-label={t("login.password")}
+            />
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-white/60">{t("login.username")}</label>
-              <TextInput
-                value={username}
-                onChange={(e) => setUsername(e.currentTarget.value)}
-                placeholder="admin"
-                aria-label={t("login.username")}
-                styles={{ input: { background: "rgba(255,255,255,.1)", borderColor: "rgba(255,255,255,.2)", color: "white" } }}
-              />
-            </div>
+            {isMock && <Alert color="yellow">{t("login.mockHint")}</Alert>}
+            {error && <Alert color="danger">{error}</Alert>}
 
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-white/60">{t("login.password")}</label>
-              <PasswordInput
-                value={password}
-                onChange={(e) => setPassword(e.currentTarget.value)}
-                autoFocus
-                aria-label={t("login.password")}
-                visibilityToggleIcon={({ reveal }) => reveal ? <EyeOff size={16} /> : <Eye size={16} />}
-                styles={{ input: { background: "rgba(255,255,255,.1)", borderColor: "rgba(255,255,255,.2)", color: "white" } }}
-              />
-            </div>
-
-            {isMock && (
-              <Alert color="yellow" variant="light" p="xs">{t("login.mockHint")}</Alert>
-            )}
-
-            {error && (
-              <Alert color="danger" variant="light" p="xs">{error}</Alert>
-            )}
-
-            <Button
-              type="submit"
-              disabled={loading || (!password && !isMock)}
-              loading={loading}
-              fullWidth
-              color="gray"
-              leftSection={<LogIn size={16} />}
-            >
-              {t("login.login")}
+            <Button type="submit" disabled={loading || (!password && !isMock)} loading={loading} fullWidth className="mt-1">
+              <LogIn aria-hidden="true" />{t("login.login")}
             </Button>
           </form>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

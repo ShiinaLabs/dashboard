@@ -21,7 +21,6 @@ export interface AccountListPageProps {
   renderBadge?: (account: Account) => React.ReactNode;
   renderMeta?: (account: Account) => React.ReactNode;
   formatUsername?: (account: Account) => string;
-  cardBorderAccent?: string;
 }
 
 const PLATFORM_PREFIX: Record<string, string> = {
@@ -42,7 +41,6 @@ export default function AccountListPage({
   renderBadge,
   renderMeta,
   formatUsername,
-  cardBorderAccent,
 }: AccountListPageProps) {
   const { t } = useTranslation();
   const { data, isLoading } = useQuery({
@@ -89,13 +87,13 @@ export default function AccountListPage({
   const i18nKey = urlPrefix;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* header — icon + heading + description only, no add button */}
       <div className="flex items-center gap-3">
-        <Icon size={24} />
-        <div>
-          <h2 className="text-xl font-semibold">{heading}</h2>
-          <p className="text-sm text-[var(--muted-foreground)]">{typeof description === "function" ? description(accounts.length) : description}</p>
+        <span className="grid size-10 shrink-0 place-items-center rounded-lg border bg-card text-muted-foreground"><Icon size={19} /></span>
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">{heading}</h1>
+          <p className="text-sm text-muted-foreground">{typeof description === "function" ? description(accounts.length) : description}</p>
         </div>
       </div>
 
@@ -106,7 +104,7 @@ export default function AccountListPage({
           {accounts.length > 0 ? t(`${i18nKey}.configuredAccounts`) : t(`${i18nKey}.noAccounts`)}
         </h3>
         {accounts.length > 0 ? (
-          <div className="space-y-3">
+          <div className="grid gap-3 xl:grid-cols-2">
             {accounts.map((account: Account) => {
               const lastFetched = account.last_fetched_at ? new Date(account.last_fetched_at) : null;
               const isStale = staleMap.get(account.id) ?? false;
@@ -119,20 +117,14 @@ export default function AccountListPage({
                 >
                 <Card
                   className={
-                    "group border-l-2 " +
-                    (!account.is_active ? "opacity-60 " : "") +
-                    "cursor-pointer transition-all duration-200 hover:shadow-sm"
+                    "group h-full cursor-pointer transition-colors hover:border-primary/30 " +
+                    (!account.is_active ? "opacity-60 " : "")
                   }
-                  style={cardBorderAccent ? {
-                    borderLeftColor: `color-mix(in oklch, ${cardBorderAccent} 30%, transparent)`,
-                  } as React.CSSProperties : {
-                    borderLeftColor: "transparent",
-                  } as React.CSSProperties}
                 >
-                   <div className="account-card-content">
-                    <div className="mobile-account-card gap-4">
-                      <div className="account-card-main">
-                        <div className="account-card-header">
+                   <div className="h-full p-5">
+                    <div className="flex h-full flex-col justify-between gap-4 sm:flex-row sm:items-start">
+                      <div className="flex min-w-0 flex-1 flex-col gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="font-semibold text-base">
                             {formatUsername ? formatUsername(account) : account.screen_name}
                           </span>
@@ -150,7 +142,7 @@ export default function AccountListPage({
                             </Badge>
                           ) : null}
                         </div>
-                        <div className="account-card-meta text-sm text-[var(--muted-foreground)]">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                           <span>{t("settings.autoSchedule")}</span>
                           {lastFetched && (
                             <span>{t(`${i18nKey}.accountCard.last`, { date: formatDateTime(lastFetched) })}</span>
@@ -158,7 +150,7 @@ export default function AccountListPage({
                           {renderMeta?.(account)}
                         </div>
                         {account.error_message && (
-                          <div className="account-card-error text-xs text-[var(--danger)]">
+                          <div className="mt-1 flex items-start gap-2 text-xs text-destructive">
                             <AlertCircle size={12} /> {account.error_message}
                           </div>
                         )}

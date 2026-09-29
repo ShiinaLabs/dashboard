@@ -110,22 +110,23 @@ export default function Settings() {
   ];
 
   return (
-    <div className="space-y-8 max-w-lg">
-      <div>
-        <h2 className="text-xl font-semibold">{t("settings.heading")}</h2>
-        <p className="text-sm text-[var(--muted-foreground)]">{t("settings.description")}</p>
+    <div className="space-y-8">
+      <div className="space-y-1.5">
+        <h1 className="text-2xl font-semibold tracking-tight">{t("settings.heading")}</h1>
+        <p className="max-w-2xl text-sm text-muted-foreground">{t("settings.description")}</p>
       </div>
 
-      <section className="space-y-4">
+      <div className="grid gap-4 xl:grid-cols-2">
+      <section className="space-y-4 rounded-lg border bg-card p-5">
         <h3 className="text-sm font-semibold">{t("settings.language")}</h3>
-        <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--card)]">
+        <div>
           <SegmentedControl value={i18n.language} onChange={(value) => void i18n.changeLanguage(value)} data={LANG_OPTIONS} fullWidth />
         </div>
       </section>
 
-      <section className="space-y-4">
+      <section className="space-y-4 rounded-lg border bg-card p-5">
         <h3 className="text-sm font-semibold flex items-center gap-1.5"><Clock size={14} /> {t("settings.timezone")}</h3>
-        <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--card)]">
+        <div>
           <Select
             value={tz}
             onChange={(value) => { if (value) setTimezone(value); }}
@@ -136,9 +137,9 @@ export default function Settings() {
         </div>
       </section>
 
-      <section className="space-y-4">
+      <section className="space-y-4 rounded-lg border bg-card p-5">
         <h3 className="text-sm font-semibold flex items-center gap-1.5"><Key size={14} /> {t("settings.security")}</h3>
-        <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--card)]">
+        <div>
           <form onSubmit={handleChangePassword} className="flex flex-col gap-3">
             <div>
               <label className="block text-xs font-medium mb-1 text-[var(--muted-foreground)]">{t("settings.currentPassword")}</label>
@@ -173,10 +174,10 @@ export default function Settings() {
         </div>
       </section>
 
-      <section className="space-y-4">
+      <section className="space-y-4 rounded-lg border bg-card p-5">
         <h3 className="text-sm font-semibold">{t("settings.appearance")}</h3>
 
-        <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--card)] space-y-4">
+        <div className="space-y-4">
           <div className="space-y-2">
             <p className="text-sm font-medium">{t("settings.mode")}</p>
             <SegmentedControl value={settings.mode} onChange={(value) => setSettings({ ...settings, mode: value as ThemeSettings["mode"] })} data={MODE_OPTIONS.map(({ value }) => ({ value, label: MODE_LABELS[value] }))} fullWidth />
@@ -204,6 +205,7 @@ export default function Settings() {
           </div>
         </div>
       </section>
+      </div>
 
       <AiSettingsSection />
     </div>
@@ -238,9 +240,9 @@ function AiSettingsSection() {
   if (isLoading || !settings?.ai) return null;
 
   return (
-    <section className="space-y-4">
+    <section className="max-w-3xl space-y-4 rounded-lg border bg-card p-5">
       <h3 className="text-sm font-semibold">AI Analysis</h3>
-      <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--card)] space-y-4">
+      <div className="space-y-4">
         <div className="space-y-2">
           <label className="text-sm font-medium">Endpoint URL</label>
           <TextInput

@@ -21,21 +21,21 @@ export function FetchRunHistory({ account, runs }: FetchRunHistoryProps) {
 
   return (
     <Card>
-      <div className="fetch-history-content">
-        <div className="fetch-history-header">
+      <div className="w-full min-w-0 p-4">
+        <div className="flex flex-col items-start gap-1 border-b pb-3 sm:flex-row sm:justify-between sm:gap-4">
           <p className="text-xs font-semibold leading-4 text-[var(--muted-foreground)]">
             {t("fetchHistory.title")}
           </p>
-          <p className="fetch-history-due text-[11px] leading-4 text-[var(--muted-foreground)]">
+          <p className="min-w-0 max-w-full text-left text-[11px] leading-4 text-[var(--muted-foreground)] sm:max-w-[70%] sm:text-right">
             {latest.status === "running"
               ? t("fetchHistory.runningNow")
               : t("fetchHistory.nextDue", { date: nextDueAt ? formatDateTime(nextDueAt) : t("fetchHistory.unknown") })}
           </p>
         </div>
 
-        <div className="fetch-history-list">
+        <div className="grid gap-2 pt-3">
           {runs.slice(0, 5).map((run) => (
-            <div key={run.id} className="fetch-history-row transition-colors hover:bg-[var(--muted)]">
+            <div key={run.id} className="min-w-0 rounded-md px-3 py-2.5 transition-colors hover:bg-[var(--muted)]">
               <div className="flex min-w-0 items-center justify-between gap-3">
                 <p className="min-w-0 truncate text-sm leading-5">
                   {formatDateTime(run.started_at)}
