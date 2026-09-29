@@ -2,6 +2,7 @@ import { json, getSearchParams } from "@/lib/api-server";
 import type { LoaderFunctionArgs } from "react-router";
 import { getTweets } from "@/lib/services/twitter";
 import { requireSession, filterOwnedAccountIds } from "@/lib/auth-helpers";
+import { getAccounts } from "@/lib/services/accounts";
 
 async function GET(req: Request) {
   const auth = await requireSession(req);
@@ -15,10 +16,17 @@ async function GET(req: Request) {
   const search = sp.get("search") || undefined;
   const isReply = sp.get("isReply") !== undefined ? Number(sp.get("isReply")) : undefined;
 
-  let accountIds = sp.get("accountIds")?.split(",").map(Number);
-  if (accountIds && accountIds.length > 0) {
-    accountIds = await filterOwnedAccountIds(auth.user, accountIds);
-    if (accountIds.length === 0) return json({ data: [], total: 0 });
+  const accountIdsParam = sp.get("accountIds");
+  const requestedIds = accountIdsParam
+    ? accountIdsParam.split(",").filter(Boolean).map(Number)
+    : undefined;
+  let accountIds: number[] | undefined;
+  if (auth.user.role === "admin") {
+    accountIds = requestedIds === undefined ? undefined : await filterOwnedAccountIds(auth.user, requestedIds);
+  } else {
+    const accounts = await getAccounts(auth.user.id);
+    const twitterIds = accounts.filter((account) => account.platform === "twitter").map((account) => account.id);
+    accountIds = requestedIds === undefined ? twitterIds : twitterIds.filter((id) => requestedIds.includes(id));
   }
 
   const data = await getTweets(page, limit, sort, order, search, accountIds, isReply);

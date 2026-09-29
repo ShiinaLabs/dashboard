@@ -13,7 +13,8 @@ async function GET(req: Request) {
   const ownerId = getOwnerId(auth.user);
   const accounts = await getAccounts(ownerId);
   const twitterIds = accounts.filter((a) => a.platform === "twitter").map((a) => a.id);
-  const tweets = await getTopTweets(metric, limit, twitterIds.length > 0 ? twitterIds : undefined);
+  const accountScope = auth.user.role === "admin" ? undefined : twitterIds;
+  const tweets = await getTopTweets(metric, limit, accountScope);
   return json(tweets);
 }
 

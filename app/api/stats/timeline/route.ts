@@ -2,6 +2,7 @@ import { json, getSearchParams } from "@/lib/api-server";
 import type { LoaderFunctionArgs } from "react-router";
 import { getTimeline } from "@/lib/services/twitter";
 import { requireSession, filterOwnedAccountIds } from "@/lib/auth-helpers";
+import { getAccounts } from "@/lib/services/accounts";
 
 async function GET(req: Request) {
   const auth = await requireSession(req);
@@ -9,10 +10,16 @@ async function GET(req: Request) {
 
   const days = Number(getSearchParams(req).get("days")) || 30;
   const accountIdsParam = getSearchParams(req).get("accountIds");
-  let ids = accountIdsParam ? accountIdsParam.split(",").map(Number) : undefined;
-  if (ids && ids.length > 0) {
-    ids = await filterOwnedAccountIds(auth.user, ids);
-    if (ids.length === 0) return json([]);
+  const requestedIds = accountIdsParam
+    ? accountIdsParam.split(",").filter(Boolean).map(Number)
+    : undefined;
+  let ids: number[] | undefined;
+  if (auth.user.role === "admin") {
+    ids = requestedIds === undefined ? undefined : await filterOwnedAccountIds(auth.user, requestedIds);
+  } else {
+    const accounts = await getAccounts(auth.user.id);
+    const twitterIds = accounts.filter((account) => account.platform === "twitter").map((account) => account.id);
+    ids = requestedIds === undefined ? twitterIds : twitterIds.filter((id) => requestedIds.includes(id));
   }
 
   const data = await getTimeline(days, ids);

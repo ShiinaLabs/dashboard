@@ -12,7 +12,8 @@ async function GET(req: Request) {
   const ownerId = getOwnerId(auth.user);
   const accounts = await getAccounts(ownerId);
   const twitterIds = accounts.filter((a) => a.platform === "twitter").map((a) => a.id);
-  const data = await getCalendarData(year, twitterIds.length > 0 ? twitterIds : undefined);
+  const accountScope = auth.user.role === "admin" ? undefined : twitterIds;
+  const data = await getCalendarData(year, accountScope);
   return json(data);
 }
 
