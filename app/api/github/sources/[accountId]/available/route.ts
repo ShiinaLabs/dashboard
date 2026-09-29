@@ -1,8 +1,7 @@
 import { json } from "@/lib/api-server";
 import type { LoaderFunctionArgs } from "react-router";
 import { requireSession, authorizeAccountOwner } from "@/lib/auth-helpers";
-import { getAccountByIdWithCredential } from "@/lib/services/accounts";
-import { GithubClient } from "@/lib/infra/fetchers/GithubClient";
+import { getGithubAvailableOrgs } from "@/lib/services/github";
 
 /**
  * Organizations the PAT belongs to, offered as picker options.
@@ -21,31 +20,12 @@ async function GET(req: Request, params: Record<string, string>) {
   if (!authorized) return json({ error: "Forbidden" }, { status: 403 });
   if (account.platform !== "github") return json({ error: "Not a GitHub account" }, { status: 400 });
 
-  // The token never travels with the authorization result, so ask for it here.
-  let credential;
-  try {
-    credential = await getAccountByIdWithCredential(account.id);
-  } catch {
+  const result = await getGithubAvailableOrgs(account.id);
+  if (result.status === "credential-error") {
     return json({ error: "Stored credential cannot be decrypted; update the credential first" }, { status: 409 });
   }
-  if (!credential) return json({ error: "Account not found" }, { status: 404 });
-
-  try {
-    const orgs = await new GithubClient().fetchAuthenticatedOrgs(credential.auth_token);
-    return json({
-      orgs: orgs
-        .map((raw) => {
-          const org = raw as { login?: unknown; id?: unknown; node_id?: unknown };
-          return typeof org?.login === "string"
-            ? { login: org.login, githubId: typeof org.id === "number" ? org.id : null, nodeId: typeof org.node_id === "string" ? org.node_id : null }
-            : null;
-        })
-        .filter(Boolean),
-      unavailable: null,
-    });
-  } catch (error) {
-    return json({ orgs: [], unavailable: error instanceof Error ? error.message : String(error) });
-  }
+  if (result.status === "not-found") return json({ error: "Account not found" }, { status: 404 });
+  return json({ orgs: result.orgs, unavailable: result.unavailable });
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {

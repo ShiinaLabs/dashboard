@@ -1,7 +1,6 @@
 import { json } from "@/lib/api-server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { getAccounts, createAccount, assertSafeInstanceUrl } from "@/lib/services/accounts";
-import { getOverviewStats } from "@/lib/services/twitter";
+import { getAccountsOverview, createAccount, assertSafeInstanceUrl } from "@/lib/services/accounts";
 import { isSupportedPlatform } from "@/lib/platforms";
 import { requireSession, getOwnerId } from "@/lib/auth-helpers";
 
@@ -9,10 +8,7 @@ async function GET(req: Request) {
   const auth = await requireSession(req);
   if (!auth) return json({ error: "Unauthorized" }, { status: 401 });
 
-  const ownerId = getOwnerId(auth.user);
-  const accounts = await getAccounts(ownerId);
-  const overview = await getOverviewStats(accounts.map((a) => a.id));
-  return json({ accounts, overview });
+  return json(await getAccountsOverview(getOwnerId(auth.user)));
 }
 
 async function POST(req: Request) {

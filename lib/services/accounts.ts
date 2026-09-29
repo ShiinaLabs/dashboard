@@ -4,9 +4,18 @@ import { getLogger } from "../logger";
 import type { AccountRow } from "../repositories/accounts";
 import { isSupportedPlatform } from "../platforms";
 import { validateUpstreamUrl } from "../ssrf-guard";
+import { getOverviewStats, getLatestUserStats } from "./twitter";
+import { getRecentFetchRuns } from "./fetch-health";
 
 export type AccountMetadata = Omit<AccountRow, "auth_token">;
 export type { AccountRow };
+
+export class InvalidAccountInputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidAccountInputError";
+  }
+}
 
 function toMetadata({ auth_token: _authToken, ...account }: AccountRow): AccountMetadata {
   return account;
@@ -43,6 +52,24 @@ export function assertSafeInstanceUrl(instanceUrl: string | null | undefined): v
 export async function getAccounts(ownerId?: number) {
   const rows = await accountsRepo.getAccounts(ownerId);
   return rows.map((row) => toMetadata(row as AccountRow));
+}
+
+/** Compose the legacy account-list API response without exposing credentials. */
+export async function getAccountsOverview(ownerId?: number) {
+  const accounts = await getAccounts(ownerId);
+  const overview = await getOverviewStats(accounts.map((account) => account.id));
+  return { accounts, overview };
+}
+
+/** Compose account metadata and its detail panels for the legacy detail API. */
+export async function getAccountDetails(id: number) {
+  const account = await getAccountById(id);
+  if (!account) return undefined;
+  const [stats, recentFetchRuns] = await Promise.all([
+    getLatestUserStats(account.id),
+    getRecentFetchRuns(account.id),
+  ]);
+  return { ...account, stats: stats || null, recentFetchRuns };
 }
 
 export async function getActiveAccounts() {
@@ -94,6 +121,32 @@ export async function updateAccount(id: number, updates: Partial<AccountRow>) {
   const safe = { ...updates };
   if (safe.auth_token) safe.auth_token = encToken(safe.auth_token);
   await accountsRepo.updateAccount(id, safe);
+}
+
+/** Translate the public account update fields to repository fields. */
+export async function updateAccountFromInput(id: number, input: {
+  screenName?: string;
+  authToken?: string;
+  fetchInterval?: number;
+  isActive?: boolean;
+  instanceUrl?: string | null;
+  authType?: string | null;
+}) {
+  const updates: Partial<AccountRow> = {};
+  if (input.screenName !== undefined) updates.screen_name = input.screenName;
+  if (input.authToken !== undefined && input.authToken !== "") updates.auth_token = input.authToken;
+  if (input.fetchInterval !== undefined) updates.fetch_interval = input.fetchInterval;
+  if (input.isActive !== undefined) updates.is_active = input.isActive ? 1 : 0;
+  if (input.instanceUrl !== undefined) {
+    try {
+      assertSafeInstanceUrl(input.instanceUrl);
+    } catch (error) {
+      throw new InvalidAccountInputError(error instanceof Error ? error.message : String(error));
+    }
+    updates.instance_url = input.instanceUrl;
+  }
+  if (input.authType !== undefined) updates.auth_type = input.authType;
+  await updateAccount(id, updates);
 }
 
 export async function deleteAccount(id: number) {

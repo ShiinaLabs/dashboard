@@ -1,4 +1,6 @@
 import * as repository from "@/lib/repositories/github";
+import { getAccountByIdWithCredential } from "@/lib/services/accounts";
+import { GithubClient } from "@/lib/infra/fetchers/GithubClient";
 
 /** Application-level GitHub read use cases. Route adapters retain HTTP parsing and account ownership checks. */
 export const getGithubOverview = (...args: Parameters<typeof repository.getGithubOverview>) => repository.getGithubOverview(...args);
@@ -15,3 +17,34 @@ export const getGithubReleases = (...args: Parameters<typeof repository.getGithu
 export const getGithubReleaseAssets = (...args: Parameters<typeof repository.getGithubReleaseAssets>) => repository.getGithubReleaseAssets(...args);
 export const getGithubReleaseDownloadTimeline = (...args: Parameters<typeof repository.getGithubReleaseDownloadTimeline>) => repository.getGithubReleaseDownloadTimeline(...args);
 export const setPinnedRepos = (...args: Parameters<typeof repository.setPinnedRepos>) => repository.setPinnedRepos(...args);
+
+export type GithubAvailableOrgsResult =
+  | { status: "ok"; orgs: { login: string; githubId: number | null; nodeId: string | null }[]; unavailable: string | null }
+  | { status: "not-found" }
+  | { status: "credential-error" };
+
+/** Load a GitHub account credential and enumerate organizations for its PAT. */
+export async function getGithubAvailableOrgs(accountId: number): Promise<GithubAvailableOrgsResult> {
+  let account;
+  try {
+    account = await getAccountByIdWithCredential(accountId);
+  } catch {
+    return { status: "credential-error" };
+  }
+  if (!account) return { status: "not-found" };
+
+  try {
+    const rawOrgs = await new GithubClient().fetchAuthenticatedOrgs(account.auth_token);
+    const orgs = rawOrgs
+      .map((raw) => {
+        const org = raw as { login?: unknown; id?: unknown; node_id?: unknown };
+        return typeof org?.login === "string"
+          ? { login: org.login, githubId: typeof org.id === "number" ? org.id : null, nodeId: typeof org.node_id === "string" ? org.node_id : null }
+          : null;
+      })
+      .filter((org): org is NonNullable<typeof org> => org !== null);
+    return { status: "ok", orgs, unavailable: null };
+  } catch (error) {
+    return { status: "ok", orgs: [], unavailable: error instanceof Error ? error.message : String(error) };
+  }
+}

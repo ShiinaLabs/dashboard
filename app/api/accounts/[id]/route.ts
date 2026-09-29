@@ -1,9 +1,7 @@
 import { json } from "@/lib/api-server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { getAccountById, updateAccount, deleteAccount, assertSafeInstanceUrl } from "@/lib/services/accounts";
+import { getAccountById, getAccountDetails, updateAccountFromInput, deleteAccount, InvalidAccountInputError } from "@/lib/services/accounts";
 import { validateConfirmToken } from "@/lib/confirm-helpers";
-import { getLatestUserStats } from "@/lib/services/twitter";
-import { getRecentFetchRuns } from "@/lib/services/fetch-health";
 import { requireSession, authorizeAccountOwner } from "@/lib/auth-helpers";
 
 async function GET(req: Request, params: Record<string, string>) {
@@ -15,10 +13,9 @@ async function GET(req: Request, params: Record<string, string>) {
   if (!account) return json({ error: "Not found" }, { status: 404 });
   if (!authorized) return json({ error: "Forbidden" }, { status: 403 });
 
-  const stats = await getLatestUserStats(account.id);
-  const recentFetchRuns = await getRecentFetchRuns(account.id);
-  const { auth_token: _, ...rest } = account as unknown as Record<string, unknown>;
-  return json({ ...rest, stats: stats || null, recentFetchRuns });
+  const details = await getAccountDetails(account.id);
+  if (!details) return json({ error: "Not found" }, { status: 404 });
+  return json(details);
 }
 
 async function PUT(req: Request, params: Record<string, string>) {
@@ -31,25 +28,15 @@ async function PUT(req: Request, params: Record<string, string>) {
   if (!authorized) return json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
-  const { screenName, authToken, fetchInterval, isActive, instanceUrl, authType } = body;
-
-  const updates: Record<string, unknown> = {};
-  if (screenName !== undefined) updates.screen_name = screenName;
-  if (authToken !== undefined && authToken !== "") updates.auth_token = authToken;
-  if (fetchInterval !== undefined) updates.fetch_interval = fetchInterval;
-  if (isActive !== undefined) updates.is_active = isActive ? 1 : 0;
-  if (instanceUrl !== undefined) {
-    try {
-      assertSafeInstanceUrl(instanceUrl);
-      updates.instance_url = instanceUrl;
-    } catch (err) {
+  try {
+    await updateAccountFromInput(Number(id), body);
+  } catch (err) {
+    if (err instanceof InvalidAccountInputError) {
       const msg = err instanceof Error ? err.message : String(err);
       return json({ error: msg }, { status: 400 });
     }
+    throw err;
   }
-  if (authType !== undefined) updates.auth_type = authType;
-
-  await updateAccount(Number(id), updates);
   const updated = await getAccountById(Number(id));
   if (!updated) return json({ error: "Not found" }, { status: 404 });
   const { auth_token: _, ...pub } = updated as unknown as Record<string, unknown>;
