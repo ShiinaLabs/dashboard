@@ -5,10 +5,10 @@ import { useTranslation } from "react-i18next";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AnalyticsDimensionCard } from "@/components/domain/analytics/AnalyticsDimensionCard";
 import { ChartCard } from "@/components/domain/shared/ChartCard";
 import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";
@@ -23,8 +23,18 @@ const titleKey = "nav.analytics" satisfies PageTitleKey;
 export const meta = pageMeta(titleKey);
 export const handle = { titleKey } satisfies TitleHandle;
 
+function countryLabel(code: string, locale: string, unknownLabel: string): string {
+  if (code === "Unknown") return unknownLabel;
+  try {
+    const name = new Intl.DisplayNames([locale], { type: "region" }).of(code);
+    return name && name !== code ? `${name} (${code})` : code;
+  } catch {
+    return code;
+  }
+}
+
 export default function WebAnalyticsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const timezone = useSyncExternalStore(
@@ -62,6 +72,16 @@ export default function WebAnalyticsPage() {
   });
   const publicOriginNotConfigured = installationQuery.error instanceof ApiError
     && installationQuery.error.message === "Analytics public URL is not configured";
+  const totalViews = traffic?.overview.views ?? 0;
+  const dimensionCardLabels = {
+    totalViews,
+    viewsLabel: t("analytics.views"),
+    shareLabel: t("analytics.share"),
+    loadingLabel: t("common.loading"),
+    loading: !traffic,
+  };
+  const dimensionData = traffic?.dimensions;
+  const countryLocale = i18n.resolvedLanguage ?? i18n.language;
 
   async function copyTrackingCode() {
     try {
@@ -104,12 +124,11 @@ export default function WebAnalyticsPage() {
         <div className="flex gap-2 sm:col-span-3"><Button type="submit" disabled={createSite.isPending}>{createSite.isPending ? t("analytics.saving") : t("analytics.saveSite")}</Button><Button type="button" variant="outline" onClick={() => setShowForm(false)}>{t("common.cancel")}</Button></div>
       </form> : null}
 
-      {selectedSite && trafficQuery.isError ? <Alert variant="destructive">
-        <AlertTitle>{t("analytics.loadErrorTitle")}</AlertTitle>
-        <AlertDescription>{t("analytics.trafficUnavailable")}</AlertDescription>
-      </Alert> : null}
-
-      {selectedSite && !trafficQuery.isError ? <>
+      {selectedSite ? <>
+        {trafficQuery.isError ? <Alert variant="destructive">
+          <AlertTitle>{t("analytics.loadErrorTitle")}</AlertTitle>
+          <AlertDescription>{t("analytics.trafficUnavailable")}</AlertDescription>
+        </Alert> : <>
         {traffic ? <MetricGrid columns="three">
           <MetricCard icon={<Eye />} label={t("analytics.views")} value={traffic.overview.views} />
           <MetricCard icon={<UsersRound />} label={t("analytics.visitors")} value={traffic.overview.visitors} />
@@ -151,62 +170,82 @@ export default function WebAnalyticsPage() {
         </ChartCard>
 
         <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-          <Card className="min-w-0 gap-0">
-            <CardHeader className="pb-3"><CardTitle className="text-base">{t("analytics.topPages")}</CardTitle></CardHeader>
-            <CardContent className="min-w-0">
-              {!traffic ? <p className="py-8 text-center text-sm text-muted-foreground">{t("common.loading")}</p> : traffic.topPages.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">{t("analytics.noPageViews")}</p>
-              ) : <>
-                <div className="mb-2 grid grid-cols-[auto_minmax(0,1fr)_auto_auto] gap-3 px-1 text-xs font-medium text-muted-foreground">
-                  <span aria-hidden="true">#</span><span>{t("analytics.page")}</span><span>{t("analytics.views")}</span><span>{t("analytics.share")}</span>
-                </div>
-                <ol className="space-y-1">
-                  {traffic.topPages.map((page, index) => {
-                    const share = traffic.overview.views > 0
-                      ? new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 1 }).format(page.views / traffic.overview.views)
-                      : new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 1 }).format(0);
-                    return <li key={page.path} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-3 rounded-md px-1 py-2 text-sm">
-                      <span className="w-5 text-right tabular-nums text-muted-foreground">{index + 1}</span>
-                      <span className="min-w-0 truncate font-mono text-xs" title={page.path}>{page.path}</span>
-                      <span className="min-w-12 text-right tabular-nums">{page.views.toLocaleString()}</span>
-                      <span className="min-w-12 text-right tabular-nums text-muted-foreground">{share}</span>
-                    </li>;
-                  })}
-                </ol>
-              </>}
-            </CardContent>
-          </Card>
+          <AnalyticsDimensionCard
+            {...dimensionCardLabels}
+            title={t("analytics.topPages")}
+            itemLabel={t("analytics.page")}
+            emptyMessage={t("analytics.noPageViews")}
+            items={(traffic?.topPages ?? []).map((page) => ({ key: page.path, label: page.path, title: page.path, views: page.views }))}
+          />
+          <AnalyticsDimensionCard
+            {...dimensionCardLabels}
+            title={t("analytics.referrers")}
+            itemLabel={t("analytics.referrer")}
+            emptyMessage={t("analytics.noReferrerData")}
+            items={(dimensionData?.referrers ?? []).map((item) => ({
+              key: item.referrer,
+              label: item.referrer || t("analytics.direct"),
+              title: item.referrer || t("analytics.direct"),
+              views: item.views,
+            }))}
+          />
+        </div>
+        <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+          <AnalyticsDimensionCard
+            {...dimensionCardLabels}
+            title={t("analytics.countries")}
+            itemLabel={t("analytics.country")}
+            emptyMessage={t("analytics.noCountryData")}
+            items={(dimensionData?.countries ?? []).map((item) => ({
+              key: item.country,
+              label: countryLabel(item.country, countryLocale, t("analytics.unknown")),
+              title: item.country,
+              views: item.views,
+            }))}
+          />
+          <AnalyticsDimensionCard
+            {...dimensionCardLabels}
+            title={t("analytics.browsers")}
+            itemLabel={t("analytics.browser")}
+            emptyMessage={t("analytics.noBrowserData")}
+            items={(dimensionData?.browsers ?? []).map((item) => ({ key: item.browser, label: item.browser, views: item.views }))}
+          />
+        </div>
+        <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+          <AnalyticsDimensionCard
+            {...dimensionCardLabels}
+            title={t("analytics.operatingSystems")}
+            itemLabel={t("analytics.operatingSystem")}
+            emptyMessage={t("analytics.noOperatingSystemData")}
+            items={(dimensionData?.operatingSystems ?? []).map((item) => ({ key: item.os, label: item.os, views: item.views }))}
+          />
+          <AnalyticsDimensionCard
+            {...dimensionCardLabels}
+            title={t("analytics.devices")}
+            itemLabel={t("analytics.device")}
+            emptyMessage={t("analytics.noDeviceData")}
+            items={(dimensionData?.devices ?? []).map((item) => ({ key: item.device, label: item.device, views: item.views }))}
+          />
+        </div>
+        </>}
 
-          <section className="min-w-0 space-y-4 rounded-xl border bg-card p-5" aria-labelledby="analytics-tracking-setup">
-        <div>
-          <h2 id="analytics-tracking-setup" className="text-lg font-semibold">{t("analytics.trackingSetup")}</h2>
-          {traffic ? <p className="mt-1 text-sm text-muted-foreground">{traffic.overview.views ? t("analytics.receivingData") : t("analytics.noData")}</p> : null}
-        </div>
-        {installationQuery.isPending ? <p className="text-sm text-muted-foreground">{t("analytics.installationLoading")}</p> : null}
-        {installationQuery.isError ? <Alert variant={publicOriginNotConfigured ? "default" : "destructive"}>
-          <AlertTitle>{publicOriginNotConfigured ? t("analytics.publicOriginNotConfigured") : t("analytics.loadErrorTitle")}</AlertTitle>
-          <AlertDescription>{publicOriginNotConfigured ? t("analytics.publicOriginNotConfiguredDescription") : t("analytics.installationLoadError")}</AlertDescription>
-        </Alert> : null}
-        {installationQuery.data ? <div className="space-y-3">
-          <p className="text-sm font-medium">{t("analytics.trackingCode")}</p>
-          <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs"><code>{installationQuery.data.snippet}</code></pre>
-          <Button variant="outline" onClick={copyTrackingCode}>{t("analytics.copyCode")}</Button>
-        </div> : null}
-          </section>
-        </div>
-      </> : selectedSite ? <section className="space-y-4 rounded-xl border bg-card p-5" aria-labelledby="analytics-tracking-setup">
-        <h2 id="analytics-tracking-setup" className="text-lg font-semibold">{t("analytics.trackingSetup")}</h2>
-        {installationQuery.isPending ? <p className="text-sm text-muted-foreground">{t("analytics.installationLoading")}</p> : null}
-        {installationQuery.isError ? <Alert variant={publicOriginNotConfigured ? "default" : "destructive"}>
-          <AlertTitle>{publicOriginNotConfigured ? t("analytics.publicOriginNotConfigured") : t("analytics.loadErrorTitle")}</AlertTitle>
-          <AlertDescription>{publicOriginNotConfigured ? t("analytics.publicOriginNotConfiguredDescription") : t("analytics.installationLoadError")}</AlertDescription>
-        </Alert> : null}
-        {installationQuery.data ? <div className="space-y-3">
-          <p className="text-sm font-medium">{t("analytics.trackingCode")}</p>
-          <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs"><code>{installationQuery.data.snippet}</code></pre>
-          <Button variant="outline" onClick={copyTrackingCode}>{t("analytics.copyCode")}</Button>
-        </div> : null}
-      </section> : null}
+        <section className="min-w-0 space-y-4 rounded-xl border bg-card p-5" aria-labelledby="analytics-tracking-setup">
+          <div>
+            <h2 id="analytics-tracking-setup" className="text-lg font-semibold">{t("analytics.trackingSetup")}</h2>
+            {traffic ? <p className="mt-1 text-sm text-muted-foreground">{traffic.overview.views ? t("analytics.receivingData") : t("analytics.noData")}</p> : null}
+          </div>
+          {installationQuery.isPending ? <p className="text-sm text-muted-foreground">{t("analytics.installationLoading")}</p> : null}
+          {installationQuery.isError ? <Alert variant={publicOriginNotConfigured ? "default" : "destructive"}>
+            <AlertTitle>{publicOriginNotConfigured ? t("analytics.publicOriginNotConfigured") : t("analytics.loadErrorTitle")}</AlertTitle>
+            <AlertDescription>{publicOriginNotConfigured ? t("analytics.publicOriginNotConfiguredDescription") : t("analytics.installationLoadError")}</AlertDescription>
+          </Alert> : null}
+          {installationQuery.data ? <div className="space-y-3">
+            <p className="text-sm font-medium">{t("analytics.trackingCode")}</p>
+            <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs"><code>{installationQuery.data.snippet}</code></pre>
+            <Button variant="outline" onClick={copyTrackingCode}>{t("analytics.copyCode")}</Button>
+          </div> : null}
+        </section>
+      </> : null}
     </div>
   );
 }

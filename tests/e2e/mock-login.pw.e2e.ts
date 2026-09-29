@@ -62,9 +62,17 @@ test("Web Analytics adds and selects sites before showing 7-day metrics", async 
   await expect(page.getByText("4,102")).toBeVisible();
   await expect(page.getByText("Traffic over time", { exact: true })).toBeVisible();
   await expect(page.getByRole("img", { name: "Traffic over time" })).toBeVisible();
-  await expect(page.getByText("Top Pages", { exact: true })).toBeVisible();
+  for (const title of ["Top Pages", "Referrers", "Countries", "Browsers", "Operating Systems", "Devices"]) {
+    await expect(page.getByRole("heading", { name: title, level: 2 })).toBeVisible();
+  }
   await expect(page.getByTitle("/", { exact: true })).toBeVisible();
   await expect(page.getByTitle("/pricing", { exact: true })).toBeVisible();
+  await expect(page.getByText("Direct", { exact: true })).toBeVisible();
+  await expect(page.getByText("google.com", { exact: true })).toBeVisible();
+  await expect(page.getByText("Japan (JP)", { exact: true })).toBeVisible();
+  await expect(page.getByText("Safari", { exact: true })).toBeVisible();
+  await expect(page.getByText("macOS", { exact: true })).toBeVisible();
+  await expect(page.getByText("Desktop", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Tracking Setup" })).toBeVisible();
 });
 
