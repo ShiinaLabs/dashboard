@@ -31,7 +31,7 @@ import { getTopContent } from "../lib/services/top-content";
 import { SyncTelemetry } from "../lib/application/usecases/SyncTelemetry";
 import { createUser } from "../lib/services/users";
 import { createAnalyticsSite, getAnalyticsSiteById, getAnalyticsSiteByKey, getAnalyticsSites } from "../lib/repositories/analytics-sites";
-import { getAnalyticsAcquisitionReport, getAnalyticsDashboardReport, getAnalyticsTrafficReport, insertAnalyticsEvent } from "../lib/repositories/analytics-events";
+import { getAnalyticsAcquisitionReport, getAnalyticsDashboardReport, getAnalyticsPortfolioReport, getAnalyticsTrafficReport, insertAnalyticsEvent } from "../lib/repositories/analytics-events";
 import { ensureAnalyticsSiteConstraints, ensureSchemaColumns } from "../lib/setup";
 import { collectAnalyticsEvent } from "../lib/services/analytics-collector";
 
@@ -181,6 +181,108 @@ describe("analytics site queries", () => {
     expect(indexesAfterUpgrade.rows.map((row: { indexname: string }) => row.indexname)).not.toContain("idx_analytics_sites_owner_site_key");
     await expect(getAnalyticsSiteById((await getAnalyticsSites(ownerA.id)).find((site) => site.site_key === legacyKey)!.id))
       .resolves.toMatchObject({ site_key: legacyKey });
+  });
+});
+
+describe("analytics portfolio queries", () => {
+  const event = (site_id: number, visit: boolean) => insertAnalyticsEvent({
+    site_id,
+    path: "/",
+    referrer_host: "",
+    os: "Other",
+    browser: "Other",
+    country: "Unknown",
+    device_type: "Desktop",
+    visitor: false,
+    visit,
+    utm_source: "",
+    utm_medium: "",
+    utm_campaign: "",
+  });
+
+  it("isolates owner scope, excludes soft-deleted sites, includes zero-traffic sites, and keeps portfolio sums invariant", async () => {
+    const suffix = Date.now();
+    const owner = await usersQ.insertUser({ username: `analytics_portfolio_owner_${suffix}`, password_hash: "hash", role: "user" });
+    const otherOwner = await usersQ.insertUser({ username: `analytics_portfolio_other_${suffix}`, password_hash: "hash", role: "user" });
+    const makeSite = (name: string, owner_id = owner.id) => createAnalyticsSite({
+      owner_id, name, site_key: `portfolio-${suffix}-${name}-${Math.random()}`, host: `${name.toLowerCase()}.portfolio.example`,
+    });
+    const cedar = await makeSite("Cedar");
+    const alpha = await makeSite("Alpha");
+    const beta = await makeSite("Beta");
+    const alder = await makeSite("Alder");
+    const sameFirst = await makeSite("Same");
+    const sameSecond = await makeSite("Same");
+    const zero = await makeSite("Zero");
+    const deleted = await makeSite("Deleted");
+    const foreign = await makeSite("Foreign", otherOwner.id);
+    for (let index = 0; index < 3; index += 1) await event(alpha.id, index < 2);
+    for (let index = 0; index < 3; index += 1) await event(beta.id, index < 1);
+    for (const site of [cedar, alder]) for (let index = 0; index < 2; index += 1) await event(site.id, index < 1);
+    await event(sameFirst.id, true);
+    await event(sameSecond.id, true);
+    for (let index = 0; index < 20; index += 1) await event(deleted.id, true);
+    for (let index = 0; index < 50; index += 1) await event(foreign.id, index < 30);
+    await getTestPool().query("UPDATE analytics_sites SET deleted_at = NOW() WHERE id = $1", [deleted.id]);
+
+    const report = await getAnalyticsPortfolioReport(owner.id, "UTC", 7);
+    expect(report.summary).toEqual({ trackedSites: 7, activeSites: 6, views: 12, visits: 7 });
+    expect(report.sites.map((site) => site.name)).toEqual(["Alpha", "Beta", "Alder", "Cedar", "Same", "Same", "Zero"]);
+    expect(report.sites.filter((site) => site.name === "Same").map((site) => site.id)).toEqual([sameFirst.id, sameSecond.id]);
+    expect(report.sites.at(-1)).toMatchObject({ id: zero.id, views: 0, visits: 0 });
+    expect(report.sites.some((site) => [deleted.id, foreign.id].includes(site.id))).toBe(false);
+    expect(report.sites.reduce((sum, site) => sum + site.views, 0)).toBe(report.summary.views);
+    expect(report.sites.reduce((sum, site) => sum + site.visits, 0)).toBe(report.summary.visits);
+
+    const adminReport = await getAnalyticsPortfolioReport(undefined, "UTC", 7);
+    const adminSiteIds = adminReport.sites.map((site) => site.id);
+    expect(adminSiteIds).toEqual(expect.arrayContaining([
+      cedar.id, alpha.id, beta.id, alder.id, sameFirst.id, sameSecond.id, zero.id, foreign.id,
+    ]));
+    expect(adminSiteIds).not.toContain(deleted.id);
+    expect(adminReport.summary.trackedSites).toBe(adminReport.sites.length);
+    expect(adminReport.summary.activeSites).toBe(adminReport.sites.filter((site) => site.views > 0).length);
+    expect(adminReport.sites.reduce((sum, site) => sum + site.views, 0)).toBe(adminReport.summary.views);
+    expect(adminReport.sites.reduce((sum, site) => sum + site.visits, 0)).toBe(adminReport.summary.visits);
+  });
+
+  it("returns a valid empty portfolio", async () => {
+    const owner = await usersQ.insertUser({ username: `analytics_portfolio_empty_${Date.now()}`, password_hash: "hash", role: "user" });
+    const report = await getAnalyticsPortfolioReport(owner.id, "UTC", 7);
+    expect(report.summary).toEqual({ trackedSites: 0, activeSites: 0, views: 0, visits: 0 });
+    expect(report.previousSummary).toEqual({ views: 0, visits: 0 });
+    expect(report.sites).toEqual([]);
+  });
+
+  it.each([7, 30, 90])("uses equal %i-day viewer-local calendar periods and excludes both outside boundaries", async (days) => {
+    const suffix = `${Date.now()}_${days}`;
+    const owner = await usersQ.insertUser({ username: `analytics_portfolio_bounds_${suffix}`, password_hash: "hash", role: "user" });
+    const site = await createAnalyticsSite({ owner_id: owner.id, name: "Bounds", site_key: `portfolio-bounds-${suffix}`, host: `portfolio-bounds-${suffix}.example` });
+    const insertRelative = async (daysAgo: number, visit: boolean, atMidnight = false) => getTestPool().query(`
+      INSERT INTO analytics_events(site_id, path, referrer_host, os, browser, country, device_type, visitor, visit, recorded_at)
+      SELECT $1, '/', '', 'Other', 'Other', 'Unknown', 'Desktop', FALSE, $3,
+        ((((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')::date - $2::integer)::timestamp AT TIME ZONE 'Asia/Tokyo')
+          + CASE WHEN $4 THEN INTERVAL '0 hours' ELSE INTERVAL '12 hours' END)
+    `, [site.id, daysAgo, visit, atMidnight]);
+    await insertRelative(0, true);
+    await insertRelative(days - 1, false, true);
+    await insertRelative(days, true);
+    await insertRelative(days * 2 - 1, false, true);
+    await insertRelative(days * 2, true, true);
+    await insertRelative(-1, true, true);
+
+    const report = await getAnalyticsPortfolioReport(owner.id, "Asia/Tokyo", days);
+    const shiftDate = (dateText: string, offset: number) => {
+      const date = new Date(`${dateText}T00:00:00.000Z`);
+      date.setUTCDate(date.getUTCDate() + offset);
+      return date.toISOString().slice(0, 10);
+    };
+    expect(report.period.days).toBe(days);
+    expect(shiftDate(report.period.startDate, days - 1)).toBe(report.period.endDate);
+    expect(shiftDate(report.previousPeriod.startDate, days - 1)).toBe(report.previousPeriod.endDate);
+    expect(shiftDate(report.previousPeriod.endDate, 1)).toBe(report.period.startDate);
+    expect(report.summary).toEqual({ trackedSites: 1, activeSites: 1, views: 2, visits: 1 });
+    expect(report.previousSummary).toEqual({ views: 2, visits: 1 });
   });
 });
 

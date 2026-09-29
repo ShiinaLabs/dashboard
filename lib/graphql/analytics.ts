@@ -4,6 +4,7 @@ import {
   AnalyticsSiteError,
   getAnalyticsAcquisitionForSite,
   getAnalyticsDashboardForSite,
+  getAnalyticsPortfolio,
   getAnalyticsSites,
   getAnalyticsTrafficForSite,
   type AnalyticsSite,
@@ -20,6 +21,7 @@ export const analyticsTypeDefs = /* GraphQL */ `
     traffic(siteId: Int!, timezone: String = "UTC"): AnalyticsTraffic!
     acquisition(siteId: Int!, timezone: String = "UTC"): AnalyticsAcquisition!
     dashboard(siteId: Int!, range: AnalyticsRange = DAYS_7, timezone: String = "UTC"): AnalyticsDashboard!
+    portfolio(range: AnalyticsRange = DAYS_7, timezone: String = "UTC"): AnalyticsPortfolio!
   }
 
   enum AnalyticsRange { DAYS_7 DAYS_30 DAYS_90 }
@@ -158,6 +160,34 @@ export const analyticsTypeDefs = /* GraphQL */ `
     dimensions: AnalyticsDashboardDimensions!
     acquisition: AnalyticsAcquisitionSummary!
   }
+
+  type AnalyticsPortfolioSummary {
+    trackedSites: Int!
+    activeSites: Int!
+    views: Int!
+    visits: Int!
+  }
+
+  type AnalyticsPortfolioPreviousSummary {
+    views: Int!
+    visits: Int!
+  }
+
+  type AnalyticsPortfolioSite {
+    id: Int!
+    name: String!
+    host: String!
+    views: Int!
+    visits: Int!
+  }
+
+  type AnalyticsPortfolio {
+    period: AnalyticsDashboardPeriod!
+    previousPeriod: AnalyticsDashboardPeriod!
+    summary: AnalyticsPortfolioSummary!
+    previousSummary: AnalyticsPortfolioPreviousSummary!
+    sites: [AnalyticsPortfolioSite!]!
+  }
 `;
 
 interface AnalyticsSiteGraphQL {
@@ -172,6 +202,16 @@ interface AnalyticsSiteGraphQL {
 type AnalyticsTrafficReport = Awaited<ReturnType<typeof getAnalyticsTrafficForSite>>;
 type AnalyticsAcquisitionReport = Awaited<ReturnType<typeof getAnalyticsAcquisitionForSite>>;
 type AnalyticsDashboardReport = Awaited<ReturnType<typeof getAnalyticsDashboardForSite>>;
+type AnalyticsPortfolioReport = Awaited<ReturnType<typeof getAnalyticsPortfolio>>;
+
+function rangeDays(range: "DAYS_7" | "DAYS_30" | "DAYS_90"): number {
+  switch (range) {
+    case "DAYS_7": return 7;
+    case "DAYS_30": return 30;
+    case "DAYS_90": return 90;
+    default: throw new AnalyticsSiteError("invalid_input");
+  }
+}
 
 function toGraphQLSite(site: AnalyticsSite): AnalyticsSiteGraphQL {
   return {
@@ -240,14 +280,7 @@ export const analyticsResolvers = {
       args: { siteId: number; range: "DAYS_7" | "DAYS_30" | "DAYS_90"; timezone: string },
       context: GraphQLContext,
     ): Promise<AnalyticsDashboardReport> => {
-      const days = (() => {
-        switch (args.range) {
-          case "DAYS_7": return 7;
-          case "DAYS_30": return 30;
-          case "DAYS_90": return 90;
-          default: throw new AnalyticsSiteError("invalid_input");
-        }
-      })();
+      const days = rangeDays(args.range);
       return mapServiceError(() => getAnalyticsDashboardForSite(
         args.siteId,
         { id: context.user.id, role: context.user.role },
@@ -255,5 +288,14 @@ export const analyticsResolvers = {
         days,
       ));
     },
+    portfolio: async (
+      _parent: unknown,
+      args: { range: "DAYS_7" | "DAYS_30" | "DAYS_90"; timezone: string },
+      context: GraphQLContext,
+    ): Promise<AnalyticsPortfolioReport> => mapServiceError(() => getAnalyticsPortfolio(
+      { id: context.user.id, role: context.user.role },
+      args.timezone,
+      rangeDays(args.range),
+    )),
   },
 };

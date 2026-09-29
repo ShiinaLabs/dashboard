@@ -2,7 +2,7 @@
 
 The authenticated GraphQL endpoint is `GET`/`POST /api/graphql`. It is a query layer over existing application services; it does not replace or change the REST API. The endpoint requires the existing `dash_session` cookie and returns HTTP `401` before GraphQL execution when no valid session is present.
 
-The current schema is query-only. It exposes `Query.analytics.sites`, the compatibility fields `traffic(siteId, timezone = "UTC")` and `acquisition(siteId, timezone = "UTC")`, and the ranged `dashboard(siteId, range = DAYS_7, timezone = "UTC")` read model. `AnalyticsRange` accepts only `DAYS_7`, `DAYS_30`, or `DAYS_90`. Site results use camelCase fields and omit owner and soft-delete fields. Traffic authorization and timezone validation are delegated to the existing analytics service, so REST and GraphQL share the same behavior.
+The current schema is query-only. It exposes `Query.analytics.sites`, the compatibility fields `traffic(siteId, timezone = "UTC")` and `acquisition(siteId, timezone = "UTC")`, the ranged `dashboard(siteId, range = DAYS_7, timezone = "UTC")` read model, and `portfolio(range = DAYS_7, timezone = "UTC")`. `AnalyticsRange` accepts only `DAYS_7`, `DAYS_30`, or `DAYS_90`. Site results use camelCase fields and omit owner and soft-delete fields. Traffic and portfolio timezone/range behavior is delegated to the analytics service.
 
 Example:
 
@@ -58,3 +58,9 @@ The existing REST traffic contract and `analytics.traffic.dimensions.referrers` 
 The ranged `analytics.dashboard.acquisition.campaigns` field groups only explicit `utm_source`, `utm_medium`, and `utm_campaign` values on `visit = true` entry events. It uses the selected dashboard range and returns at most 10 groups ordered by visits descending, then campaign, source, and medium ascending. The complete source/medium/campaign tuple defines a group; a visit with all three fields blank is un-attributed and is excluded. The campaign UI reports Visits and divides each campaign's visits by all dashboard Visits.
 
 The tracker reads only those three allow-listed query parameters. It never sends or stores the full query string, any other parameter, or a full landing URL. UTM values are decoded, trimmed, and limited to 200 characters; the collector treats malformed values as empty. UTM fields are persisted only on visit-entry events. Referrers are independent data and are never used to infer UTM attribution. The compatibility `analytics.acquisition` field remains unchanged.
+
+## Portfolio overview
+
+`analytics.portfolio` provides the site-level summary used by `/overview`. One authenticated GraphQL request returns the tracked-site count, active sites, aggregate Views and Visits, previous-period Views and Visits, and every visible site's summary. It does not issue one dashboard query per site. The typed `getAnalyticsPortfolio` client calls the shared `graphqlRequest` transport.
+
+The service applies the same visibility rule as `analytics.sites`: regular users see their own sites and admins see all users' sites. The repository excludes soft-deleted sites and scopes events to the visible sites before aggregating. A single PostgreSQL statement uses one database clock and viewer-local calendar bounds for the current period and the immediately preceding equal-length period. Sites without events remain in the result. Portfolio Views and Visits equal the sum of the per-site values; Active Sites counts sites with at least one current-period event. Portfolio does not report cross-site visitors because site-local visitor markers cannot identify unique people across sites.

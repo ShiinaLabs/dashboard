@@ -48,6 +48,7 @@ describe("GraphQL dependency boundary", () => {
     expect(analytics).toContain("getAnalyticsSites(");
     expect(analytics).toContain("getAnalyticsAcquisitionForSite(");
     expect(analytics).toContain("getAnalyticsDashboardForSite(");
+    expect(analytics).toContain("getAnalyticsPortfolio(");
     expect(analytics).toContain('case "DAYS_7": return 7');
     expect(analytics).toContain('case "DAYS_30": return 30');
     expect(analytics).toContain('case "DAYS_90": return 90');
@@ -62,10 +63,15 @@ describe("GraphQL dependency boundary", () => {
   it("keeps GraphQL resolvers on services and the acquisition client on graphqlRequest", async () => {
     const service = await readFile("lib/services/analytics.ts", "utf8");
     const acquisitionClient = await readFile("lib/client/analytics-graphql.ts", "utf8");
+    const portfolioClient = acquisitionClient;
     expect(service).toContain("getAnalyticsAcquisitionReport(site.id, timezone)");
     expect(acquisitionClient).toContain('import { graphqlRequest } from "./graphql"');
     expect(acquisitionClient).not.toMatch(/\bfetch\s*\(|\bapiRequest\s*\(/);
     expect(acquisitionClient).toContain("export async function getAnalyticsDashboard(");
     expect(acquisitionClient).toContain("dashboard(siteId: $siteId, range: $range, timezone: $timezone)");
+    expect(service).toContain("return getAnalyticsPortfolioReport(ownerId, timezone, days)");
+    expect(portfolioClient).toContain('import { graphqlRequest } from "./graphql"');
+    expect(portfolioClient).toContain("export async function getAnalyticsPortfolio(");
+    expect(portfolioClient).toContain("portfolio(range: $range, timezone: $timezone)");
   });
 });

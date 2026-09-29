@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { analyticsPublicOrigin } from "../lib/config";
-import { createAnalyticsSite, getAnalyticsAcquisitionForSite, getAnalyticsDashboardForSite, getAnalyticsInstallationForSite, getAnalyticsTrafficForSite, getAnalyticsSites } from "../lib/services/analytics";
+import { createAnalyticsSite, getAnalyticsAcquisitionForSite, getAnalyticsDashboardForSite, getAnalyticsInstallationForSite, getAnalyticsPortfolio, getAnalyticsTrafficForSite, getAnalyticsSites } from "../lib/services/analytics";
 import * as sitesRepo from "../lib/repositories/analytics-sites";
 import * as eventsRepo from "../lib/repositories/analytics-events";
 
@@ -8,7 +8,7 @@ vi.mock("../lib/config", () => ({ analyticsPublicOrigin: vi.fn() }));
 vi.mock("../lib/repositories/analytics-sites", () => ({
   getAnalyticsSites: vi.fn(), getAnalyticsSiteById: vi.fn(), getAnalyticsSiteByKey: vi.fn(), createAnalyticsSite: vi.fn(),
 }));
-vi.mock("../lib/repositories/analytics-events", () => ({ insertAnalyticsEvent: vi.fn(), getAnalyticsTrafficReport: vi.fn(), getAnalyticsAcquisitionReport: vi.fn(), getAnalyticsDashboardReport: vi.fn() }));
+vi.mock("../lib/repositories/analytics-events", () => ({ insertAnalyticsEvent: vi.fn(), getAnalyticsTrafficReport: vi.fn(), getAnalyticsAcquisitionReport: vi.fn(), getAnalyticsDashboardReport: vi.fn(), getAnalyticsPortfolioReport: vi.fn() }));
 
 const siteA = { id: 10, owner_id: 1, name: "A", site_key: "site-a", host: "a.example", created_at: "now", updated_at: "now", deleted_at: null };
 const trafficReport = {
@@ -109,6 +109,27 @@ describe("analytics service", () => {
   it("blocks foreign dashboard access before querying the repository", async () => {
     await expect(getAnalyticsDashboardForSite(10, { id: 2, role: "user" }, "UTC", 7)).rejects.toMatchObject({ code: "forbidden" });
     expect(eventsRepo.getAnalyticsDashboardReport).not.toHaveBeenCalled();
+  });
+
+  it("loads a portfolio with owner-scoped regular users and global admin scope", async () => {
+    const report = {
+      period: { days: 7, timezone: "Asia/Tokyo", startDate: "2026-09-24", endDate: "2026-09-30" },
+      previousPeriod: { days: 7, timezone: "Asia/Tokyo", startDate: "2026-09-17", endDate: "2026-09-23" },
+      summary: { trackedSites: 1, activeSites: 1, views: 10, visits: 4 },
+      previousSummary: { views: 8, visits: 3 },
+      sites: [{ id: 10, name: "A", host: "a.example", views: 10, visits: 4 }],
+    };
+    vi.mocked(eventsRepo.getAnalyticsPortfolioReport).mockResolvedValue(report);
+    await expect(getAnalyticsPortfolio({ id: 1, role: "user" }, "Asia/Tokyo", 7)).resolves.toBe(report);
+    await expect(getAnalyticsPortfolio({ id: 99, role: "admin" }, "Asia/Tokyo", 7)).resolves.toBe(report);
+    expect(eventsRepo.getAnalyticsPortfolioReport).toHaveBeenNthCalledWith(1, 1, "Asia/Tokyo", 7);
+    expect(eventsRepo.getAnalyticsPortfolioReport).toHaveBeenNthCalledWith(2, undefined, "Asia/Tokyo", 7);
+  });
+
+  it("rejects an invalid portfolio timezone or range before repository access", async () => {
+    await expect(getAnalyticsPortfolio({ id: 1, role: "user" }, "Not/AZone", 7)).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(getAnalyticsPortfolio({ id: 1, role: "user" }, "UTC", 14)).rejects.toMatchObject({ code: "invalid_input" });
+    expect(eventsRepo.getAnalyticsPortfolioReport).not.toHaveBeenCalled();
   });
 
   it("rejects missing sites and invalid acquisition timezones before querying the repository", async () => {

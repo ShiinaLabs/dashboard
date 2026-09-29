@@ -128,6 +128,22 @@ export interface AnalyticsDashboardReport {
   };
 }
 
+export interface AnalyticsPortfolioSite {
+  id: number;
+  name: string;
+  host: string;
+  views: number;
+  visits: number;
+}
+
+export interface AnalyticsPortfolioReport {
+  period: { days: number; timezone: string; startDate: string; endDate: string };
+  previousPeriod: { days: number; timezone: string; startDate: string; endDate: string };
+  summary: { trackedSites: number; activeSites: number; views: number; visits: number };
+  previousSummary: { views: number; visits: number };
+  sites: AnalyticsPortfolioSite[];
+}
+
 const mockEvents: Array<NewAnalyticsEvent & { recorded_at: Date }> = [];
 
 function shiftDate(dateText: string, days: number): string {
@@ -168,6 +184,30 @@ function mockDashboardReport(timezone: string, days: number): AnalyticsDashboard
         { source: "google", medium: "cpc", campaign: "wifi-tool", visits: 210 },
       ],
     },
+  };
+}
+
+function mockPortfolioReport(timezone: string, days: number): AnalyticsPortfolioReport {
+  const today = localDateInTimezone(new Date(), timezone);
+  const startDate = shiftDate(today, 1 - days);
+  const previousEndDate = shiftDate(startDate, -1);
+  const previousStartDate = shiftDate(previousEndDate, 1 - days);
+  const sites = [
+    { id: 1, name: "WiFi Lens", host: "wifi-lens.app", views: 7_200, visits: 2_300 },
+    { id: 2, name: "Tazuki", host: "tazuki.dev", views: 3_800, visits: 1_200 },
+    { id: 3, name: "ShiinaPlay", host: "shiina.play", views: 1_842, visits: 602 },
+  ];
+  return {
+    period: { days, timezone, startDate, endDate: today },
+    previousPeriod: { days, timezone, startDate: previousStartDate, endDate: previousEndDate },
+    summary: {
+      trackedSites: sites.length,
+      activeSites: sites.filter((site) => site.views > 0).length,
+      views: sites.reduce((total, site) => total + site.views, 0),
+      visits: sites.reduce((total, site) => total + site.visits, 0),
+    },
+    previousSummary: { views: 11_420, visits: 3_870 },
+    sites,
   };
 }
 
@@ -628,5 +668,110 @@ export async function getAnalyticsDashboardReport(siteId: number, timezone: stri
     topPages: report.top_pages,
     dimensions: report.dimensions,
     acquisition: report.acquisition,
+  };
+}
+
+export async function getAnalyticsPortfolioReport(
+  ownerId: number | undefined,
+  timezone: string,
+  days: number,
+): Promise<AnalyticsPortfolioReport> {
+  if (isMockMode()) return mockPortfolioReport(timezone, days);
+
+  const { rows } = await getDb().execute<{
+    timezone: string;
+    current_start_date: string;
+    current_end_date: string;
+    previous_start_date: string;
+    previous_end_date: string;
+    summary: AnalyticsPortfolioReport["summary"];
+    previous_summary: AnalyticsPortfolioReport["previousSummary"];
+    sites: AnalyticsPortfolioSite[];
+  }>(sql`
+    WITH clock AS MATERIALIZED (
+      SELECT ${timezone}::text AS timezone,
+        ${days}::int AS days,
+        (CURRENT_TIMESTAMP AT TIME ZONE ${timezone}::text)::date AS local_today
+    ),
+    bounds AS MATERIALIZED (
+      SELECT timezone, days, local_today,
+        local_today - (days - 1) AS current_start_date,
+        local_today + 1 AS current_end_date,
+        local_today - (days * 2 - 1) AS previous_start_date,
+        local_today - (days - 1) AS previous_end_date
+      FROM clock
+    ),
+    site_scope AS MATERIALIZED (
+      SELECT site.id, site.name, site.host
+      FROM analytics_sites AS site
+      WHERE site.deleted_at IS NULL
+        AND (${ownerId ?? null}::int IS NULL OR site.owner_id = ${ownerId ?? null}::int)
+    ),
+    scoped_events AS MATERIALIZED (
+      SELECT event.site_id, event.recorded_at, event.visit
+      FROM analytics_events AS event
+      INNER JOIN site_scope ON site_scope.id = event.site_id
+      CROSS JOIN bounds
+      WHERE event.recorded_at >= (bounds.previous_start_date::timestamp AT TIME ZONE bounds.timezone)
+        AND event.recorded_at < (bounds.current_end_date::timestamp AT TIME ZONE bounds.timezone)
+    ),
+    current_events AS MATERIALIZED (
+      SELECT scoped_events.site_id, scoped_events.visit
+      FROM scoped_events CROSS JOIN bounds
+      WHERE scoped_events.recorded_at >= (bounds.current_start_date::timestamp AT TIME ZONE bounds.timezone)
+    ),
+    previous_events AS MATERIALIZED (
+      SELECT scoped_events.visit
+      FROM scoped_events CROSS JOIN bounds
+      WHERE scoped_events.recorded_at < (bounds.current_start_date::timestamp AT TIME ZONE bounds.timezone)
+    ),
+    current_site_metrics AS (
+      SELECT site_id, COUNT(*)::int AS views,
+        COUNT(*) FILTER (WHERE visit = TRUE)::int AS visits
+      FROM current_events
+      GROUP BY site_id
+    ),
+    portfolio_sites AS (
+      SELECT site_scope.id, site_scope.name, site_scope.host,
+        COALESCE(current_site_metrics.views, 0)::int AS views,
+        COALESCE(current_site_metrics.visits, 0)::int AS visits
+      FROM site_scope
+      LEFT JOIN current_site_metrics ON current_site_metrics.site_id = site_scope.id
+    ),
+    current_summary AS (
+      SELECT COUNT(*)::int AS tracked_sites,
+        COUNT(*) FILTER (WHERE views > 0)::int AS active_sites,
+        COALESCE(SUM(views), 0)::int AS views,
+        COALESCE(SUM(visits), 0)::int AS visits
+      FROM portfolio_sites
+    ),
+    previous_summary AS (
+      SELECT COUNT(*)::int AS views,
+        COUNT(*) FILTER (WHERE visit = TRUE)::int AS visits
+      FROM previous_events
+    )
+    SELECT bounds.timezone,
+      to_char(bounds.current_start_date, 'YYYY-MM-DD') AS current_start_date,
+      to_char(bounds.local_today, 'YYYY-MM-DD') AS current_end_date,
+      to_char(bounds.previous_start_date, 'YYYY-MM-DD') AS previous_start_date,
+      to_char(bounds.previous_end_date - 1, 'YYYY-MM-DD') AS previous_end_date,
+      json_build_object('trackedSites', current_summary.tracked_sites, 'activeSites', current_summary.active_sites,
+        'views', current_summary.views, 'visits', current_summary.visits) AS summary,
+      json_build_object('views', previous_summary.views, 'visits', previous_summary.visits) AS previous_summary,
+      COALESCE((
+        SELECT json_agg(json_build_object('id', id, 'name', name, 'host', host, 'views', views, 'visits', visits)
+          ORDER BY views DESC, visits DESC, name ASC, id ASC)
+        FROM portfolio_sites
+      ), '[]'::json) AS sites
+    FROM bounds CROSS JOIN current_summary CROSS JOIN previous_summary
+  `);
+
+  const report = rows[0];
+  return {
+    period: { days, timezone: report.timezone, startDate: report.current_start_date, endDate: report.current_end_date },
+    previousPeriod: { days, timezone: report.timezone, startDate: report.previous_start_date, endDate: report.previous_end_date },
+    summary: report.summary,
+    previousSummary: report.previous_summary,
+    sites: report.sites,
   };
 }

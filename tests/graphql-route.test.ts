@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getAnalyticsTrafficForSite: vi.fn(),
   getAnalyticsAcquisitionForSite: vi.fn(),
   getAnalyticsDashboardForSite: vi.fn(),
+  getAnalyticsPortfolio: vi.fn(),
 }));
 
 vi.mock("@/lib/auth-helpers", () => ({
@@ -256,5 +257,37 @@ describe("authenticated GraphQL route", () => {
     const response = await routeCall(graphqlAction, request("{ analytics { dashboard(siteId: 12) { overview { visitorDays } } } }"));
     await expect(response.json()).resolves.toEqual({ data: { analytics: { dashboard: { overview: { visitorDays: 2 } } } } });
     expect(mocks.getAnalyticsDashboardForSite).toHaveBeenCalledWith(12, { id: 7, role: "user" }, "UTC", 7);
+  });
+
+  it.each([["DAYS_7", 7], ["DAYS_30", 30], ["DAYS_90", 90]] as const)("resolves portfolio range %s through the analytics service", async (range, days) => {
+    authAs(7, "user");
+    const portfolio = {
+      period: { days, timezone: "Asia/Tokyo", startDate: "2026-09-01", endDate: "2026-09-30" },
+      previousPeriod: { days, timezone: "Asia/Tokyo", startDate: "2026-08-02", endDate: "2026-08-31" },
+      summary: { trackedSites: 1, activeSites: 1, views: 10, visits: 4 },
+      previousSummary: { views: 8, visits: 3 },
+      sites: [{ id: 12, name: "Site", host: "site.example", views: 10, visits: 4 }],
+    };
+    mocks.getAnalyticsPortfolio.mockResolvedValueOnce(portfolio);
+    const query = `query Portfolio($range: AnalyticsRange!, $timezone: String!) { analytics { portfolio(range: $range, timezone: $timezone) { period { days timezone startDate endDate } previousPeriod { days timezone startDate endDate } summary { trackedSites activeSites views visits } previousSummary { views visits } sites { id name host views visits } } } }`;
+    const response = await routeCall(graphqlAction, request(query, { range, timezone: "Asia/Tokyo" }));
+    await expect(response.json()).resolves.toEqual({ data: { analytics: { portfolio } } });
+    expect(mocks.getAnalyticsPortfolio).toHaveBeenCalledWith({ id: 7, role: "user" }, "Asia/Tokyo", days);
+  });
+
+  it("defaults Portfolio to seven UTC days and passes admin identity to the service", async () => {
+    authAs(99, "admin");
+    const portfolio = { summary: { trackedSites: 0, activeSites: 0, views: 0, visits: 0 }, previousSummary: { views: 0, visits: 0 }, sites: [] };
+    mocks.getAnalyticsPortfolio.mockResolvedValueOnce(portfolio);
+    const response = await routeCall(graphqlAction, request("{ analytics { portfolio { summary { trackedSites activeSites views visits } previousSummary { views visits } sites { id } } } }"));
+    await expect(response.json()).resolves.toEqual({ data: { analytics: { portfolio } } });
+    expect(mocks.getAnalyticsPortfolio).toHaveBeenCalledWith({ id: 99, role: "admin" }, "UTC", 7);
+  });
+
+  it("keeps unauthenticated Portfolio requests behind the GraphQL session guard", async () => {
+    vi.mocked(requireSession).mockResolvedValue(null);
+    const response = await routeCall(graphqlAction, request("{ analytics { portfolio { summary { trackedSites } } } }"));
+    expect(response.status).toBe(401);
+    expect(mocks.getAnalyticsPortfolio).not.toHaveBeenCalled();
   });
 });

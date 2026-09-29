@@ -9,9 +9,11 @@ import {
 import {
   getAnalyticsAcquisitionReport,
   getAnalyticsDashboardReport,
+  getAnalyticsPortfolioReport,
   getAnalyticsTrafficReport,
   type AnalyticsAcquisitionReport,
   type AnalyticsDashboardReport,
+  type AnalyticsPortfolioReport,
   type AnalyticsTrafficReport,
 } from "../repositories/analytics-events";
 
@@ -106,6 +108,16 @@ export async function getAnalyticsDashboardForSite(
   if (viewer.role !== "admin" && site.owner_id !== viewer.id) throw new AnalyticsSiteError("forbidden");
   if (!isValidTimezone(timezone) || ![7, 30, 90].includes(days)) throw new AnalyticsSiteError("invalid_input");
   return getAnalyticsDashboardReport(site.id, timezone, days);
+}
+
+export async function getAnalyticsPortfolio(
+  viewer: AnalyticsViewer,
+  timezone: string,
+  days: number,
+): Promise<AnalyticsPortfolioReport> {
+  if (!isValidTimezone(timezone) || ![7, 30, 90].includes(days)) throw new AnalyticsSiteError("invalid_input");
+  const ownerId = viewer.role === "admin" ? undefined : viewer.id;
+  return getAnalyticsPortfolioReport(ownerId, timezone, days);
 }
 
 export interface AnalyticsInstallation {
