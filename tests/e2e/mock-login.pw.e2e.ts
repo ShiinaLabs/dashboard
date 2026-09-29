@@ -148,6 +148,21 @@ test("Web Analytics adds and selects sites, then switches the complete dashboard
   await expect(page.getByRole("button", { name: "90D" })).toHaveAttribute("aria-pressed", "true");
 });
 
+test("Analytics card headers have the shared vertical inset", async ({ page }) => {
+  await logIn(page);
+  await page.goto("/analytics");
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  for (const title of ["Traffic over time", "Visitor geography", "Top Pages", "Countries", "Browsers", "Operating Systems", "Devices", "Referrers", "Entry Pages"]) {
+    const heading = page.locator('[data-slot="card-title"]').filter({ hasText: title }).first();
+    const card = heading.locator("xpath=ancestor::*[@data-slot='card'][1]");
+    const cardBounds = await card.boundingBox();
+    const headingBounds = await heading.boundingBox();
+    expect(cardBounds, `${title} card should be rendered`).not.toBeNull();
+    expect(headingBounds, `${title} heading should be rendered`).not.toBeNull();
+    expect(headingBounds!.y - cardBounds!.y, `${title} heading inset from card top`).toBeGreaterThanOrEqual(16);
+  }
+});
+
 test("dashboard failures are reported while tracking setup remains available", async ({ page }) => {
   await logIn(page);
   await page.route("**/api/graphql", (route) => route.fulfill({

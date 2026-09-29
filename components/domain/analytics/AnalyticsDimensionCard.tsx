@@ -34,10 +34,10 @@ export function AnalyticsDimensionCard({
 
   return (
     <Card className="min-w-0 gap-0">
-      <CardHeader className="pb-3">
+      <CardHeader className="gap-1 px-5 pb-3 pt-5">
         <CardTitle role="heading" aria-level={2} className="text-base">{title}</CardTitle>
       </CardHeader>
-      <CardContent className="min-w-0">
+      <CardContent className="min-w-0 px-5 pb-5">
         {loading ? <p className="py-8 text-center text-sm text-muted-foreground">{loadingLabel}</p> : items.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">{emptyMessage}</p>
         ) : <>
