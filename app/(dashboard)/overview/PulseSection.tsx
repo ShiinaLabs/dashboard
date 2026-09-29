@@ -28,7 +28,7 @@ function signed(value: number) {
   return `${value > 0 ? "+" : ""}${value.toLocaleString()}`;
 }
 
-function deltaDescription(current: number, previous: number) {
+function deltaDescription(previous: number, current: number) {
   return `${previous.toLocaleString()} → ${current.toLocaleString()}`;
 }
 
