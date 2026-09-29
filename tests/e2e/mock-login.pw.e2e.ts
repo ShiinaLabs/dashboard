@@ -104,8 +104,16 @@ test("Web Analytics adds and selects sites before showing 7-day metrics", async 
   for (const title of ["Top Pages", "Referrers", "Countries", "Browsers", "Operating Systems", "Devices"]) {
     await expect(page.getByRole("heading", { name: title, level: 2 })).toBeVisible();
   }
-  await expect(page.getByTitle("/", { exact: true })).toBeVisible();
-  await expect(page.getByTitle("/pricing", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Acquisition", level: 2 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Entry Pages", level: 2 })).toBeVisible();
+  const referrerCard = page.getByRole("heading", { name: "Referrers", level: 2 }).locator("xpath=../..");
+  const entryPageCard = page.getByRole("heading", { name: "Entry Pages", level: 2 }).locator("xpath=../..");
+  await expect(referrerCard.getByText("Visits", { exact: true })).toBeVisible();
+  await expect(referrerCard.getByText("Views", { exact: true })).toHaveCount(0);
+  await expect(entryPageCard.getByText("Visits", { exact: true })).toBeVisible();
+  await expect(entryPageCard.getByTitle("/", { exact: true })).toBeVisible();
+  await expect(entryPageCard.getByTitle("/pricing", { exact: true })).toBeVisible();
+  await expect(entryPageCard.getByTitle("/docs", { exact: true })).toBeVisible();
   await expect(page.getByText("Direct", { exact: true })).toBeVisible();
   await expect(page.getByText("google.com", { exact: true })).toBeVisible();
   await expect(page.getByText("Japan (JP)", { exact: true })).toBeVisible();
@@ -113,6 +121,38 @@ test("Web Analytics adds and selects sites before showing 7-day metrics", async 
   await expect(page.getByText("macOS", { exact: true })).toBeVisible();
   await expect(page.getByText("Desktop", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Tracking Setup" })).toBeVisible();
+});
+
+test("acquisition failures stay local to the acquisition section", async ({ page }) => {
+  await logIn(page);
+  await page.route("**/api/graphql", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ errors: [{ message: "Internal server error", extensions: { code: "INTERNAL_SERVER_ERROR" } }] }),
+  }));
+  await page.goto("/analytics");
+  await expect(page.getByText("Acquisition data unavailable")).toBeVisible();
+  await expect(page.getByRole("img", { name: "Traffic over time" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Top Pages", level: 2 })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Visitor geography" })).toBeVisible();
+});
+
+test("acquisition shows separate empty states when the selected site has no visits", async ({ page }) => {
+  await logIn(page);
+  await page.route("**/api/graphql", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ data: { analytics: { acquisition: {
+      period: { days: 7, timezone: "UTC" },
+      totalVisits: 0,
+      referrers: [],
+      entryPages: [],
+    } } } }),
+  }));
+  await page.goto("/analytics");
+  await expect(page.getByText("No acquisition referrer data in this period")).toBeVisible();
+  await expect(page.getByText("No entry page data in this period")).toBeVisible();
+  await expect(page.getByRole("img", { name: "Traffic over time" })).toBeVisible();
 });
 
 test("dashboard routes render without horizontal overflow at desktop and tablet widths", async ({ page }) => {

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getAnalyticsAcquisition } from "@/lib/client/analytics-graphql";
 import { GraphQLRequestError, graphqlRequest } from "@/lib/client/graphql";
 
 describe("GraphQL client helper", () => {
@@ -43,5 +44,25 @@ describe("GraphQL client helper", () => {
     expect(error).toBeInstanceOf(GraphQLRequestError);
     expect(error).toMatchObject({ message: "Unauthorized", status: 401 });
     expect(replace).toHaveBeenCalledWith("/login?from=%2Fanalytics");
+  });
+
+  it("loads typed acquisition data through graphqlRequest and the GraphQL endpoint", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: { analytics: { acquisition: {
+      period: { days: 7, timezone: "Asia/Tokyo" },
+      totalVisits: 2,
+      referrers: [{ referrer: "", visits: 1 }, { referrer: "google.com", visits: 1 }],
+      entryPages: [{ path: "/", visits: 1 }, { path: "/landing", visits: 1 }],
+    } } } })));
+
+    await expect(getAnalyticsAcquisition(12, "Asia/Tokyo")).resolves.toEqual({
+      period: { days: 7, timezone: "Asia/Tokyo" },
+      totalVisits: 2,
+      referrers: [{ referrer: "", visits: 1 }, { referrer: "google.com", visits: 1 }],
+      entryPages: [{ path: "/", visits: 1 }, { path: "/landing", visits: 1 }],
+    });
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
+    expect(url).toBe("/api/graphql");
+    expect(JSON.parse(String(init?.body))).toMatchObject({ variables: { siteId: 12, timezone: "Asia/Tokyo" } });
+    expect(JSON.parse(String(init?.body)).query).toContain("acquisition");
   });
 });

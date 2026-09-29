@@ -7,6 +7,7 @@ import { getOwnerId, requireSession } from "@/lib/auth-helpers";
 const mocks = vi.hoisted(() => ({
   getAnalyticsSites: vi.fn(),
   getAnalyticsTrafficForSite: vi.fn(),
+  getAnalyticsAcquisitionForSite: vi.fn(),
 }));
 
 vi.mock("@/lib/auth-helpers", () => ({
@@ -47,6 +48,19 @@ const trafficQuery = /* GraphQL */ `
           operatingSystems { os views }
           devices { device views }
         }
+      }
+    }
+  }
+`;
+
+const acquisitionQuery = /* GraphQL */ `
+  query AnalyticsAcquisition($siteId: Int!, $timezone: String!) {
+    analytics {
+      acquisition(siteId: $siteId, timezone: $timezone) {
+        period { days timezone }
+        totalVisits
+        referrers { referrer visits }
+        entryPages { path visits }
       }
     }
   }
@@ -167,5 +181,31 @@ describe("authenticated GraphQL route", () => {
     const graphqlResponse = await routeCall(graphqlAction, request(trafficQuery, { siteId: 12, timezone: "Asia/Tokyo" }));
 
     expect((await graphqlResponse.json()).data.analytics.traffic).toEqual(await restResponse.json());
+  });
+
+  it("returns acquisition totals, referrers, and entry pages through the service", async () => {
+    authAs(7, "user");
+    const acquisition = {
+      period: { days: 7, timezone: "Asia/Tokyo" },
+      totalVisits: 2,
+      referrers: [{ referrer: "", visits: 1 }, { referrer: "google.com", visits: 1 }],
+      entryPages: [{ path: "/", visits: 1 }, { path: "/landing", visits: 1 }],
+    };
+    mocks.getAnalyticsAcquisitionForSite.mockResolvedValueOnce(acquisition);
+    const response = await routeCall(graphqlAction, request(acquisitionQuery, { siteId: 12, timezone: "Asia/Tokyo" }));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ data: { analytics: { acquisition } } });
+    expect(mocks.getAnalyticsAcquisitionForSite).toHaveBeenCalledWith(12, { id: 7, role: "user" }, "Asia/Tokyo");
+  });
+
+  it("maps acquisition authorization and timezone errors using the existing service errors", async () => {
+    authAs(7, "user");
+    mocks.getAnalyticsAcquisitionForSite.mockRejectedValueOnce(new AnalyticsSiteError("forbidden"));
+    const forbidden = await routeCall(graphqlAction, request(acquisitionQuery, { siteId: 80, timezone: "UTC" }));
+    expect((await forbidden.json()).errors[0].extensions.code).toBe("FORBIDDEN");
+
+    mocks.getAnalyticsAcquisitionForSite.mockRejectedValueOnce(new AnalyticsSiteError("invalid_input"));
+    const invalidTimezone = await routeCall(graphqlAction, request(acquisitionQuery, { siteId: 12, timezone: "Not/AZone" }));
+    expect((await invalidTimezone.json()).errors[0].extensions.code).toBe("BAD_USER_INPUT");
   });
 });

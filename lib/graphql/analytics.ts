@@ -2,6 +2,7 @@ import { createGraphQLError } from "graphql-yoga";
 import { getOwnerId } from "@/lib/auth-helpers";
 import {
   AnalyticsSiteError,
+  getAnalyticsAcquisitionForSite,
   getAnalyticsSites,
   getAnalyticsTrafficForSite,
   type AnalyticsSite,
@@ -16,6 +17,7 @@ export const analyticsTypeDefs = /* GraphQL */ `
   type AnalyticsQuery {
     sites: [AnalyticsSite!]!
     traffic(siteId: Int!, timezone: String = "UTC"): AnalyticsTraffic!
+    acquisition(siteId: Int!, timezone: String = "UTC"): AnalyticsAcquisition!
   }
 
   type AnalyticsSite {
@@ -90,6 +92,23 @@ export const analyticsTypeDefs = /* GraphQL */ `
     topPages: [AnalyticsTopPage!]!
     dimensions: AnalyticsTrafficDimensions!
   }
+
+  type AnalyticsAcquisitionReferrer {
+    referrer: String!
+    visits: Int!
+  }
+
+  type AnalyticsEntryPage {
+    path: String!
+    visits: Int!
+  }
+
+  type AnalyticsAcquisition {
+    period: AnalyticsPeriod!
+    totalVisits: Int!
+    referrers: [AnalyticsAcquisitionReferrer!]!
+    entryPages: [AnalyticsEntryPage!]!
+  }
 `;
 
 interface AnalyticsSiteGraphQL {
@@ -102,6 +121,7 @@ interface AnalyticsSiteGraphQL {
 }
 
 type AnalyticsTrafficReport = Awaited<ReturnType<typeof getAnalyticsTrafficForSite>>;
+type AnalyticsAcquisitionReport = Awaited<ReturnType<typeof getAnalyticsAcquisitionForSite>>;
 
 function toGraphQLSite(site: AnalyticsSite): AnalyticsSiteGraphQL {
   return {
@@ -152,6 +172,15 @@ export const analyticsResolvers = {
       args: { siteId: number; timezone: string },
       context: GraphQLContext,
     ): Promise<AnalyticsTrafficReport> => mapServiceError(() => getAnalyticsTrafficForSite(
+      args.siteId,
+      { id: context.user.id, role: context.user.role },
+      args.timezone,
+    )),
+    acquisition: async (
+      _parent: unknown,
+      args: { siteId: number; timezone: string },
+      context: GraphQLContext,
+    ): Promise<AnalyticsAcquisitionReport> => mapServiceError(() => getAnalyticsAcquisitionForSite(
       args.siteId,
       { id: context.user.id, role: context.user.role },
       args.timezone,

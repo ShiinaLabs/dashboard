@@ -15,7 +15,7 @@ Unless listed as public below, endpoints require the existing `dash_session` ses
 | `/api/analytics/sites` | GET, POST | session | `getAnalyticsSites`, `createAnalyticsSite` | `analytics.getAnalyticsSites`, `analytics.createAnalyticsSite` | Owner-scoped sites; POST owner comes from session |
 | `/api/analytics/sites/:id/traffic` | GET | session + owner (admin global) | `getAnalyticsTraffic` | `analytics.getAnalyticsTrafficForSite` | Site ownership is checked before the PostgreSQL traffic query; one viewer-timezone 7-calendar-day read model returns overview, zero-filled timeline, Top 10 pages and non-country dimensions, and all country groups, counted by views |
 | `/api/analytics/sites/:id/installation` | GET | session + owner (admin global) | `getAnalyticsInstallation` | `analytics.getAnalyticsInstallationForSite` | Site ownership checked before returning the tracker snippet; missing public origin is a service configuration error |
-| `/api/graphql` | GET, POST | session | `graphqlRequest` (`lib/client/graphql.ts`) | Analytics query resolvers → `analytics.getAnalyticsSites`, `analytics.getAnalyticsTrafficForSite` | Authenticated HTTP adapter; query-only, service-backed; see [GraphQL Query Layer](GRAPHQL.md) |
+| `/api/graphql` | GET, POST | session | `graphqlRequest` (`lib/client/graphql.ts`) | Analytics query resolvers → `analytics.getAnalyticsSites`, `analytics.getAnalyticsTrafficForSite`, `analytics.getAnalyticsAcquisitionForSite` | Authenticated HTTP adapter; query-only, service-backed; see [GraphQL Query Layer](GRAPHQL.md) |
 | `/api/ai/chat` | GET, POST | session | `getAiStatus`, `streamAiChat` | `ai-analysis.getAiStatus`, `runAgentStream` | AI config/quota/model integration; POST streams a `Response` |
 | `/api/auth/change-password` | POST | session | `changePassword` | Existing auth handler | Auth/password implementation; cookie/session semantics unchanged |
 | `/api/auth/login` | POST | public | `login` | Existing auth handler | Auth implementation; rate limit and session cookie |
@@ -74,7 +74,7 @@ Unless listed as public below, endpoints require the existing `dash_session` ses
 
 - Browser pages and components call `lib/api.ts` or the thin `lib/client/graphql.ts` helper; only `lib/client/api-transport.ts` constructs API URLs and invokes `fetch`.
 - `app/api/**` adapts HTTP input/authentication to `lib/services/**`. It does not import repositories, database drivers, fetchers, or `fetch-dispatch`.
-- `/api/graphql` authenticates before executing Yoga, passes only the authenticated user into context, and routes analytics fields through existing application services. REST analytics endpoints remain supported and unchanged.
+- `/api/graphql` authenticates before executing Yoga, passes only the authenticated user into context, and routes analytics fields through existing application services. REST analytics endpoints remain supported and unchanged; acquisition is visit-entry based and distinct from REST traffic's views-based referrer dimension.
 - `lib/services/**` is the Application / Use Case Layer. It may call repositories and infrastructure and returns application data, never `Response` objects or HTTP status codes.
 - The browser → HTTP → service → repository contract remains in the existing single Node application. This inventory describes dependency boundaries; it does not declare an endpoint API version or runtime migration.
 

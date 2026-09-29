@@ -3,31 +3,31 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export interface AnalyticsDimensionItem {
   key: string;
   label: string;
-  views: number;
+  value: number;
   title?: string;
 }
 
 interface AnalyticsDimensionCardProps {
   title: string;
   itemLabel: string;
-  viewsLabel: string;
+  metricLabel: string;
   shareLabel: string;
   emptyMessage: string;
   loadingLabel: string;
   items: AnalyticsDimensionItem[];
-  totalViews: number;
+  totalValue: number;
   loading?: boolean;
 }
 
 export function AnalyticsDimensionCard({
   title,
   itemLabel,
-  viewsLabel,
+  metricLabel,
   shareLabel,
   emptyMessage,
   loadingLabel,
   items,
-  totalViews,
+  totalValue,
   loading = false,
 }: AnalyticsDimensionCardProps) {
   const percent = new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 1 });
@@ -42,15 +42,15 @@ export function AnalyticsDimensionCard({
           <p className="py-8 text-center text-sm text-muted-foreground">{emptyMessage}</p>
         ) : <>
           <div className="mb-2 grid grid-cols-[auto_minmax(0,1fr)_auto_auto] gap-3 px-1 text-xs font-medium text-muted-foreground">
-            <span aria-hidden="true">#</span><span>{itemLabel}</span><span>{viewsLabel}</span><span>{shareLabel}</span>
+            <span aria-hidden="true">#</span><span>{itemLabel}</span><span>{metricLabel}</span><span>{shareLabel}</span>
           </div>
           <ol className="space-y-1">
             {items.map((item, index) => {
-              const share = percent.format(totalViews > 0 ? item.views / totalViews : 0);
+              const share = percent.format(totalValue > 0 ? item.value / totalValue : 0);
               return <li key={item.key} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-3 rounded-md px-1 py-2 text-sm">
                 <span className="w-5 text-right tabular-nums text-muted-foreground">{index + 1}</span>
                 <span className="min-w-0 truncate" title={item.title ?? item.label}>{item.label}</span>
-                <span className="min-w-12 text-right tabular-nums">{item.views.toLocaleString()}</span>
+                <span className="min-w-12 text-right tabular-nums">{item.value.toLocaleString()}</span>
                 <span className="min-w-12 text-right tabular-nums text-muted-foreground">{share}</span>
               </li>;
             })}

@@ -28,12 +28,18 @@ describe("Web Analytics boundaries", () => {
     expect(page).toContain("api.getAnalyticsSites");
     expect(page).toContain("api.getAnalyticsTraffic(selectedSite!.id, timezone!)");
     expect(page).toContain("api.getAnalyticsInstallation(selectedSite!.id)");
+    expect(page).toContain("getAnalyticsAcquisition");
+    expect(page).toContain("getAnalyticsAcquisition(selectedSite!.id, timezone!)");
+    expect(page).not.toContain("dimensionData?.referrers");
     expect(page).not.toMatch(/\bfetch\s*\(/);
+    expect(page).not.toMatch(/fetch\s*\(\s*[`"']\/api\/graphql/);
     expect(client).toContain('"/analytics/sites"');
     expect(client).toContain("/analytics/sites/${siteId}/traffic?timezone=${encodeURIComponent(timezone)}");
     expect(client).toContain("/analytics/sites/${siteId}/installation");
     expect(client).toContain("AnalyticsTrafficDimensions");
     expect(client).toContain("operatingSystems: AnalyticsOperatingSystemDimension[]");
+    const graphqlClient = readFileSync("lib/client/analytics-graphql.ts", "utf8");
+    expect(graphqlClient).toContain("graphqlRequest<");
   });
 
   it("keeps the public collector as an HTTP adapter and the exact tracker file allow-listed", () => {

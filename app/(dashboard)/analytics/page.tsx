@@ -14,6 +14,7 @@ import { ChartCard } from "@/components/domain/shared/ChartCard";
 import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";
 import { ApiError, api } from "@/lib/api";
+import { getAnalyticsAcquisition } from "@/lib/client/analytics-graphql";
 import { getTimezone } from "@/lib/client/datetime";
 import { calcYAxisWidth } from "@/lib/client/utils";
 import { useIsMobile } from "@/lib/client/useIsMobile";
@@ -66,6 +67,13 @@ export default function WebAnalyticsPage() {
     staleTime: 5 * 60 * 1000,
   });
   const traffic = trafficQuery.data;
+  const acquisitionQuery = useQuery({
+    queryKey: ["analytics", "acquisition", selectedSite?.id, timezone],
+    queryFn: () => getAnalyticsAcquisition(selectedSite!.id, timezone!),
+    enabled: Boolean(selectedSite && timezone),
+    staleTime: 5 * 60 * 1000,
+  });
+  const acquisition = acquisitionQuery.data;
   const installationQuery = useQuery({
     queryKey: ["analytics", "installation", selectedSite?.id],
     queryFn: () => api.getAnalyticsInstallation(selectedSite!.id),
@@ -75,8 +83,8 @@ export default function WebAnalyticsPage() {
     && installationQuery.error.message === "Analytics public URL is not configured";
   const totalViews = traffic?.overview.views ?? 0;
   const dimensionCardLabels = {
-    totalViews,
-    viewsLabel: t("analytics.views"),
+    totalValue: totalViews,
+    metricLabel: t("analytics.views"),
     shareLabel: t("analytics.share"),
     loadingLabel: t("common.loading"),
     loading: !traffic,
@@ -193,22 +201,8 @@ export default function WebAnalyticsPage() {
             title={t("analytics.topPages")}
             itemLabel={t("analytics.page")}
             emptyMessage={t("analytics.noPageViews")}
-            items={(traffic?.topPages ?? []).map((page) => ({ key: page.path, label: page.path, title: page.path, views: page.views }))}
+            items={(traffic?.topPages ?? []).map((page) => ({ key: page.path, label: page.path, title: page.path, value: page.views }))}
           />
-          <AnalyticsDimensionCard
-            {...dimensionCardLabels}
-            title={t("analytics.referrers")}
-            itemLabel={t("analytics.referrer")}
-            emptyMessage={t("analytics.noReferrerData")}
-            items={(dimensionData?.referrers ?? []).map((item) => ({
-              key: item.referrer,
-              label: item.referrer || t("analytics.direct"),
-              title: item.referrer || t("analytics.direct"),
-              views: item.views,
-            }))}
-          />
-        </div>
-        <div className="grid min-w-0 gap-4 lg:grid-cols-2">
           <AnalyticsDimensionCard
             {...dimensionCardLabels}
             title={t("analytics.countries")}
@@ -218,15 +212,17 @@ export default function WebAnalyticsPage() {
               key: item.country,
               label: countryLabel(item.country, countryLocale, t("analytics.unknown")),
               title: item.country,
-              views: item.views,
+              value: item.views,
             }))}
           />
+        </div>
+        <div className="grid min-w-0 gap-4 lg:grid-cols-2">
           <AnalyticsDimensionCard
             {...dimensionCardLabels}
             title={t("analytics.browsers")}
             itemLabel={t("analytics.browser")}
             emptyMessage={t("analytics.noBrowserData")}
-            items={(dimensionData?.browsers ?? []).map((item) => ({ key: item.browser, label: item.browser, views: item.views }))}
+            items={(dimensionData?.browsers ?? []).map((item) => ({ key: item.browser, label: item.browser, value: item.views }))}
           />
         </div>
         <div className="grid min-w-0 gap-4 lg:grid-cols-2">
@@ -235,17 +231,60 @@ export default function WebAnalyticsPage() {
             title={t("analytics.operatingSystems")}
             itemLabel={t("analytics.operatingSystem")}
             emptyMessage={t("analytics.noOperatingSystemData")}
-            items={(dimensionData?.operatingSystems ?? []).map((item) => ({ key: item.os, label: item.os, views: item.views }))}
+            items={(dimensionData?.operatingSystems ?? []).map((item) => ({ key: item.os, label: item.os, value: item.views }))}
           />
+        </div>
+        <div className="grid min-w-0 gap-4 lg:grid-cols-2">
           <AnalyticsDimensionCard
             {...dimensionCardLabels}
             title={t("analytics.devices")}
             itemLabel={t("analytics.device")}
             emptyMessage={t("analytics.noDeviceData")}
-            items={(dimensionData?.devices ?? []).map((item) => ({ key: item.device, label: item.device, views: item.views }))}
+            items={(dimensionData?.devices ?? []).map((item) => ({ key: item.device, label: item.device, value: item.views }))}
           />
         </div>
         </>}
+
+        <section className="min-w-0 space-y-3" aria-labelledby="analytics-acquisition-heading">
+          <h2 id="analytics-acquisition-heading" className="text-lg font-semibold">{t("analytics.acquisition")}</h2>
+          {acquisitionQuery.isError ? <Alert variant="destructive">
+            <AlertTitle>{t("analytics.loadErrorTitle")}</AlertTitle>
+            <AlertDescription>{t("analytics.acquisitionUnavailable")}</AlertDescription>
+          </Alert> : <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+            <AnalyticsDimensionCard
+              title={t("analytics.referrers")}
+              itemLabel={t("analytics.referrer")}
+              metricLabel={t("analytics.visits")}
+              totalValue={acquisition?.totalVisits ?? 0}
+              shareLabel={t("analytics.share")}
+              emptyMessage={t("analytics.noAcquisitionReferrerData")}
+              loadingLabel={t("common.loading")}
+              loading={acquisitionQuery.isPending}
+              items={(acquisition?.referrers ?? []).map((item) => ({
+                key: item.referrer,
+                label: item.referrer === "" ? t("analytics.direct") : item.referrer,
+                title: item.referrer,
+                value: item.visits,
+              }))}
+            />
+            <AnalyticsDimensionCard
+              title={t("analytics.entryPages")}
+              itemLabel={t("analytics.entryPage")}
+              metricLabel={t("analytics.visits")}
+              totalValue={acquisition?.totalVisits ?? 0}
+              shareLabel={t("analytics.share")}
+              emptyMessage={t("analytics.noEntryPageData")}
+              loadingLabel={t("common.loading")}
+              loading={acquisitionQuery.isPending}
+              items={(acquisition?.entryPages ?? []).map((item) => ({
+                key: item.path,
+                label: item.path,
+                title: item.path,
+                value: item.visits,
+              }))}
+            />
+          </div>}
+        </section>
 
         <section className="min-w-0 space-y-4 rounded-xl border bg-card p-5" aria-labelledby="analytics-tracking-setup">
           <div>

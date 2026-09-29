@@ -46,11 +46,20 @@ describe("GraphQL dependency boundary", () => {
     expect(analytics).toContain('@/lib/services/analytics');
     expect(analytics).toContain("getAnalyticsTrafficForSite(");
     expect(analytics).toContain("getAnalyticsSites(");
+    expect(analytics).toContain("getAnalyticsAcquisitionForSite(");
   });
 
   it("keeps GraphQL browser requests on apiRequest", async () => {
     const client = await readFile("lib/client/graphql.ts", "utf8");
     expect(client).toContain('import { apiRequest } from "./api-transport"');
     expect(client).not.toMatch(/\bfetch\s*\(/);
+  });
+
+  it("keeps GraphQL resolvers on services and the acquisition client on graphqlRequest", async () => {
+    const service = await readFile("lib/services/analytics.ts", "utf8");
+    const acquisitionClient = await readFile("lib/client/analytics-graphql.ts", "utf8");
+    expect(service).toContain("getAnalyticsAcquisitionReport(site.id, timezone)");
+    expect(acquisitionClient).toContain('import { graphqlRequest } from "./graphql"');
+    expect(acquisitionClient).not.toMatch(/\bfetch\s*\(|\bapiRequest\s*\(/);
   });
 });
