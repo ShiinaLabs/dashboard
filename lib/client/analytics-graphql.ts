@@ -42,6 +42,14 @@ export interface AnalyticsDashboard {
   acquisition: AnalyticsAcquisitionSummary;
 }
 
+export interface AnalyticsPortfolio {
+  period: { days: number; timezone: string; startDate: string; endDate: string };
+  previousPeriod: { days: number; timezone: string; startDate: string; endDate: string };
+  summary: { trackedSites: number; activeSites: number; views: number; visits: number };
+  previousSummary: { views: number; visits: number };
+  sites: Array<{ id: number; name: string; host: string; views: number; visits: number }>;
+}
+
 interface AnalyticsAcquisitionSummary {
   totalVisits: number;
   referrers: AnalyticsAcquisitionReferrer[];
@@ -97,10 +105,32 @@ const dashboardQuery = /* GraphQL */ `
   }
 `;
 
+const portfolioQuery = /* GraphQL */ `
+  query AnalyticsPortfolio($range: AnalyticsRange!, $timezone: String!) {
+    analytics {
+      portfolio(range: $range, timezone: $timezone) {
+        period { days timezone startDate endDate }
+        previousPeriod { days timezone startDate endDate }
+        summary { trackedSites activeSites views visits }
+        previousSummary { views visits }
+        sites { id name host views visits }
+      }
+    }
+  }
+`;
+
 export async function getAnalyticsDashboard(siteId: number, range: AnalyticsRange, timezone: string): Promise<AnalyticsDashboard> {
   const result = await graphqlRequest<
     { analytics: { dashboard: AnalyticsDashboard } },
     { siteId: number; range: AnalyticsRange; timezone: string }
   >(dashboardQuery, { siteId, range, timezone });
   return result.analytics.dashboard;
+}
+
+export async function getAnalyticsPortfolio(range: AnalyticsRange, timezone: string): Promise<AnalyticsPortfolio> {
+  const result = await graphqlRequest<
+    { analytics: { portfolio: AnalyticsPortfolio } },
+    { range: AnalyticsRange; timezone: string }
+  >(portfolioQuery, { range, timezone });
+  return result.analytics.portfolio;
 }

@@ -18,6 +18,7 @@ import { RedditSection } from "./RedditSection";
 import { TopContentSection } from "./TopContentSection";
 import { XSection } from "./XSection";
 import { useOverviewData } from "./useOverviewData";
+import { WebAnalyticsSection } from "./WebAnalyticsSection";
 
 const titleKey = "nav.overview" satisfies PageTitleKey;
 export const meta = pageMeta(titleKey);
@@ -94,6 +95,8 @@ export default function Overview() {
           <MetricCard icon={<MessageSquareText />} label={t("overview.stats.totalKarma")} value={redditKarma} hint={`${redditTotalPosts.toLocaleString()} ${t("overview.stats.redditPosts")} · ${redditTotalComments.toLocaleString()} ${t("overview.stats.redditComments")}`} />
         </MetricGrid>
       </section>
+
+      <WebAnalyticsSection />
 
       <section aria-label={t("overview.pulse.heading")} className="grid min-w-0 gap-4 xl:grid-cols-2 [&>*]:min-w-0">
         <PulseSection />

@@ -106,6 +106,22 @@
         "capability_gap": "Capability gap"
       }
     },
+    "webAnalytics": {
+      "heading": "Web Analytics",
+      "trackedSites": "Tracked Sites",
+      "activeSites": "Active Sites",
+      "topSites": "Top Sites",
+      "site": "Site",
+      "openAnalytics": "Open Analytics",
+      "unavailable": "Web Analytics unavailable",
+      "noSites": "No websites are being tracked yet.",
+      "setup": "Set up Web Analytics",
+      "noTraffic": "No traffic recorded in this period.",
+      "moreSites": "+ {{count}} more sites",
+      "range7d": "7D",
+      "range30d": "30D",
+      "range90d": "90D"
+    },
     "bothPlatforms": "3 platforms",
     "platformX": "X",
     "platformGitHub": "GitHub",

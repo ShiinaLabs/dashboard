@@ -25,6 +25,151 @@ test("mock login keeps its session and opens the requested route", async ({ page
   });
 });
 
+test("Overview shows portfolio analytics from one ranged GraphQL request", async ({ page }) => {
+  const portfolioRanges: string[] = [];
+  page.on("request", (request) => {
+    if (!request.url().endsWith("/api/graphql") || request.method() !== "POST") return;
+    const body = request.postDataJSON() as { query?: string; variables?: { range?: string } };
+    if (body.query?.includes("query AnalyticsPortfolio(")) portfolioRanges.push(body.variables?.range ?? "");
+  });
+  await logIn(page);
+
+  const section = page.getByRole("region", { name: "Web Analytics" });
+  await expect(section).toBeVisible();
+  const metric = (label: string) => section.getByText(label, { exact: true }).locator("xpath=../..");
+  await expect(metric("Tracked Sites").getByText("3", { exact: true })).toBeVisible();
+  await expect(metric("Active Sites").getByText("3", { exact: true })).toBeVisible();
+  await expect(metric("Views").getByText("12,842", { exact: true })).toBeVisible();
+  await expect(metric("Visits").getByText("4,102", { exact: true })).toBeVisible();
+  await expect(section.getByText("Top Sites", { exact: true })).toBeVisible();
+  for (const [name, host, views, visits] of [
+    ["WiFi Lens", "wifi-lens.app", "7,200", "2,300"],
+    ["Tazuki", "tazuki.dev", "3,800", "1,200"],
+    ["ShiinaPlay", "shiina.play", "1,842", "602"],
+  ]) {
+    const row = section.getByRole("listitem").filter({ hasText: name });
+    await expect(row.getByText(name, { exact: true })).toBeVisible();
+    await expect(row.getByText(host, { exact: true })).toBeVisible();
+    await expect(row).toContainText(views);
+    await expect(row).toContainText(visits);
+  }
+  await expect(section.getByRole("link", { name: "Open Analytics" })).toHaveAttribute("href", "/analytics");
+  await expect(section.getByText(/Visitors|Unique Visitors|Average Daily Visitors/)).toHaveCount(0);
+  const sectionOrder = await page.evaluate(() => {
+    const globalMetrics = document.querySelector('section[aria-label="Overview"]');
+    const analytics = document.querySelector('section[aria-label="Web Analytics"]');
+    const pulse = document.querySelector('section[aria-label="Business Pulse"]');
+    const follows = (before: Element | null, after: Element | null) =>
+      Boolean(before && after && (before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING));
+    return { metricsBeforeAnalytics: follows(globalMetrics, analytics), analyticsBeforePulse: follows(analytics, pulse) };
+  });
+  expect(sectionOrder).toEqual({ metricsBeforeAnalytics: true, analyticsBeforePulse: true });
+  expect(portfolioRanges).toEqual(["DAYS_7"]);
+
+  for (const [buttonName, range] of [["30D", "DAYS_30"], ["90D", "DAYS_90"]]) {
+    const response = page.waitForResponse((candidate) => {
+      if (!candidate.url().endsWith("/api/graphql") || candidate.request().method() !== "POST") return false;
+      const body = candidate.request().postDataJSON() as { query?: string; variables?: { range?: string } };
+      return body.query?.includes("query AnalyticsPortfolio(") === true && body.variables?.range === range;
+    });
+    await section.getByRole("button", { name: buttonName, exact: true }).click();
+    expect((await response).ok()).toBeTruthy();
+    await expect(section).toBeVisible();
+  }
+  expect(portfolioRanges).toEqual(["DAYS_7", "DAYS_30", "DAYS_90"]);
+});
+
+test("Portfolio errors stay inside Web Analytics while other overview sections load", async ({ page }) => {
+  await logIn(page);
+  await page.route("**/api/graphql", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ errors: [{ message: "Internal server error" }] }),
+  }));
+  await page.goto("/overview");
+  await expect(page.getByText("Web Analytics unavailable", { exact: true })).toBeVisible();
+  const overviewHealth = page.getByRole("region", { name: "Business Pulse" });
+  await expect(overviewHealth.getByText("Business Pulse", { exact: true })).toBeVisible();
+  await expect(overviewHealth.getByText("Fetch health", { exact: true })).toBeVisible();
+});
+
+test("Portfolio empty and no-traffic states keep setup and site summaries useful", async ({ page }) => {
+  await logIn(page);
+  await page.route("**/api/graphql", async (route) => {
+    const response = await route.fetch();
+    const payload = await response.json();
+    const portfolio = payload.data?.analytics?.portfolio;
+    if (portfolio) {
+      portfolio.summary = { trackedSites: 0, activeSites: 0, views: 0, visits: 0 };
+      portfolio.previousSummary = { views: 0, visits: 0 };
+      portfolio.sites = [];
+    }
+    await route.fulfill({ response, body: JSON.stringify(payload) });
+  });
+  await page.goto("/overview");
+  const section = page.getByRole("region", { name: "Web Analytics" });
+  await expect(section.getByText("No websites are being tracked yet.")).toBeVisible();
+  await expect(section.getByRole("link", { name: "Set up Web Analytics" })).toHaveAttribute("href", "/analytics");
+  await expect(section.getByText("Tracked Sites", { exact: true })).toHaveCount(0);
+
+  await page.unroute("**/api/graphql");
+  await page.route("**/api/graphql", async (route) => {
+    const response = await route.fetch();
+    const payload = await response.json();
+    const portfolio = payload.data?.analytics?.portfolio;
+    if (portfolio) {
+      portfolio.summary = { trackedSites: 1, activeSites: 0, views: 0, visits: 0 };
+      portfolio.previousSummary = { views: 0, visits: 0 };
+      portfolio.sites = [{ id: 9, name: "Quiet Site", host: "quiet.example", views: 0, visits: 0 }];
+    }
+    await route.fulfill({ response, body: JSON.stringify(payload) });
+  });
+  await page.reload();
+  await expect(section.getByText("No traffic recorded in this period.")).toBeVisible();
+  await expect(section.getByText("Quiet Site", { exact: true })).toBeVisible();
+  await expect(section.getByText("quiet.example", { exact: true })).toBeVisible();
+});
+
+test("Portfolio rows remain responsive without horizontal overflow", async ({ page }) => {
+  await logIn(page);
+  const section = page.getByRole("region", { name: "Web Analytics" });
+  for (const width of [390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(section.getByText("Top Sites", { exact: true })).toBeVisible();
+    const dimensions = await page.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      content: document.documentElement.scrollWidth,
+    }));
+    expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport);
+  }
+});
+
+test("Top Sites limits rows to five and reports the remaining site count", async ({ page }) => {
+  await logIn(page);
+  await page.route("**/api/graphql", async (route) => {
+    const response = await route.fetch();
+    const payload = await response.json();
+    const portfolio = payload.data?.analytics?.portfolio;
+    if (portfolio) {
+      portfolio.summary = { trackedSites: 7, activeSites: 7, views: 28, visits: 14 };
+      portfolio.previousSummary = { views: 24, visits: 12 };
+      portfolio.sites = Array.from({ length: 7 }, (_, index) => ({
+        id: index + 1,
+        name: `Site ${index + 1}`,
+        host: `site-${index + 1}.example`,
+        views: 4,
+        visits: 2,
+      }));
+    }
+    await route.fulfill({ response, body: JSON.stringify(payload) });
+  });
+  await page.goto("/overview");
+  const section = page.getByRole("region", { name: "Web Analytics" });
+  await expect(section.getByRole("listitem")).toHaveCount(5);
+  await expect(section.getByText("+ 2 more sites", { exact: true })).toBeVisible();
+  await expect(section.getByText("Site 6", { exact: true })).toHaveCount(0);
+});
+
 test("Web Analytics adds and selects sites, then switches the complete dashboard across ranges", async ({ page }) => {
   await logIn(page);
   await page.getByRole("link", { name: "Web Analytics" }).click();

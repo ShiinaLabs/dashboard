@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getAnalyticsAcquisition, getAnalyticsDashboard } from "@/lib/client/analytics-graphql";
+import { getAnalyticsAcquisition, getAnalyticsDashboard, getAnalyticsPortfolio } from "@/lib/client/analytics-graphql";
 import { GraphQLRequestError, graphqlRequest } from "@/lib/client/graphql";
 
 describe("GraphQL client helper", () => {
@@ -87,5 +87,27 @@ describe("GraphQL client helper", () => {
     expect(body.query).toContain("dimensions {");
     expect(body.query).toContain("acquisition {");
     expect(body.query).toContain("campaigns { source medium campaign visits }");
+  });
+
+  it("loads portfolio summaries and all sites through one GraphQL request", async () => {
+    const portfolio = {
+      period: { days: 30, timezone: "Asia/Tokyo", startDate: "2026-09-01", endDate: "2026-09-30" },
+      previousPeriod: { days: 30, timezone: "Asia/Tokyo", startDate: "2026-08-02", endDate: "2026-08-31" },
+      summary: { trackedSites: 1, activeSites: 1, views: 10, visits: 4 },
+      previousSummary: { views: 8, visits: 3 },
+      sites: [{ id: 12, name: "Site", host: "site.example", views: 10, visits: 4 }],
+    };
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: { analytics: { portfolio } } })));
+
+    await expect(getAnalyticsPortfolio("DAYS_30", "Asia/Tokyo")).resolves.toEqual(portfolio);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
+    const body = JSON.parse(String(init?.body));
+    expect(url).toBe("/api/graphql");
+    expect(body.variables).toEqual({ range: "DAYS_30", timezone: "Asia/Tokyo" });
+    expect(body.query).toContain("portfolio(range: $range, timezone: $timezone)");
+    expect(body.query).toContain("summary { trackedSites activeSites views visits }");
+    expect(body.query).toContain("sites { id name host views visits }");
+    expect(body.query).not.toContain("dashboard(");
   });
 });

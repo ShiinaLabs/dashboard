@@ -106,6 +106,22 @@
         "capability_gap": "能力缺口"
       }
     },
+    "webAnalytics": {
+      "heading": "网站分析",
+      "trackedSites": "已追踪网站",
+      "activeSites": "活跃网站",
+      "topSites": "热门网站",
+      "site": "网站",
+      "openAnalytics": "打开网站分析",
+      "unavailable": "网站分析暂不可用",
+      "noSites": "尚未追踪任何网站。",
+      "setup": "设置网站分析",
+      "noTraffic": "该周期暂无网站流量。",
+      "moreSites": "另有 {{count}} 个网站",
+      "range7d": "7天",
+      "range30d": "30天",
+      "range90d": "90天"
+    },
     "bothPlatforms": "3 个平台",
     "platformX": "X",
     "platformGitHub": "GitHub",
