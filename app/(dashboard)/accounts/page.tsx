@@ -320,11 +320,22 @@ function AccountFormPanel({
       {/* platform selector — add mode only */}
       {!editing && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {TABS.map(({ key, Icon }) => (
-            <Button key={key} type="button" onClick={() => setPlatform(key)} variant="secondary" size="sm">
-              <Icon size={16} aria-hidden="true" />{t(`nav.${key === "twitter" ? "x" : key}`)}
-            </Button>
-          ))}
+          {TABS.map(({ key, Icon }) => {
+            const selected = platform === key;
+
+            return (
+              <Button
+                key={key}
+                type="button"
+                onClick={() => setPlatform(key)}
+                variant={selected ? "default" : "secondary"}
+                aria-pressed={selected}
+                size="sm"
+              >
+                <Icon size={16} aria-hidden="true" />{t(`nav.${key === "twitter" ? "x" : key}`)}
+              </Button>
+            );
+          })}
         </div>
       )}
 
@@ -350,8 +361,8 @@ function AccountFormPanel({
           <fieldset>
             <legend className="text-sm font-medium mb-1.5">{t("addAccountForm.redditAuthType")}</legend>
             <div className="grid grid-cols-2 gap-2">
-              <Button type="button" onClick={() => setAuthType(null)} variant="secondary">{t("addAccountForm.redditOAuth")}</Button>
-              <Button type="button" onClick={() => setAuthType("reddit_public")} variant="secondary">{t("addAccountForm.redditPublic")}</Button>
+              <Button type="button" onClick={() => setAuthType(null)} variant={!isRedditPublic ? "default" : "secondary"} aria-pressed={!isRedditPublic}>{t("addAccountForm.redditOAuth")}</Button>
+              <Button type="button" onClick={() => setAuthType("reddit_public")} variant={isRedditPublic ? "default" : "secondary"} aria-pressed={isRedditPublic}>{t("addAccountForm.redditPublic")}</Button>
             </div>
             <p className="text-[12px] text-[var(--muted-foreground)] mt-1">
               {isRedditPublic ? t("addAccountForm.helpRedditPublicMode") : t("addAccountForm.helpRedditOAuthMode")}

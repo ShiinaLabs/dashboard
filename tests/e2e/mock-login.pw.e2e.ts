@@ -47,6 +47,43 @@ test("dashboard routes render without horizontal overflow at desktop and tablet 
   }
 });
 
+test("account form exposes selected platform and Reddit access mode", async ({ page }) => {
+  await logIn(page);
+  await page.goto("/accounts");
+  await page.getByRole("button", { name: "Add Account", exact: true }).click();
+
+  const platformButton = (name: string) => page.getByRole("button", { name, exact: true });
+  await expect(platformButton("X")).toHaveAttribute("aria-pressed", "true");
+  await expect(platformButton("GitHub")).toHaveAttribute("aria-pressed", "false");
+  await expect(platformButton("GitLab")).toHaveAttribute("aria-pressed", "false");
+  await expect(platformButton("Reddit")).toHaveAttribute("aria-pressed", "false");
+
+  await platformButton("GitHub").click();
+  await expect(platformButton("GitHub")).toHaveAttribute("aria-pressed", "true");
+  await expect(platformButton("X")).toHaveAttribute("aria-pressed", "false");
+  await expect(platformButton("GitLab")).toHaveAttribute("aria-pressed", "false");
+  await expect(platformButton("Reddit")).toHaveAttribute("aria-pressed", "false");
+
+  await platformButton("Reddit").click();
+  await expect(platformButton("Reddit")).toHaveAttribute("aria-pressed", "true");
+  await expect(platformButton("X")).toHaveAttribute("aria-pressed", "false");
+  await expect(platformButton("GitHub")).toHaveAttribute("aria-pressed", "false");
+  await expect(platformButton("GitLab")).toHaveAttribute("aria-pressed", "false");
+
+  const oauthButton = platformButton("OAuth");
+  const publicButton = platformButton("Browser Cookies");
+  await expect(oauthButton).toHaveAttribute("aria-pressed", "true");
+  await expect(publicButton).toHaveAttribute("aria-pressed", "false");
+
+  await publicButton.click();
+  await expect(publicButton).toHaveAttribute("aria-pressed", "true");
+  await expect(oauthButton).toHaveAttribute("aria-pressed", "false");
+
+  await oauthButton.click();
+  await expect(oauthButton).toHaveAttribute("aria-pressed", "true");
+  await expect(publicButton).toHaveAttribute("aria-pressed", "false");
+});
+
 test("mobile navigation opens, closes, and logout returns to login", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await logIn(page);
