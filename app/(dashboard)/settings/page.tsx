@@ -221,20 +221,11 @@ function AiSettingsSection() {
   const [saved, setSaved] = useState(false);
   const { data: settings, isLoading } = useQuery({
     queryKey: ["settings"],
-    queryFn: () => fetch("/api/settings", { credentials: "include" }).then(r => r.json()),
+    queryFn: api.getSettings,
   });
 
   const mutation = useMutation({
-    mutationFn: async (data: { baseUrl?: string; apiKey?: string; model?: string }) => {
-      const res = await fetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Failed to save");
-      return res.json();
-    },
+    mutationFn: api.updateSettings,
     onSuccess: () => {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);

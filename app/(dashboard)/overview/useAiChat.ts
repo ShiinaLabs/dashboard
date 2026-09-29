@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 
 export interface Message {
   role: "user" | "assistant";
@@ -17,7 +18,7 @@ export function useAiChat() {
   const queryClient = useQueryClient();
   const { data: status } = useQuery({
     queryKey: ["ai-status"],
-    queryFn: () => fetch("/api/ai/chat", { credentials: "include" }).then(r => r.json()),
+    queryFn: api.getAiStatus,
     refetchInterval: isStreaming ? 2000 : false,
   });
 
@@ -37,12 +38,7 @@ export function useAiChat() {
     setIsStreaming(true);
 
     try {
-      const res = await fetch("/api/ai/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ messages: newMessages }),
-      });
+      const res = await api.streamAiChat(newMessages);
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Failed to get response" }));
