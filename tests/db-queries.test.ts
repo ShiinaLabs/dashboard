@@ -31,7 +31,7 @@ import { getTopContent } from "../lib/services/top-content";
 import { SyncTelemetry } from "../lib/application/usecases/SyncTelemetry";
 import { createUser } from "../lib/services/users";
 import { createAnalyticsSite, getAnalyticsSiteById, getAnalyticsSiteByKey, getAnalyticsSites } from "../lib/repositories/analytics-sites";
-import { getAnalyticsTrafficReport, insertAnalyticsEvent } from "../lib/repositories/analytics-events";
+import { getAnalyticsAcquisitionReport, getAnalyticsTrafficReport, insertAnalyticsEvent } from "../lib/repositories/analytics-events";
 import { ensureAnalyticsSiteConstraints } from "../lib/setup";
 
 beforeAll(async () => {
@@ -352,6 +352,93 @@ describe("analytics event queries", () => {
     const emptyReport = await getAnalyticsTrafficReport(emptySite.id, "UTC");
     expect(emptyReport.overview.views).toBe(0);
     expect(emptyReport.dimensions).toEqual({ referrers: [], countries: [], browsers: [], operatingSystems: [], devices: [] });
+
+    const acquisitionSite = await createAnalyticsSite({ owner_id: owner.id, name: "Acquisition Site", site_key: `acq-${suffix}`, host: "acquisition.example" });
+    const acquisitionEvent = {
+      site_id: acquisitionSite.id,
+      referrer_host: "",
+      os: "Other",
+      browser: "Other",
+      country: "Unknown",
+      device_type: "Desktop",
+      visitor: false,
+    };
+    await insertAnalyticsEvent({ ...acquisitionEvent, path: "/landing", referrer_host: "google.com", visit: true });
+    await insertAnalyticsEvent({ ...acquisitionEvent, path: "/campaign", referrer_host: "google.com", visit: true });
+    await insertAnalyticsEvent({ ...acquisitionEvent, path: "/github", referrer_host: "github.com", visit: true });
+    await insertAnalyticsEvent({ ...acquisitionEvent, path: "/github", referrer_host: "github.com", visit: true });
+    await insertAnalyticsEvent({ ...acquisitionEvent, path: "/", visit: true });
+    await insertAnalyticsEvent({ ...acquisitionEvent, path: "/pricing", visit: false });
+    await insertAnalyticsEvent({ ...acquisitionEvent, path: "/docs", visit: false });
+    await getTestPool().query(`
+      INSERT INTO analytics_events(site_id, path, referrer_host, os, browser, country, device_type, visitor, visit, recorded_at)
+      SELECT $1::int, '/start', 'start.example', 'Other', 'Other', 'Unknown', 'Desktop', FALSE, TRUE,
+        ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')::date - 6)::timestamp AT TIME ZONE 'Asia/Tokyo'
+      UNION ALL
+      SELECT $1::int, '/future', 'future.example', 'Other', 'Other', 'Unknown', 'Desktop', FALSE, TRUE,
+        ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')::date + 1)::timestamp AT TIME ZONE 'Asia/Tokyo'
+    `, [acquisitionSite.id]);
+    const acquisitionOtherSite = await createAnalyticsSite({ owner_id: otherOwner.id, name: "Other Acquisition Site", site_key: `acq-other-${suffix}`, host: "other-acquisition.example" });
+    await insertAnalyticsEvent({ ...acquisitionEvent, site_id: acquisitionOtherSite.id, path: "/other", referrer_host: "bing.com", visit: true });
+    await getTestPool().query(`
+      INSERT INTO analytics_events(site_id, path, referrer_host, os, browser, country, device_type, visitor, visit, recorded_at)
+      SELECT $1, '/old-entry', 'old.example', 'Other', 'Other', 'Unknown', 'Desktop', FALSE, TRUE,
+        ((((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')::date - 8)::timestamp) AT TIME ZONE 'Asia/Tokyo') + INTERVAL '12 hours'
+    `, [acquisitionSite.id]);
+
+    const acquisition = await getAnalyticsAcquisitionReport(acquisitionSite.id, "Asia/Tokyo");
+    expect(acquisition.period).toEqual({ days: 7, timezone: "Asia/Tokyo" });
+    expect(acquisition.totalVisits).toBe(6);
+    expect(acquisition.referrers).toEqual([
+      { referrer: "github.com", visits: 2 },
+      { referrer: "google.com", visits: 2 },
+      { referrer: "", visits: 1 },
+      { referrer: "start.example", visits: 1 },
+    ]);
+    expect(acquisition.entryPages).toEqual([
+      { path: "/github", visits: 2 },
+      { path: "/", visits: 1 },
+      { path: "/campaign", visits: 1 },
+      { path: "/landing", visits: 1 },
+      { path: "/start", visits: 1 },
+    ]);
+    expect(acquisition.referrers.reduce((sum, item) => sum + item.visits, 0)).toBe(acquisition.totalVisits);
+    expect(acquisition.entryPages.reduce((sum, item) => sum + item.visits, 0)).toBe(acquisition.totalVisits);
+    expect(acquisition.referrers.map((item) => item.referrer)).not.toContain("old.example");
+    expect(acquisition.entryPages.map((item) => item.path)).not.toContain("/old-entry");
+    expect(acquisition.referrers.map((item) => item.referrer)).not.toContain("future.example");
+    expect(acquisition.entryPages.map((item) => item.path)).not.toContain("/future");
+    expect(acquisition.referrers.map((item) => item.referrer)).not.toContain("bing.com");
+    expect(acquisition.entryPages.map((item) => item.path)).not.toContain("/other");
+    expect((await getAnalyticsAcquisitionReport(acquisitionSite.id, "UTC")).period).toEqual({ days: 7, timezone: "UTC" });
+
+    const utcBoundarySite = await createAnalyticsSite({ owner_id: owner.id, name: "UTC Boundary", site_key: `acq-utc-${suffix}`, host: "acquisition-utc.example" });
+    await getTestPool().query(`
+      INSERT INTO analytics_events(site_id, path, referrer_host, os, browser, country, device_type, visitor, visit, recorded_at)
+      SELECT $1::int, '/utc-start', 'utc-start.example', 'Other', 'Other', 'Unknown', 'Desktop', FALSE, TRUE,
+        ((CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date - 6)::timestamp AT TIME ZONE 'UTC'
+      UNION ALL
+      SELECT $1::int, '/utc-future', 'utc-future.example', 'Other', 'Other', 'Unknown', 'Desktop', FALSE, TRUE,
+        ((CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date + 1)::timestamp AT TIME ZONE 'UTC'
+    `, [utcBoundarySite.id]);
+    const utcBoundaryReport = await getAnalyticsAcquisitionReport(utcBoundarySite.id, "UTC");
+    expect(utcBoundaryReport.totalVisits).toBe(1);
+    expect(utcBoundaryReport.entryPages).toEqual([{ path: "/utc-start", visits: 1 }]);
+
+    const acquisitionLimitSite = await createAnalyticsSite({ owner_id: owner.id, name: "Acquisition Limit", site_key: `acq-limit-${suffix}`, host: "acquisition-limit.example" });
+    for (const source of "abcdefghijkl") {
+      await insertAnalyticsEvent({ ...acquisitionEvent, site_id: acquisitionLimitSite.id, path: `/page-${source}`, referrer_host: `${source}.example`, visit: true });
+    }
+    const limitedAcquisition = await getAnalyticsAcquisitionReport(acquisitionLimitSite.id, "UTC");
+    expect(limitedAcquisition.totalVisits).toBe(12);
+    expect(limitedAcquisition.referrers).toHaveLength(10);
+    expect(limitedAcquisition.referrers).toEqual(
+      "abcdefghij".split("").map((source) => ({ referrer: `${source}.example`, visits: 1 })),
+    );
+    expect(limitedAcquisition.entryPages).toHaveLength(10);
+    expect(limitedAcquisition.entryPages).toEqual(
+      "abcdefghij".split("").map((source) => ({ path: `/page-${source}`, visits: 1 })),
+    );
 
     const indexes = await getTestPool().query("SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'analytics_events'");
     expect(indexes.rows.filter((row: { indexname: string }) => row.indexname !== "analytics_events_pkey")).toEqual([expect.objectContaining({

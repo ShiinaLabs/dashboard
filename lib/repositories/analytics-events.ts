@@ -72,6 +72,23 @@ export interface AnalyticsTrafficReport {
   dimensions: AnalyticsTrafficDimensions;
 }
 
+export interface AnalyticsAcquisitionReferrer {
+  referrer: string;
+  visits: number;
+}
+
+export interface AnalyticsEntryPage {
+  path: string;
+  visits: number;
+}
+
+export interface AnalyticsAcquisitionReport {
+  period: { days: 7; timezone: string };
+  totalVisits: number;
+  referrers: AnalyticsAcquisitionReferrer[];
+  entryPages: AnalyticsEntryPage[];
+}
+
 const mockEvents: Array<NewAnalyticsEvent & { recorded_at: Date }> = [];
 
 export async function insertAnalyticsEvent(event: NewAnalyticsEvent): Promise<void> {
@@ -291,5 +308,90 @@ export async function getAnalyticsTrafficReport(siteId: number, timezone: string
     timeline: report.timeline,
     topPages: report.top_pages,
     dimensions: report.dimensions,
+  };
+}
+
+function mockAcquisitionReport(timezone: string): AnalyticsAcquisitionReport {
+  return {
+    period: { days: 7, timezone },
+    totalVisits: 4_102,
+    referrers: [
+      { referrer: "", visits: 2_100 },
+      { referrer: "google.com", visits: 980 },
+      { referrer: "github.com", visits: 520 },
+    ],
+    entryPages: [
+      { path: "/", visits: 1_800 },
+      { path: "/pricing", visits: 900 },
+      { path: "/docs", visits: 600 },
+    ],
+  };
+}
+
+export async function getAnalyticsAcquisitionReport(siteId: number, timezone: string): Promise<AnalyticsAcquisitionReport> {
+  if (isMockMode()) {
+    return mockAcquisitionReport(timezone);
+  }
+
+  const { rows } = await getDb().execute<{
+    timezone: string;
+    total_visits: number;
+    referrers: AnalyticsAcquisitionReferrer[];
+    entry_pages: AnalyticsEntryPage[];
+  }>(sql`
+    WITH clock AS MATERIALIZED (
+      SELECT ${timezone}::text AS timezone,
+        (CURRENT_TIMESTAMP AT TIME ZONE ${timezone}::text)::date AS local_today
+    ),
+    bounds AS MATERIALIZED (
+      SELECT timezone,
+        ((local_today - 6)::timestamp AT TIME ZONE timezone) AS start_at,
+        ((local_today + 1)::timestamp AT TIME ZONE timezone) AS end_at
+      FROM clock
+    ),
+    visit_events AS MATERIALIZED (
+      SELECT event.path, event.referrer_host
+      FROM analytics_events AS event
+      CROSS JOIN bounds
+      WHERE event.site_id = ${siteId}
+        AND event.recorded_at >= bounds.start_at
+        AND event.recorded_at < bounds.end_at
+        AND event.visit = TRUE
+    ),
+    referrers AS (
+      SELECT referrer_host AS referrer, COUNT(*)::int AS visits
+      FROM visit_events
+      GROUP BY referrer_host
+      ORDER BY COUNT(*) DESC, referrer_host ASC
+      LIMIT 10
+    ),
+    entry_pages AS (
+      SELECT path, COUNT(*)::int AS visits
+      FROM visit_events
+      GROUP BY path
+      ORDER BY COUNT(*) DESC, path ASC
+      LIMIT 10
+    )
+    SELECT bounds.timezone,
+      (SELECT COUNT(*)::int FROM visit_events) AS total_visits,
+      COALESCE((
+        SELECT json_agg(json_build_object('referrer', referrer, 'visits', visits)
+          ORDER BY visits DESC, referrer ASC)
+        FROM referrers
+      ), '[]'::json) AS referrers,
+      COALESCE((
+        SELECT json_agg(json_build_object('path', path, 'visits', visits)
+          ORDER BY visits DESC, path ASC)
+        FROM entry_pages
+      ), '[]'::json) AS entry_pages
+    FROM bounds
+  `);
+
+  const report = rows[0];
+  return {
+    period: { days: 7, timezone: report.timezone },
+    totalVisits: report.total_visits,
+    referrers: report.referrers,
+    entryPages: report.entry_pages,
   };
 }

@@ -6,7 +6,12 @@ import {
   getAnalyticsSites as listSites,
   type AnalyticsSiteRow,
 } from "../repositories/analytics-sites";
-import { getAnalyticsTrafficReport, type AnalyticsTrafficReport } from "../repositories/analytics-events";
+import {
+  getAnalyticsAcquisitionReport,
+  getAnalyticsTrafficReport,
+  type AnalyticsAcquisitionReport,
+  type AnalyticsTrafficReport,
+} from "../repositories/analytics-events";
 
 export interface AnalyticsSiteInput {
   name: string;
@@ -78,6 +83,14 @@ export async function getAnalyticsTrafficForSite(siteId: number, viewer: Analyti
   if (viewer.role !== "admin" && site.owner_id !== viewer.id) throw new AnalyticsSiteError("forbidden");
   if (!isValidTimezone(timezone)) throw new AnalyticsSiteError("invalid_input");
   return getAnalyticsTrafficReport(site.id, timezone);
+}
+
+export async function getAnalyticsAcquisitionForSite(siteId: number, viewer: AnalyticsViewer, timezone: string): Promise<AnalyticsAcquisitionReport> {
+  const site = await getAnalyticsSiteById(siteId);
+  if (!site) throw new AnalyticsSiteError("not_found");
+  if (viewer.role !== "admin" && site.owner_id !== viewer.id) throw new AnalyticsSiteError("forbidden");
+  if (!isValidTimezone(timezone)) throw new AnalyticsSiteError("invalid_input");
+  return getAnalyticsAcquisitionReport(site.id, timezone);
 }
 
 export interface AnalyticsInstallation {

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { analyticsPublicOrigin } from "../lib/config";
-import { createAnalyticsSite, getAnalyticsInstallationForSite, getAnalyticsTrafficForSite, getAnalyticsSites } from "../lib/services/analytics";
+import { createAnalyticsSite, getAnalyticsAcquisitionForSite, getAnalyticsInstallationForSite, getAnalyticsTrafficForSite, getAnalyticsSites } from "../lib/services/analytics";
 import * as sitesRepo from "../lib/repositories/analytics-sites";
 import * as eventsRepo from "../lib/repositories/analytics-events";
 
@@ -8,7 +8,7 @@ vi.mock("../lib/config", () => ({ analyticsPublicOrigin: vi.fn() }));
 vi.mock("../lib/repositories/analytics-sites", () => ({
   getAnalyticsSites: vi.fn(), getAnalyticsSiteById: vi.fn(), getAnalyticsSiteByKey: vi.fn(), createAnalyticsSite: vi.fn(),
 }));
-vi.mock("../lib/repositories/analytics-events", () => ({ insertAnalyticsEvent: vi.fn(), getAnalyticsTrafficReport: vi.fn() }));
+vi.mock("../lib/repositories/analytics-events", () => ({ insertAnalyticsEvent: vi.fn(), getAnalyticsTrafficReport: vi.fn(), getAnalyticsAcquisitionReport: vi.fn() }));
 
 const siteA = { id: 10, owner_id: 1, name: "A", site_key: "site-a", host: "a.example", created_at: "now", updated_at: "now", deleted_at: null };
 const trafficReport = {
@@ -16,6 +16,12 @@ const trafficReport = {
   overview: { views: 3, visitors: 1, visits: 2 },
   timeline: [],
   topPages: [],
+};
+const acquisitionReport = {
+  period: { days: 7 as const, timezone: "Asia/Tokyo" },
+  totalVisits: 5,
+  referrers: [{ referrer: "", visits: 1 }, { referrer: "google.com", visits: 4 }],
+  entryPages: [{ path: "/", visits: 2 }, { path: "/landing", visits: 3 }],
 };
 
 beforeEach(() => {
@@ -66,6 +72,27 @@ describe("analytics service", () => {
     vi.mocked(sitesRepo.getAnalyticsSiteById).mockResolvedValue(undefined);
     await expect(getAnalyticsTrafficForSite(99, { id: 2, role: "user" }, "UTC")).rejects.toMatchObject({ code: "not_found" });
     expect(eventsRepo.getAnalyticsTrafficReport).not.toHaveBeenCalled();
+  });
+
+  it("loads acquisition reports for owners and admins", async () => {
+    vi.mocked(eventsRepo.getAnalyticsAcquisitionReport).mockResolvedValue(acquisitionReport);
+    await expect(getAnalyticsAcquisitionForSite(10, { id: 1, role: "user" }, "Asia/Tokyo")).resolves.toEqual(acquisitionReport);
+    await expect(getAnalyticsAcquisitionForSite(10, { id: 99, role: "admin" }, "UTC")).resolves.toEqual(acquisitionReport);
+    expect(eventsRepo.getAnalyticsAcquisitionReport).toHaveBeenNthCalledWith(1, 10, "Asia/Tokyo");
+    expect(eventsRepo.getAnalyticsAcquisitionReport).toHaveBeenNthCalledWith(2, 10, "UTC");
+  });
+
+  it("blocks foreign acquisition access before querying the repository", async () => {
+    await expect(getAnalyticsAcquisitionForSite(10, { id: 2, role: "user" }, "UTC")).rejects.toMatchObject({ code: "forbidden" });
+    expect(eventsRepo.getAnalyticsAcquisitionReport).not.toHaveBeenCalled();
+  });
+
+  it("rejects missing sites and invalid acquisition timezones before querying the repository", async () => {
+    vi.mocked(sitesRepo.getAnalyticsSiteById).mockResolvedValue(undefined);
+    await expect(getAnalyticsAcquisitionForSite(99, { id: 1, role: "user" }, "UTC")).rejects.toMatchObject({ code: "not_found" });
+    vi.mocked(sitesRepo.getAnalyticsSiteById).mockResolvedValue(siteA);
+    await expect(getAnalyticsAcquisitionForSite(10, { id: 1, role: "user" }, "Not/AZone")).rejects.toMatchObject({ code: "invalid_input" });
+    expect(eventsRepo.getAnalyticsAcquisitionReport).not.toHaveBeenCalled();
   });
 
   it.each(["Not/AZone", "../../etc", "x".repeat(101)])("rejects invalid timezone %s", async (timezone) => {
