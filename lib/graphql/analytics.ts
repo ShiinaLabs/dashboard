@@ -3,6 +3,7 @@ import { getOwnerId } from "@/lib/auth-helpers";
 import {
   AnalyticsSiteError,
   getAnalyticsAcquisitionForSite,
+  getAnalyticsDashboardForSite,
   getAnalyticsSites,
   getAnalyticsTrafficForSite,
   type AnalyticsSite,
@@ -18,7 +19,10 @@ export const analyticsTypeDefs = /* GraphQL */ `
     sites: [AnalyticsSite!]!
     traffic(siteId: Int!, timezone: String = "UTC"): AnalyticsTraffic!
     acquisition(siteId: Int!, timezone: String = "UTC"): AnalyticsAcquisition!
+    dashboard(siteId: Int!, range: AnalyticsRange = DAYS_7, timezone: String = "UTC"): AnalyticsDashboard!
   }
+
+  enum AnalyticsRange { DAYS_7 DAYS_30 DAYS_90 }
 
   type AnalyticsSite {
     id: Int!
@@ -109,6 +113,43 @@ export const analyticsTypeDefs = /* GraphQL */ `
     referrers: [AnalyticsAcquisitionReferrer!]!
     entryPages: [AnalyticsEntryPage!]!
   }
+
+  type AnalyticsDashboardPeriod {
+    days: Int!
+    timezone: String!
+    startDate: String!
+    endDate: String!
+  }
+
+  type AnalyticsDashboardOverview {
+    views: Int!
+    visits: Int!
+    visitorDays: Int!
+  }
+
+  type AnalyticsDashboardDimensions {
+    countries: [AnalyticsCountryDimension!]!
+    browsers: [AnalyticsBrowserDimension!]!
+    operatingSystems: [AnalyticsOperatingSystemDimension!]!
+    devices: [AnalyticsDeviceDimension!]!
+  }
+
+  type AnalyticsAcquisitionSummary {
+    totalVisits: Int!
+    referrers: [AnalyticsAcquisitionReferrer!]!
+    entryPages: [AnalyticsEntryPage!]!
+  }
+
+  type AnalyticsDashboard {
+    period: AnalyticsDashboardPeriod!
+    previousPeriod: AnalyticsDashboardPeriod!
+    overview: AnalyticsDashboardOverview!
+    previousOverview: AnalyticsDashboardOverview!
+    timeline: [AnalyticsTrafficPoint!]!
+    topPages: [AnalyticsTopPage!]!
+    dimensions: AnalyticsDashboardDimensions!
+    acquisition: AnalyticsAcquisitionSummary!
+  }
 `;
 
 interface AnalyticsSiteGraphQL {
@@ -122,6 +163,7 @@ interface AnalyticsSiteGraphQL {
 
 type AnalyticsTrafficReport = Awaited<ReturnType<typeof getAnalyticsTrafficForSite>>;
 type AnalyticsAcquisitionReport = Awaited<ReturnType<typeof getAnalyticsAcquisitionForSite>>;
+type AnalyticsDashboardReport = Awaited<ReturnType<typeof getAnalyticsDashboardForSite>>;
 
 function toGraphQLSite(site: AnalyticsSite): AnalyticsSiteGraphQL {
   return {
@@ -185,5 +227,25 @@ export const analyticsResolvers = {
       { id: context.user.id, role: context.user.role },
       args.timezone,
     )),
+    dashboard: async (
+      _parent: unknown,
+      args: { siteId: number; range: "DAYS_7" | "DAYS_30" | "DAYS_90"; timezone: string },
+      context: GraphQLContext,
+    ): Promise<AnalyticsDashboardReport> => {
+      const days = (() => {
+        switch (args.range) {
+          case "DAYS_7": return 7;
+          case "DAYS_30": return 30;
+          case "DAYS_90": return 90;
+          default: throw new AnalyticsSiteError("invalid_input");
+        }
+      })();
+      return mapServiceError(() => getAnalyticsDashboardForSite(
+        args.siteId,
+        { id: context.user.id, role: context.user.role },
+        args.timezone,
+        days,
+      ));
+    },
   },
 };

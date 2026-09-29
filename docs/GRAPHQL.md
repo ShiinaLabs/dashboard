@@ -2,7 +2,7 @@
 
 The authenticated GraphQL endpoint is `GET`/`POST /api/graphql`. It is a query layer over existing application services; it does not replace or change the REST API. The endpoint requires the existing `dash_session` cookie and returns HTTP `401` before GraphQL execution when no valid session is present.
 
-The current schema is query-only. It exposes `Query.analytics.sites`, `Query.analytics.traffic(siteId, timezone = "UTC")`, and `Query.analytics.acquisition(siteId, timezone = "UTC")`. Future query-oriented features should prefer this GraphQL entry point. Site results use camelCase fields and omit owner and soft-delete fields. Traffic authorization and timezone validation are delegated to the existing analytics service, so REST and GraphQL share the same behavior.
+The current schema is query-only. It exposes `Query.analytics.sites`, the compatibility fields `traffic(siteId, timezone = "UTC")` and `acquisition(siteId, timezone = "UTC")`, and the ranged `dashboard(siteId, range = DAYS_7, timezone = "UTC")` read model. `AnalyticsRange` accepts only `DAYS_7`, `DAYS_30`, or `DAYS_90`. Site results use camelCase fields and omit owner and soft-delete fields. Traffic authorization and timezone validation are delegated to the existing analytics service, so REST and GraphQL share the same behavior.
 
 Example:
 
@@ -26,7 +26,11 @@ query AnalyticsTraffic($siteId: Int!, $timezone: String!) {
 }
 ```
 
-Resolvers receive only the authenticated user in their context and call `lib/services/analytics.ts`. They do not import database or repository code. The typed Acquisition helper in `lib/client/analytics-graphql.ts` calls the shared `lib/client/graphql.ts` transport, which retains cookie credentials and the common unauthorized redirect behavior. Dashboard analytics pages continue using their existing REST client for sites, traffic, and installation.
+Resolvers receive only the authenticated user in their context and call `lib/services/analytics.ts`. They do not import database or repository code. The typed Acquisition and Dashboard helpers in `lib/client/analytics-graphql.ts` call the shared `lib/client/graphql.ts` transport, which retains cookie credentials and the common unauthorized redirect behavior. Dashboard analytics pages use REST for sites and installation, and one GraphQL Dashboard request for the selected period's analytics.
+
+## Ranged dashboard
+
+The Analytics page's primary read is `analytics.dashboard`. It returns current and previous equal-length local-calendar periods, the current-period timeline and view dimensions, and visit-based acquisition summaries from one repository statement. Its overview calls the sum of `visitor = true` markers `visitorDays`: markers represent a browser's first event on each local calendar day, so this is not a count of unique visitors over the selected range. The UI displays `Average Daily Visitors` as `round(visitorDays / period.days)`. `timeline.visitors` remains a daily count. Sites and tracker installation remain on REST; the legacy traffic and acquisition GraphQL fields and REST traffic contract remain unchanged.
 
 GraphiQL is available only outside production. Request batching is disabled. The schema has no mutations or subscriptions; state-changing operations remain on REST endpoints for now.
 
@@ -47,4 +51,4 @@ query AnalyticsAcquisition($siteId: Int!, $timezone: String!) {
 }
 ```
 
-The existing REST traffic contract and `analytics.traffic.dimensions.referrers` remain views-based and unchanged. The Analytics page continues to use REST for sites, traffic, and tracker installation; Acquisition is the first page query to use GraphQL.
+The existing REST traffic contract and `analytics.traffic.dimensions.referrers` remain views-based and unchanged. The standalone Acquisition field and helper also remain available for compatibility.
