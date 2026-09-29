@@ -18,6 +18,24 @@
 | **Encryption** | AES-256-GCM (credentials at rest) |
 | **i18n** | react-i18next (en/zh) |
 
+## Deployment Model
+
+Dashboard is a private multi-user internal operations dashboard for a trusted personal, family, or small-team environment.
+
+The supported production architecture is a single Node.js process running the HTTP/SSR server, API routes, in-process scheduler, and fetchers together:
+
+```text
+Node process
+├── HTTP / SSR
+├── API routes
+├── Scheduler
+└── Fetchers
+```
+
+Single-process deployment is intentional and supported. This is a first-class architecture and may remain the production model indefinitely.
+
+Serverless, Edge, and Function runtimes are future deployment options, not current architecture targets. Do not prepare for them by removing Node APIs, replacing `pg` or Argon2, externalizing the scheduler, introducing queues or cron services, or changing cryptography. Portability is desirable only when it does not add current operational or code complexity without present value.
+
 ## Source Layout
 
 ```
@@ -67,14 +85,14 @@ dashboard/
 │   ├── fetcher.ts              # X (Twitter) fetcher
 │   ├── fetchers/               # GitHub, GitLab, Reddit fetchers
 │   ├── repositories/           # Drizzle query layer per domain
-│   ├── services/               # Business logic (accounts, users)
+│   ├── services/               # Application services and use cases
 │   ├── scheduler.ts            # Per-platform dispatch every 60s (round-robin + cooldowns)
 │   ├── scheduler-singleton.ts  # ensureScheduler() (start once per process)
 │   ├── logger.ts               # Structured file logger with rotation
 │   ├── http.ts                 # fetchWithConfig (TLS-configurable wrapper)
 │   ├── mock/                   # Fixture data for MOCK_DATA=1 debug mode
 │   ├── setup.ts                # bootstrap(): pool, schema, admin seed, token re-encryption
-│   └── startup.ts              # Legacy Next.js startup path (bootstrap + logger + scheduler)
+│   └── startup.ts              # Startup helpers (bootstrap + logger + scheduler)
 ├── server/
 │   └── index.mjs               # Production entry: node http + @react-router/node + static serving
 ├── shared/
@@ -87,34 +105,36 @@ dashboard/
 └── data/                       # Runtime data (logs, legacy SQLite db/dumps)
 ```
 
-## Data Flow
+## Dependency Direction
 
 ```
-User clicks "Fetch" (or scheduler ticks)
-        │
-        ▼
-  Scheduler (lib/scheduler.ts) → fetchAccount / fetch*Account
-        │
-        ▼
-  Fetcher (lib/fetcher.ts, lib/fetchers/*.ts)
-    → External API (X, GitHub, GitLab, Reddit)
-    → Parse + transform
-        │
-        ▼
-  Repository (lib/repositories/*.ts)  ← Drizzle ORM queries
-    → PostgreSQL (pg pool)
-        │
-        ▼
-  React Query cache invalidation (client refetches)
-        │
-        ▼
-  Frontend re-render
+Browser / UI
+    ↓
+API client (lib/api.ts and client utilities)
+    ↓
+HTTP route adapter (app/api/**)
+    ↓
+Application service (lib/services/**)
+    ↓
+Repository / integration
+    ↓
+PostgreSQL / external APIs
+
+Scheduler (lib/scheduler.ts)
+    ↓
+Application operation / dispatch
+    ↓
+Repository / integration
 ```
+
+UI pages and components use the API client for browser requests. They do not access database or fetcher implementation details. API routes parse and authorize HTTP requests, then call application services. Services contain application behavior and coordinate repositories and integrations.
+
+The scheduler is a background entry point into dispatch and application operations; it does not pass through an HTTP route. Repositories may use Drizzle and `pg` directly. Fetchers and integration clients communicate with external APIs.
 
 Browser requests flow through `app/auth-middleware.server.ts` (session check + lazy bootstrap) into either:
 
 - **Pages** — React Router route modules under `app/(dashboard)/`, rendered server-side with client hydration
-- **API** — route handlers under `app/api/*/route.ts` that call services/repositories directly
+- **API** — route handlers under `app/api/*/route.ts` that adapt HTTP requests to application services
 
 ## Request Lifecycle (Production)
 
@@ -126,7 +146,7 @@ Browser requests flow through `app/auth-middleware.server.ts` (session check + l
 ## Key Patterns
 
 - **Singleton Drizzle client** — `getDb()` in `lib/db/connection.ts` returns a cached drizzle instance wrapping a shared `pg` pool (max 5 connections). No per-request connections.
-- **Three-layer architecture** — Route handlers (HTTP) → Services (business logic) → Repositories (data access). Fetchers sit alongside services, called by route handlers or the scheduler.
+- **Dependency boundaries** — Browser UI → API client → HTTP route adapters → application services → repositories/integrations. Routes do not import repositories, database drivers, fetchers, or dispatch implementations. Services do not depend on HTTP request/response helpers.
 - **Lazy bootstrap** — `bootstrap()` in `lib/setup.ts` (PostgreSQL pool, missing-table creation, admin seed, plaintext-token re-encryption) is triggered on the first request via `app/auth-middleware.server.ts`, so the production Node server starts without a DB dependency and `MOCK_DATA=1` never touches PostgreSQL.
 - **Soft-delete** — All destructive operations set `deleted_at = NOW()` instead of DELETE. List queries filter with `deleted_at IS NULL`. Users with the same username can be revived on re-creation.
 - **Confirmation tokens** — Destructive operations (delete account, delete user) require a 6-character random token with 5-minute TTL, stored in an in-memory `Map` (`lib/confirm-helpers.ts`).
@@ -136,3 +156,12 @@ Browser requests flow through `app/auth-middleware.server.ts` (session check + l
 - **Multi-user isolation** — `owner_id` on accounts links to `users.id`. Non-admin users only see their own accounts.
 - **Memory-constrained build** — Client and server bundles are built in separate passes (`build:client` with `RR_SKIP_SSR=1`, `build:server` with `RR_SKIP_CLIENT=1`), each with bounded Node heaps, to keep CI memory usage low.
 - **shadcn UI system** — `components/ui/` contains the UI primitives adapted from the pinned shadcn-admin donor. The dashboard keeps its 12 theme IDs and localStorage settings; `lib/client/theme-tokens.ts` applies shadcn CSS variables, while Sonner provides notifications. React Router, the API client, and React Query remain the page data boundary.
+
+## Architecture Decision Rules
+
+1. The current Node.js deployment is first-class and may remain indefinitely.
+2. Do not introduce an abstraction without a second concrete implementation or clear present-day value.
+3. Node-specific capabilities are allowed at runtime and infrastructure boundaries; do not ban them in pursuit of hypothetical portability.
+4. Business workflows should not be independently reimplemented across HTTP, the scheduler, or future delivery mechanisms.
+5. Every architecture phase must leave the application production-valid indefinitely.
+6. Future deployment portability is desirable, but must not increase current operational or code complexity without present value.
