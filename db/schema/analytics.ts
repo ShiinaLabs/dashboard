@@ -12,5 +12,5 @@ export const analytics_sites = pgTable("analytics_sites", {
   updated_at: text("updated_at").notNull().default(sql`NOW()`),
   deleted_at: text("deleted_at"),
 }, (table) => ({
-  ownerSiteKey: uniqueIndex("idx_analytics_sites_owner_site_key").on(table.owner_id, table.site_key),
+  siteKey: uniqueIndex("idx_analytics_sites_site_key").on(table.site_key),
 }));

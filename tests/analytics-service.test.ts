@@ -29,13 +29,22 @@ describe("analytics service", () => {
 
   it("creates a site for the supplied session owner and normalizes its host", async () => {
     vi.mocked(sitesRepo.createAnalyticsSite).mockImplementation(async (row) => ({ ...siteA, ...row }));
-    await createAnalyticsSite(7, { name: "  New Site ", siteKey: " key ", host: "HTTPS://Example.COM/" });
-    expect(sitesRepo.createAnalyticsSite).toHaveBeenCalledWith({ owner_id: 7, name: "New Site", site_key: "key", host: "example.com" });
+    const first = await createAnalyticsSite(7, { name: "  New Site ", host: "HTTPS://Example.COM/" });
+    const second = await createAnalyticsSite(7, { name: "Another Site", host: "another.example" });
+    expect(first.site_key).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    expect(second.site_key).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    expect(first.site_key).not.toBe(second.site_key);
+    expect(sitesRepo.createAnalyticsSite).toHaveBeenNthCalledWith(1, {
+      owner_id: 7, name: "New Site", site_key: first.site_key, host: "example.com",
+    });
+    expect(sitesRepo.createAnalyticsSite).toHaveBeenNthCalledWith(2, {
+      owner_id: 7, name: "Another Site", site_key: second.site_key, host: "another.example",
+    });
   });
 
   it("rejects incomplete or path-bearing site input", async () => {
-    await expect(createAnalyticsSite(7, { name: "", siteKey: "x", host: "x.example" })).rejects.toMatchObject({ code: "invalid_input" });
-    await expect(createAnalyticsSite(7, { name: "x", siteKey: "x", host: "x.example/path" })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(createAnalyticsSite(7, { name: "", host: "x.example" })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(createAnalyticsSite(7, { name: "x", host: "x.example/path" })).rejects.toMatchObject({ code: "invalid_input" });
     expect(sitesRepo.createAnalyticsSite).not.toHaveBeenCalled();
   });
 

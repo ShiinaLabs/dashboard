@@ -32,10 +32,12 @@ describe("analytics site routes", () => {
 
   it("always creates for the authenticated user even when body supplies ownerId", async () => {
     authAs(10);
-    vi.mocked(createAnalyticsSite).mockResolvedValue({ id: 3, name: "A", site_key: "a", host: "a.example", created_at: "now", updated_at: "now" });
-    const response = await sitesAction({ request: request("POST", { ownerId: 999, name: "A", siteKey: "a", host: "a.example" }), params: {}, context: {} } as never);
+    vi.mocked(createAnalyticsSite).mockResolvedValue({ id: 3, name: "A", site_key: "server-generated", host: "a.example", created_at: "now", updated_at: "now" });
+    const response = await sitesAction({ request: request("POST", { ownerId: 999, name: "A", siteKey: "victim-key", host: "a.example" }), params: {}, context: {} } as never);
     expect(response.status).toBe(201);
-    expect(createAnalyticsSite).toHaveBeenCalledWith(10, { name: "A", siteKey: "a", host: "a.example" });
+    expect(createAnalyticsSite).toHaveBeenCalledWith(10, { name: "A", host: "a.example" });
+    const created = await response.json();
+    expect(created.site_key).not.toBe("victim-key");
   });
 
   it("maps inaccessible and missing overview sites to 403 and 404", async () => {

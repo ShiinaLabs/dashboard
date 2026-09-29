@@ -160,7 +160,7 @@ export const api = {
 
   // Web Analytics
   getAnalyticsSites: () => apiJson<{ sites: AnalyticsSite[] }>("/analytics/sites"),
-  createAnalyticsSite: (data: { name: string; siteKey: string; host: string }) =>
+  createAnalyticsSite: (data: { name: string; host: string }) =>
     apiJson<AnalyticsSite>("/analytics/sites", { method: "POST", body: JSON.stringify(data) }),
   getAnalyticsOverview: (siteId: number) => apiJson<AnalyticsOverview>(`/analytics/sites/${siteId}/overview`),
 

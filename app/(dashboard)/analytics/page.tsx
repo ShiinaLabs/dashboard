@@ -22,7 +22,6 @@ export default function WebAnalyticsPage() {
   const [selectedSiteId, setSelectedSiteId] = useState<number>();
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
-  const [siteKey, setSiteKey] = useState("");
   const [host, setHost] = useState("");
   const sitesQuery = useQuery({ queryKey: ["analytics", "sites"], queryFn: api.getAnalyticsSites });
   const sites = sitesQuery.data?.sites ?? [];
@@ -32,7 +31,7 @@ export default function WebAnalyticsPage() {
     onSuccess: async (site) => {
       setSelectedSiteId(site.id);
       setShowForm(false);
-      setName(""); setSiteKey(""); setHost("");
+      setName(""); setHost("");
       await queryClient.invalidateQueries({ queryKey: ["analytics", "sites"] });
     },
   });
@@ -68,9 +67,8 @@ export default function WebAnalyticsPage() {
         <Button variant="outline" onClick={() => setShowForm((visible) => !visible)}><Plus />{t("analytics.addSite")}</Button>
       </div> : null}
 
-      {showForm ? <form className="grid gap-4 rounded-xl border bg-card p-5 sm:grid-cols-3" onSubmit={(event) => { event.preventDefault(); createSite.mutate({ name, siteKey, host }); }}>
+      {showForm ? <form className="grid gap-4 rounded-xl border bg-card p-5 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); createSite.mutate({ name, host }); }}>
         <div className="space-y-2"><Label htmlFor="analytics-site-name">{t("analytics.name")}</Label><Input id="analytics-site-name" value={name} onChange={(event) => setName(event.target.value)} required /></div>
-        <div className="space-y-2"><Label htmlFor="analytics-site-key">{t("analytics.siteId")}</Label><Input id="analytics-site-key" value={siteKey} onChange={(event) => setSiteKey(event.target.value)} required /></div>
         <div className="space-y-2"><Label htmlFor="analytics-site-host">{t("analytics.host")}</Label><Input id="analytics-site-host" value={host} onChange={(event) => setHost(event.target.value)} placeholder="example.com" required /></div>
         {createSite.isError ? <p className="text-sm text-destructive sm:col-span-3">{t("analytics.createError")}</p> : null}
         <div className="flex gap-2 sm:col-span-3"><Button type="submit" disabled={createSite.isPending}>{createSite.isPending ? t("analytics.saving") : t("analytics.saveSite")}</Button><Button type="button" variant="outline" onClick={() => setShowForm(false)}>{t("common.cancel")}</Button></div>

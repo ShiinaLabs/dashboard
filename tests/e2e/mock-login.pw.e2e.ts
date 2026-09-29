@@ -32,11 +32,14 @@ test("Web Analytics adds and selects sites before showing 7-day metrics", async 
   await expect(page.getByRole("heading", { name: "Web Analytics", level: 1 })).toBeVisible();
   await page.getByRole("button", { name: "Add Site" }).click();
   await page.getByLabel("Name").fill("Playwright Site");
-  await page.getByLabel("Site ID").fill("playwright-site");
   await page.getByLabel("Host").fill("playwright.example");
+  await expect(page.getByLabel("Site ID")).toHaveCount(0);
   const createResponse = page.waitForResponse((response) => response.url().endsWith("/api/analytics/sites") && response.request().method() === "POST");
   await page.getByRole("button", { name: "Save Site" }).click();
-  expect((await createResponse).status()).toBe(201);
+  const createdResponse = await createResponse;
+  expect(createdResponse.status()).toBe(201);
+  const createdSite = await createdResponse.json();
+  expect(createdSite.site_key).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
   await expect(page.getByText("Playwright Site", { exact: false })).toBeVisible();
   const selector = page.getByRole("combobox", { name: "Select a website" });
   await expect(selector).toBeVisible();

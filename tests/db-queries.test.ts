@@ -31,6 +31,7 @@ import { getTopContent } from "../lib/services/top-content";
 import { SyncTelemetry } from "../lib/application/usecases/SyncTelemetry";
 import { createUser } from "../lib/services/users";
 import { createAnalyticsSite, getAnalyticsSiteById, getAnalyticsSites } from "../lib/repositories/analytics-sites";
+import { ensureAnalyticsSiteConstraints } from "../lib/setup";
 
 beforeAll(async () => {
   const databaseConfig = getTestDatabaseConfig();
@@ -125,12 +126,14 @@ describe("users queries", () => {
 });
 
 describe("analytics site queries", () => {
-  it("scopes by owner, supports global lists, and excludes soft-deleted sites", async () => {
+  it("scopes by owner, enforces global keys, and excludes soft-deleted sites", async () => {
     const suffix = Date.now();
     const ownerA = await usersQ.insertUser({ username: `analytics_a_${suffix}`, password_hash: "hash", role: "user" });
     const ownerB = await usersQ.insertUser({ username: `analytics_b_${suffix}`, password_hash: "hash", role: "user" });
     const siteA = await createAnalyticsSite({ owner_id: ownerA.id, name: "Site A", site_key: `same-${suffix}`, host: "a.example" });
-    const siteB = await createAnalyticsSite({ owner_id: ownerB.id, name: "Site B", site_key: `same-${suffix}`, host: "b.example" });
+    const siteB = await createAnalyticsSite({ owner_id: ownerB.id, name: "Site B", site_key: `other-${suffix}`, host: "b.example" });
+    await expect(createAnalyticsSite({ owner_id: ownerB.id, name: "Duplicate", site_key: siteA.site_key, host: "duplicate.example" }))
+      .rejects.toMatchObject({ cause: { code: "23505" } });
 
     expect((await getAnalyticsSites(ownerA.id)).map((site) => site.id)).toEqual([siteA.id]);
     expect((await getAnalyticsSites(ownerB.id)).map((site) => site.id)).toEqual([siteB.id]);
@@ -141,6 +144,41 @@ describe("analytics site queries", () => {
     await getTestPool().query("UPDATE analytics_sites SET deleted_at = NOW() WHERE id = $1", [siteA.id]);
     expect((await getAnalyticsSites(ownerA.id)).map((site) => site.id)).toEqual([]);
     await expect(getAnalyticsSiteById(siteA.id)).resolves.toBeUndefined();
+  });
+
+  it("upgrades the legacy owner-scoped index and fails closed on existing duplicates", async () => {
+    const suffix = Date.now();
+    const ownerA = await usersQ.insertUser({ username: `analytics_upgrade_a_${suffix}`, password_hash: "hash", role: "user" });
+    const ownerB = await usersQ.insertUser({ username: `analytics_upgrade_b_${suffix}`, password_hash: "hash", role: "user" });
+    const pool = getTestPool();
+
+    await pool.query("DROP INDEX IF EXISTS idx_analytics_sites_site_key");
+    await pool.query("CREATE UNIQUE INDEX idx_analytics_sites_owner_site_key ON analytics_sites(owner_id, site_key)");
+    const legacyKey = `legacy-duplicate-${suffix}`;
+    await pool.query(
+      "INSERT INTO analytics_sites(owner_id, name, site_key, host) VALUES ($1, 'Legacy A', $3, 'a.example'), ($2, 'Legacy B', $3, 'b.example')",
+      [ownerA.id, ownerB.id, legacyKey],
+    );
+
+    await expect(ensureAnalyticsSiteConstraints(pool)).rejects.toThrow(
+      "Duplicate analytics site keys detected; resolve them before startup can continue safely.",
+    );
+    const legacyRows = await pool.query("SELECT owner_id, site_key FROM analytics_sites WHERE site_key = $1 ORDER BY owner_id", [legacyKey]);
+    expect(legacyRows.rows).toEqual([{ owner_id: ownerA.id, site_key: legacyKey }, { owner_id: ownerB.id, site_key: legacyKey }]);
+    const indexesAfterFailure = await pool.query("SELECT indexname FROM pg_indexes WHERE tablename = 'analytics_sites'");
+    expect(indexesAfterFailure.rows.map((row: { indexname: string }) => row.indexname)).toContain("idx_analytics_sites_owner_site_key");
+    expect(indexesAfterFailure.rows.map((row: { indexname: string }) => row.indexname)).not.toContain("idx_analytics_sites_site_key");
+
+    await pool.query("DELETE FROM analytics_sites WHERE owner_id = $1 AND site_key = $2", [ownerB.id, legacyKey]);
+    await ensureAnalyticsSiteConstraints(pool);
+    const indexesAfterUpgrade = await pool.query("SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'analytics_sites'");
+    expect(indexesAfterUpgrade.rows).toContainEqual(expect.objectContaining({
+      indexname: "idx_analytics_sites_site_key",
+      indexdef: expect.stringContaining("CREATE UNIQUE INDEX idx_analytics_sites_site_key ON public.analytics_sites USING btree (site_key)"),
+    }));
+    expect(indexesAfterUpgrade.rows.map((row: { indexname: string }) => row.indexname)).not.toContain("idx_analytics_sites_owner_site_key");
+    await expect(getAnalyticsSiteById((await getAnalyticsSites(ownerA.id)).find((site) => site.site_key === legacyKey)!.id))
+      .resolves.toMatchObject({ site_key: legacyKey });
   });
 });
 

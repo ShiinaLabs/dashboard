@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { cloudflareAnalyticsConfig, isMockMode } from "../config";
 import {
   createAnalyticsSite as createSite,
@@ -16,7 +17,6 @@ export interface AnalyticsOverview {
 
 export interface AnalyticsSiteInput {
   name: string;
-  siteKey: string;
   host: string;
 }
 
@@ -56,9 +56,13 @@ function normalizeHost(value: string): string {
 
 export async function createAnalyticsSite(ownerId: number, input: AnalyticsSiteInput): Promise<AnalyticsSite> {
   const name = input.name?.trim();
-  const siteKey = input.siteKey?.trim();
-  if (!name || !siteKey || !input.host?.trim()) throw new AnalyticsSiteError("invalid_input");
-  return publicSite(await createSite({ owner_id: ownerId, name, site_key: siteKey, host: normalizeHost(input.host) }));
+  if (!name || !input.host?.trim()) throw new AnalyticsSiteError("invalid_input");
+  return publicSite(await createSite({
+    owner_id: ownerId,
+    name,
+    host: normalizeHost(input.host),
+    site_key: randomUUID(),
+  }));
 }
 
 export async function getAnalyticsSiteById(id: number): Promise<AnalyticsSiteRow | undefined> {

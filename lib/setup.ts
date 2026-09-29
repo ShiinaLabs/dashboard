@@ -36,6 +36,7 @@ export async function bootstrap() {
   // 4. Create missing tables (must run before migration)
   await createMissingTables();
   await ensureSchemaColumns();
+  await ensureAnalyticsSiteConstraints();
   await backfillGithubIdentityAndTracking();
 
   // 5. Check for legacy SQLite migration (no-op once flagged)
@@ -97,7 +98,7 @@ async function autoMigrate() {
 export const SCHEMA = [
   { table: "users", sql: `CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'user', created_at TEXT NOT NULL DEFAULT NOW(), deleted_at TEXT)` },
   { table: "accounts", sql: `CREATE TABLE IF NOT EXISTS accounts (id SERIAL PRIMARY KEY, owner_id INTEGER NOT NULL REFERENCES users(id), screen_name TEXT NOT NULL, platform TEXT NOT NULL DEFAULT 'twitter', user_id TEXT, auth_token TEXT NOT NULL, fetch_interval INTEGER DEFAULT 30, is_active INTEGER DEFAULT 1, last_fetched_at TEXT, error_message TEXT, instance_url TEXT, auth_type TEXT, created_at TEXT NOT NULL DEFAULT NOW(), updated_at TEXT NOT NULL DEFAULT NOW(), deleted_at TEXT); CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_screen_name_platform ON accounts(owner_id, screen_name, platform)` },
-  { table: "analytics_sites", sql: `CREATE TABLE IF NOT EXISTS analytics_sites (id SERIAL PRIMARY KEY, owner_id INTEGER NOT NULL REFERENCES users(id), name TEXT NOT NULL, site_key TEXT NOT NULL, host TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT NOW(), updated_at TEXT NOT NULL DEFAULT NOW(), deleted_at TEXT); CREATE UNIQUE INDEX IF NOT EXISTS idx_analytics_sites_owner_site_key ON analytics_sites(owner_id, site_key)` },
+  { table: "analytics_sites", sql: `CREATE TABLE IF NOT EXISTS analytics_sites (id SERIAL PRIMARY KEY, owner_id INTEGER NOT NULL REFERENCES users(id), name TEXT NOT NULL, site_key TEXT NOT NULL, host TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT NOW(), updated_at TEXT NOT NULL DEFAULT NOW(), deleted_at TEXT); CREATE UNIQUE INDEX IF NOT EXISTS idx_analytics_sites_site_key ON analytics_sites(site_key)` },
   { table: "fetch_policy", sql: `CREATE TABLE IF NOT EXISTS fetch_policy (platform TEXT NOT NULL, level TEXT NOT NULL, interval_minutes INTEGER NOT NULL, PRIMARY KEY(platform, level)); INSERT INTO fetch_policy (platform, level, interval_minutes) VALUES ('github','l0',1440),('github','l1',90),('github','l2',480),('gitlab','l0',1440),('gitlab','l1',90),('gitlab','l2',480),('twitter','l0',1440),('twitter','l1',90),('twitter','l2',480),('reddit','l0',1440),('reddit','l1',90),('reddit','l2',480) ON CONFLICT DO NOTHING` },
   { table: "account_fetch_state", sql: `CREATE TABLE IF NOT EXISTS account_fetch_state (id SERIAL PRIMARY KEY, account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, level TEXT NOT NULL, last_fetched_at TEXT, next_due_at TEXT, UNIQUE(account_id, level)); CREATE INDEX IF NOT EXISTS idx_account_fetch_state_due ON account_fetch_state(next_due_at)` },
   { table: "fetch_runs", sql: `CREATE TABLE IF NOT EXISTS fetch_runs (id SERIAL PRIMARY KEY, account_id INTEGER NOT NULL REFERENCES accounts(id), trigger TEXT NOT NULL DEFAULT 'manual', status TEXT NOT NULL DEFAULT 'running', started_at TEXT NOT NULL DEFAULT NOW(), finished_at TEXT, duration_ms INTEGER, error_message TEXT, capability_gaps TEXT NOT NULL DEFAULT '[]'); CREATE INDEX IF NOT EXISTS idx_fetch_runs_account_started ON fetch_runs(account_id, started_at DESC); CREATE INDEX IF NOT EXISTS idx_fetch_runs_status ON fetch_runs(status)` },
@@ -188,6 +189,18 @@ async function ensureSchemaColumns(pool: Pool = getPgPool()!): Promise<void> {
   await pool.query("CREATE INDEX IF NOT EXISTS idx_github_paths_repository_id ON github_paths(repository_id)");
   await pool.query("CREATE INDEX IF NOT EXISTS idx_github_releases_repository_id ON github_releases(repository_id)");
   await pool.query("CREATE INDEX IF NOT EXISTS idx_github_release_asset_snapshots_repository_id ON github_release_asset_snapshots(repository_id)");
+}
+
+export async function ensureAnalyticsSiteConstraints(pool: Pool = getPgPool()!): Promise<void> {
+  const { rows } = await pool.query(
+    "SELECT site_key FROM analytics_sites GROUP BY site_key HAVING COUNT(*) > 1 LIMIT 1",
+  );
+  if (rows.length > 0) {
+    throw new Error("Duplicate analytics site keys detected; resolve them before startup can continue safely.");
+  }
+
+  await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS idx_analytics_sites_site_key ON analytics_sites(site_key)");
+  await pool.query("DROP INDEX IF EXISTS idx_analytics_sites_owner_site_key");
 }
 
 /**
