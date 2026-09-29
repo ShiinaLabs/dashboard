@@ -145,22 +145,8 @@ export function isMockFetcherMode(): boolean {
   return false;
 }
 
-export interface CloudflareAnalyticsConfig {
-  accountId: string;
-  apiToken: string;
-  dataset: string;
-}
-
-export function cloudflareAnalyticsConfig(): CloudflareAnalyticsConfig | null {
-  const accountId = process.env.CLOUDFLARE_ANALYTICS_ACCOUNT_ID?.trim();
-  const apiToken = process.env.CLOUDFLARE_ANALYTICS_API_TOKEN?.trim();
-  const dataset = process.env.CLOUDFLARE_ANALYTICS_DATASET?.trim();
-  if (!accountId || !apiToken || !dataset) return null;
-  return { accountId, apiToken, dataset };
-}
-
-export function analyticsCollectorUrl(): string | null {
-  const value = process.env.ANALYTICS_COLLECTOR_URL?.trim();
+export function analyticsPublicOrigin(): string | null {
+  const value = process.env.ANALYTICS_PUBLIC_ORIGIN?.trim();
   if (!value) return null;
   try {
     const url = new URL(value);

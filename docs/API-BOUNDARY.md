@@ -13,8 +13,8 @@ Unless listed as public below, endpoints require the existing `dash_session` ses
 | `/api/accounts` | GET, POST | session | `getAccounts`, `createAccount` | `accounts.getAccountsOverview`, `accounts.createAccount` | Accounts + Twitter repositories; account create validation |
 | `/api/accounts/:id` | GET, PUT, DELETE | session + owner | `getAccount`, `updateAccount`, `deleteAccount` | `accounts.getAccountDetails`, `updateAccountFromInput`, `deleteAccount` | Accounts, Twitter stats, fetch health; confirmation token validation |
 | `/api/analytics/sites` | GET, POST | session | `getAnalyticsSites`, `createAnalyticsSite` | `analytics.getAnalyticsSites`, `analytics.createAnalyticsSite` | Owner-scoped sites; POST owner comes from session |
-| `/api/analytics/sites/:id/overview` | GET | session + owner (admin global) | `getAnalyticsOverview` | `analytics.getAnalyticsOverviewForSite` | Site ownership checked before Cloudflare Analytics Engine query |
-| `/api/analytics/sites/:id/installation` | GET | session + owner (admin global) | `getAnalyticsInstallation` | `analytics.getAnalyticsInstallationForSite` | Site ownership checked before returning the collector tracker snippet; missing public collector URL is a service configuration error |
+| `/api/analytics/sites/:id/overview` | GET | session + owner (admin global) | `getAnalyticsOverview` | `analytics.getAnalyticsOverviewForSite` | Site ownership checked before the PostgreSQL event summary query |
+| `/api/analytics/sites/:id/installation` | GET | session + owner (admin global) | `getAnalyticsInstallation` | `analytics.getAnalyticsInstallationForSite` | Site ownership checked before returning the tracker snippet; missing public origin is a service configuration error |
 | `/api/ai/chat` | GET, POST | session | `getAiStatus`, `streamAiChat` | `ai-analysis.getAiStatus`, `runAgentStream` | AI config/quota/model integration; POST streams a `Response` |
 | `/api/auth/change-password` | POST | session | `changePassword` | Existing auth handler | Auth/password implementation; cookie/session semantics unchanged |
 | `/api/auth/login` | POST | public | `login` | Existing auth handler | Auth implementation; rate limit and session cookie |
@@ -75,3 +75,7 @@ Unless listed as public below, endpoints require the existing `dash_session` ses
 - `app/api/**` adapts HTTP input/authentication to `lib/services/**`. It does not import repositories, database drivers, fetchers, or `fetch-dispatch`.
 - `lib/services/**` is the Application / Use Case Layer. It may call repositories and infrastructure and returns application data, never `Response` objects or HTTP status codes.
 - The browser → HTTP → service → repository contract remains in the existing single Node application. This inventory describes dependency boundaries; it does not declare an endpoint API version or runtime migration.
+
+## Public tracking collector
+
+`POST /a/e` and `OPTIONS /a/e` are public browser-tracking routes outside the `/api` namespace. The POST route owns HTTP parsing, body limits, Origin/UA/country headers, and status/CORS responses; `lib/services/analytics-collector.ts` validates registered-site identity and event data before calling repositories. It does not use a dashboard session.

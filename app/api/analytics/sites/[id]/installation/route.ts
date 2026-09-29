@@ -14,8 +14,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   } catch (error) {
     if (error instanceof AnalyticsSiteError && error.code === "not_found") return json({ error: "Not found" }, { status: 404 });
     if (error instanceof AnalyticsSiteError && error.code === "forbidden") return json({ error: "Forbidden" }, { status: 403 });
-    if (error instanceof AnalyticsSiteError && error.code === "collector_not_configured") {
-      return json({ error: "Analytics collector is not configured", code: error.code }, { status: 503 });
+    if (error instanceof AnalyticsSiteError && error.code === "public_origin_not_configured") {
+      return json({ error: "Analytics public URL is not configured", code: error.code }, { status: 503 });
     }
     return json({ error: "Analytics installation is unavailable" }, { status: 503 });
   }

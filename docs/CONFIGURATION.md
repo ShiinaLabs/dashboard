@@ -113,15 +113,9 @@ AI settings can also be configured via the admin Settings page after deployment.
 
 | Variable | Description |
 |----------|-------------|
-| `CLOUDFLARE_ANALYTICS_ACCOUNT_ID` | Cloudflare account that owns the Analytics Engine dataset |
-| `CLOUDFLARE_ANALYTICS_API_TOKEN` | Server-side API token with Account Analytics Read permission |
-| `CLOUDFLARE_ANALYTICS_DATASET` | Analytics Engine dataset name (SQL identifier) |
-| `ANALYTICS_COLLECTOR_URL` | Public origin of the separately deployed tracking Worker, e.g. `https://dashboard-analytics-collector.example.workers.dev` |
-Sites are added by signed-in users in Web Analytics. Dashboard generates a globally unique Site ID, which is matched against the dataset's `blob1` field; it is not deployment configuration.
+| `ANALYTICS_PUBLIC_ORIGIN` | Public dashboard origin used in installed snippets, e.g. `https://dashboard.example.com`; must contain only scheme and host |
 
-When all three variables are set, `/analytics` queries the selected site's views, visitors, and visits for the last seven days. `pnpm run mock` uses local fixture values and does not contact Cloudflare.
-
-The Cloudflare Collector Worker is deployed independently from the Node dashboard. Set `ANALYTICS_COLLECTOR_URL` to its origin to enable tracking snippets in `/analytics`; the variable is public configuration, not a secret. See [Deployment](DEPLOYMENT.md#analytics-collector) for the Worker commands.
+Sites are added by signed-in users in Web Analytics. Dashboard generates a globally unique Site ID and stores events locally in PostgreSQL. `/analytics` queries the selected site's views, visitors, and visits for the last seven days. `pnpm run mock` uses a fixture public origin and in-memory analytics data.
 
 ## Mock / Debug Mode
 

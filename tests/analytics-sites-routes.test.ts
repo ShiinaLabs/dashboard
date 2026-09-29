@@ -65,18 +65,18 @@ describe("analytics site routes", () => {
     expect(getAnalyticsInstallationForSite).toHaveBeenLastCalledWith(20, { id: 10, role: "user" });
 
     authAs(99, "admin");
-    vi.mocked(getAnalyticsInstallationForSite).mockResolvedValue({ trackerUrl: "https://collector.example/tracker.js", snippet: "<script></script>" });
+    vi.mocked(getAnalyticsInstallationForSite).mockResolvedValue({ trackerUrl: "https://dashboard.example/a/t.js", snippet: "<script></script>" });
     const allowed = await installationLoader({ request: request(), params: { id: "20" }, context: {} } as never);
     expect(allowed.status).toBe(200);
     expect(getAnalyticsInstallationForSite).toHaveBeenLastCalledWith(20, { id: 99, role: "admin" });
-    await expect(allowed.json()).resolves.toMatchObject({ trackerUrl: "https://collector.example/tracker.js" });
+    await expect(allowed.json()).resolves.toMatchObject({ trackerUrl: "https://dashboard.example/a/t.js" });
   });
 
   it("returns an explicit collector configuration error", async () => {
     authAs(10);
-    vi.mocked(getAnalyticsInstallationForSite).mockRejectedValue(new AnalyticsSiteError("collector_not_configured"));
+    vi.mocked(getAnalyticsInstallationForSite).mockRejectedValue(new AnalyticsSiteError("public_origin_not_configured"));
     const response = await installationLoader({ request: request(), params: { id: "20" }, context: {} } as never);
     expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual({ error: "Analytics collector is not configured", code: "collector_not_configured" });
+    await expect(response.json()).resolves.toEqual({ error: "Analytics public URL is not configured", code: "public_origin_not_configured" });
   });
 });

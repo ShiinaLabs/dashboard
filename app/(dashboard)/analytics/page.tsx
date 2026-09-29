@@ -47,8 +47,8 @@ export default function WebAnalyticsPage() {
     queryFn: () => api.getAnalyticsInstallation(selectedSite!.id),
     enabled: Boolean(selectedSite),
   });
-  const collectorNotConfigured = installationQuery.error instanceof ApiError
-    && installationQuery.error.message === "Analytics collector is not configured";
+  const publicOriginNotConfigured = installationQuery.error instanceof ApiError
+    && installationQuery.error.message === "Analytics public URL is not configured";
 
   async function copyTrackingCode() {
     try {
@@ -114,9 +114,9 @@ export default function WebAnalyticsPage() {
           {!isPending && !isError ? <p className="mt-1 text-sm text-muted-foreground">{data?.views ? t("analytics.receivingData") : t("analytics.noData")}</p> : null}
         </div>
         {installationQuery.isPending ? <p className="text-sm text-muted-foreground">{t("analytics.installationLoading")}</p> : null}
-        {installationQuery.isError ? <Alert variant={collectorNotConfigured ? "default" : "destructive"}>
-          <AlertTitle>{collectorNotConfigured ? t("analytics.collectorNotConfigured") : t("analytics.loadErrorTitle")}</AlertTitle>
-          <AlertDescription>{collectorNotConfigured ? t("analytics.collectorNotConfiguredDescription") : t("analytics.installationLoadError")}</AlertDescription>
+        {installationQuery.isError ? <Alert variant={publicOriginNotConfigured ? "default" : "destructive"}>
+          <AlertTitle>{publicOriginNotConfigured ? t("analytics.publicOriginNotConfigured") : t("analytics.loadErrorTitle")}</AlertTitle>
+          <AlertDescription>{publicOriginNotConfigured ? t("analytics.publicOriginNotConfiguredDescription") : t("analytics.installationLoadError")}</AlertDescription>
         </Alert> : null}
         {installationQuery.data ? <div className="space-y-3">
           <p className="text-sm font-medium">{t("analytics.trackingCode")}</p>

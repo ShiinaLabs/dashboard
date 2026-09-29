@@ -48,6 +48,7 @@ dashboard/
 │   ├── globals.css             # Tailwind v4 preflight, theme tokens and animations
 │   ├── (dashboard)/            # Dashboard layout + pages (overview, accounts, x, github, gitlab, reddit, settings, admin)
 │   ├── login/                  # Login page
+│   ├── a/e/                    # Public analytics event route (validated by collector service)
 │   ├── api/                    # API route handlers, one file per endpoint
 │   └── catch-all/              # 404 fallbacks for pages (`*`) and API (`api/*`)
 ├── components/                 # Shared UI components
@@ -70,6 +71,7 @@ dashboard/
 │   │   ├── github.ts           # GitHub tables (stats, repos, snapshots, traffic, releases, contributions)
 │   │   ├── gitlab.ts           # GitLab tables (stats, projects, snapshots, releases, contributions)
 │   │   ├── reddit.ts           # Reddit tables (stats, posts, comments)
+│   │   ├── analytics.ts        # Web Analytics sites and normalized page events
 │   │   └── settings.ts         # settings table
 │   └── migrate.ts              # Re-exports bootstrap() from lib/setup (backward compat)
 ├── lib/
@@ -138,7 +140,7 @@ Browser requests flow through `app/auth-middleware.server.ts` (application readi
 
 ## Request Lifecycle (Production)
 
-1. `server/index.mjs` creates a `node:http` server; static assets under `/assets/`, `/favicon.*` are served from `build/client` by the hand-written static handler
+1. `server/index.mjs` creates a `node:http` server; static assets under `/assets/`, the exact `/a/t.js` tracker path, and `/favicon.*` are served from `build/client` by the hand-written static handler
 2. Everything else goes through `createRequestListener` from `@react-router/node`
 3. `app/auth-middleware.server.ts` awaits `ensureApplicationReady()` before auth handling. Startup initializes the logger, awaits `bootstrap()`, then starts the scheduler; mock mode skips scheduler startup. Concurrent requests share the same startup promise, and a failed bootstrap can be retried by a later request.
 4. API route handlers and page loaders execute within the same process

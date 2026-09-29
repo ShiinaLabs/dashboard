@@ -8,7 +8,7 @@
   "packageManager": "pnpm@10.34.5",
   "scripts": {
     "dev": "react-router dev",
-    "mock": "HTTPS=false MOCK_DATA=1 NEXT_PUBLIC_MOCK_DATA=1 ANALYTICS_COLLECTOR_URL=https://collector.example react-router dev",
+    "mock": "HTTPS=false MOCK_DATA=1 NEXT_PUBLIC_MOCK_DATA=1 ANALYTICS_PUBLIC_ORIGIN=https://dashboard.example react-router dev",
     "build": "pnpm run build:client && pnpm run build:server",
     "start": "node server/index.mjs",
     "lint": "eslint .",
@@ -16,10 +16,7 @@
     "test": "vitest run",
     "build:client": "RR_SKIP_SSR=1 NODE_OPTIONS=\"--max-old-space-size=512 --max-semi-space-size=8\" react-router build",
     "build:server": "RR_SKIP_CLIENT=1 NODE_OPTIONS=\"--max-old-space-size=160 --max-semi-space-size=8\" react-router build",
-    "test:e2e": "playwright test",
-    "analytics:collector:dev": "wrangler --config analytics/collector/wrangler.jsonc dev",
-    "analytics:collector:check": "wrangler --config analytics/collector/wrangler.jsonc deploy --dry-run",
-    "analytics:collector:deploy": "wrangler --config analytics/collector/wrangler.jsonc deploy"
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.46",
@@ -85,8 +82,7 @@
     "tailwindcss": "^4.3.2",
     "typescript-eslint": "^8.59.2",
     "vite": "^7.3.6",
-    "vitest": "^4.1.9",
-    "wrangler": "4.86.0"
+    "vitest": "^4.1.9"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"

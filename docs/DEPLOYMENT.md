@@ -68,19 +68,21 @@ pnpm run start
 
 The production app runs as a single React Router process on port 3000 (`node server/index.mjs`).
 
-## Analytics Collector
+## Analytics Tracking and Cloudflare Access
 
-The optional tracking collector is an independent Cloudflare Worker in `analytics/collector`; it does not add public collection routes to the Node dashboard. It serves `/tracker.js` as a static asset and accepts events at `/collect`, writing to the existing `AnalyticsDataset` Analytics Engine dataset.
+The tracker is served by the Dashboard Node process at `/a/t.js`; browser events are posted to `/a/e` and stored in PostgreSQL. Set `ANALYTICS_PUBLIC_ORIGIN` to the public Dashboard origin to enable installation snippets. The event endpoint validates the registered site, payload host, and browser Origin itself; Cloudflare Access bypass does not authenticate or authorize events.
 
-Use the repository scripts from the project root:
+If Cloudflare Access protects the Dashboard hostname, configure one narrow application:
 
-```bash
-pnpm analytics:collector:dev
-pnpm analytics:collector:check
-pnpm analytics:collector:deploy
+```text
+Path application: dashboard.example.com/a/*
+Policy: Bypass
+Include: Everyone
 ```
 
-Configure the Worker with the Cloudflare account's Analytics Engine access and set the dashboard's public `ANALYTICS_COLLECTOR_URL` to the deployed Worker origin. Deploying the Worker is a separate production infrastructure action from deploying the Node dashboard.
+Keep existing Access policies on every other path. Do not bypass `/*`, `/api/*`, or `/api/analytics/*`. This is a manual Cloudflare configuration instruction; the application collector still performs its own event validation.
+
+The collector reads the `CF-IPCountry` request header when present and stores a two-letter country code. Missing or invalid values are stored as `Unknown`. Ensure the reverse proxy forwards this header if country attribution is wanted; no Cloudflare Managed Transform change is part of this application migration.
 
 ## Database
 
