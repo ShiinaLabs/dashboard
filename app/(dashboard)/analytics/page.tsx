@@ -1,15 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Eye, MousePointerClick, Plus, UsersRound } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ChartCard } from "@/components/domain/shared/ChartCard";
 import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";
 import { ApiError, api } from "@/lib/api";
+import { getTimezone } from "@/lib/client/datetime";
+import { calcYAxisWidth } from "@/lib/client/utils";
+import { useIsMobile } from "@/lib/client/useIsMobile";
 import { notifications } from "@/components/ui/notifications";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 
@@ -20,6 +26,12 @@ export const handle = { titleKey } satisfies TitleHandle;
 export default function WebAnalyticsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
+  const timezone = useSyncExternalStore(
+    () => () => {},
+    getTimezone,
+    () => null,
+  );
   const [selectedSiteId, setSelectedSiteId] = useState<number>();
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
@@ -36,12 +48,13 @@ export default function WebAnalyticsPage() {
       await queryClient.invalidateQueries({ queryKey: ["analytics", "sites"] });
     },
   });
-  const { data, isPending, isError } = useQuery({
-    queryKey: ["analytics", "overview", selectedSite?.id, "7d"],
-    queryFn: () => api.getAnalyticsOverview(selectedSite!.id),
-    enabled: Boolean(selectedSite),
+  const trafficQuery = useQuery({
+    queryKey: ["analytics", "traffic", selectedSite?.id, timezone],
+    queryFn: () => api.getAnalyticsTraffic(selectedSite!.id, timezone!),
+    enabled: Boolean(selectedSite && timezone),
     staleTime: 5 * 60 * 1000,
   });
+  const traffic = trafficQuery.data;
   const installationQuery = useQuery({
     queryKey: ["analytics", "installation", selectedSite?.id],
     queryFn: () => api.getAnalyticsInstallation(selectedSite!.id),
@@ -91,28 +104,98 @@ export default function WebAnalyticsPage() {
         <div className="flex gap-2 sm:col-span-3"><Button type="submit" disabled={createSite.isPending}>{createSite.isPending ? t("analytics.saving") : t("analytics.saveSite")}</Button><Button type="button" variant="outline" onClick={() => setShowForm(false)}>{t("common.cancel")}</Button></div>
       </form> : null}
 
-      {selectedSite && isPending ? (
-        <MetricGrid columns="three">
-          {Array.from({ length: 3 }, (_, index) => <MetricCardSkeleton key={index} />)}
-        </MetricGrid>
-      ) : selectedSite && isError ? (
-        <Alert variant="destructive">
-          <AlertTitle>{t("analytics.loadErrorTitle")}</AlertTitle>
-          <AlertDescription>{t("analytics.loadErrorDescription")}</AlertDescription>
-        </Alert>
-      ) : selectedSite && data ? (
-        <MetricGrid columns="three">
-          <MetricCard icon={<Eye />} label={t("analytics.views")} value={data.views} />
-          <MetricCard icon={<UsersRound />} label={t("analytics.visitors")} value={data.visitors} />
-          <MetricCard icon={<MousePointerClick />} label={t("analytics.visits")} value={data.visits} />
-        </MetricGrid>
-      ) : null}
+      {selectedSite && trafficQuery.isError ? <Alert variant="destructive">
+        <AlertTitle>{t("analytics.loadErrorTitle")}</AlertTitle>
+        <AlertDescription>{t("analytics.trafficUnavailable")}</AlertDescription>
+      </Alert> : null}
 
-      {selectedSite ? <section className="space-y-4 rounded-xl border bg-card p-5" aria-labelledby="analytics-tracking-setup">
+      {selectedSite && !trafficQuery.isError ? <>
+        {traffic ? <MetricGrid columns="three">
+          <MetricCard icon={<Eye />} label={t("analytics.views")} value={traffic.overview.views} />
+          <MetricCard icon={<UsersRound />} label={t("analytics.visitors")} value={traffic.overview.visitors} />
+          <MetricCard icon={<MousePointerClick />} label={t("analytics.visits")} value={traffic.overview.visits} />
+        </MetricGrid> : <MetricGrid columns="three">
+          {Array.from({ length: 3 }, (_, index) => <MetricCardSkeleton key={index} />)}
+        </MetricGrid>}
+
+        <ChartCard title={t("analytics.trafficOverTime")}>
+          {traffic ? (
+            <>
+              <div role="img" aria-label={t("analytics.trafficChartA11y")}>
+              <ResponsiveContainer width="100%" height={isMobile ? 210 : 280}>
+                <LineChart data={traffic.timeline} margin={{ top: 6, right: 8, bottom: 4, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} tickFormatter={(date: string) => date.slice(5)} />
+                  <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={calcYAxisWidth(traffic.timeline, "views", "visitors", "visits")} />
+                  <Tooltip
+                    labelFormatter={(date) => String(date)}
+                    contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "12px" }}
+                  />
+                  <Line type="monotone" dataKey="views" name={t("analytics.views")} stroke="var(--chart-1)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="visitors" name={t("analytics.visitors")} stroke="var(--chart-2)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="visits" name={t("analytics.visits")} stroke="var(--chart-3)" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+              </div>
+              <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 pt-3 text-xs text-muted-foreground">
+                {[
+                  ["var(--chart-1)", t("analytics.views")],
+                  ["var(--chart-2)", t("analytics.visitors")],
+                  ["var(--chart-3)", t("analytics.visits")],
+                ].map(([color, label]) => <span key={label} className="inline-flex items-center gap-2">
+                  <span aria-hidden="true" className="size-2 rounded-full" style={{ backgroundColor: color }} />{label}
+                </span>)}
+              </div>
+            </>
+          ) : <div className="flex h-[210px] items-center justify-center text-sm text-muted-foreground">{t("common.loading")}</div>}
+        </ChartCard>
+
+        <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+          <Card className="min-w-0 gap-0">
+            <CardHeader className="pb-3"><CardTitle className="text-base">{t("analytics.topPages")}</CardTitle></CardHeader>
+            <CardContent className="min-w-0">
+              {!traffic ? <p className="py-8 text-center text-sm text-muted-foreground">{t("common.loading")}</p> : traffic.topPages.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">{t("analytics.noPageViews")}</p>
+              ) : <>
+                <div className="mb-2 grid grid-cols-[auto_minmax(0,1fr)_auto_auto] gap-3 px-1 text-xs font-medium text-muted-foreground">
+                  <span aria-hidden="true">#</span><span>{t("analytics.page")}</span><span>{t("analytics.views")}</span><span>{t("analytics.share")}</span>
+                </div>
+                <ol className="space-y-1">
+                  {traffic.topPages.map((page, index) => {
+                    const share = traffic.overview.views > 0
+                      ? new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 1 }).format(page.views / traffic.overview.views)
+                      : new Intl.NumberFormat(undefined, { style: "percent", maximumFractionDigits: 1 }).format(0);
+                    return <li key={page.path} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-3 rounded-md px-1 py-2 text-sm">
+                      <span className="w-5 text-right tabular-nums text-muted-foreground">{index + 1}</span>
+                      <span className="min-w-0 truncate font-mono text-xs" title={page.path}>{page.path}</span>
+                      <span className="min-w-12 text-right tabular-nums">{page.views.toLocaleString()}</span>
+                      <span className="min-w-12 text-right tabular-nums text-muted-foreground">{share}</span>
+                    </li>;
+                  })}
+                </ol>
+              </>}
+            </CardContent>
+          </Card>
+
+          <section className="min-w-0 space-y-4 rounded-xl border bg-card p-5" aria-labelledby="analytics-tracking-setup">
         <div>
           <h2 id="analytics-tracking-setup" className="text-lg font-semibold">{t("analytics.trackingSetup")}</h2>
-          {!isPending && !isError ? <p className="mt-1 text-sm text-muted-foreground">{data?.views ? t("analytics.receivingData") : t("analytics.noData")}</p> : null}
+          {traffic ? <p className="mt-1 text-sm text-muted-foreground">{traffic.overview.views ? t("analytics.receivingData") : t("analytics.noData")}</p> : null}
         </div>
+        {installationQuery.isPending ? <p className="text-sm text-muted-foreground">{t("analytics.installationLoading")}</p> : null}
+        {installationQuery.isError ? <Alert variant={publicOriginNotConfigured ? "default" : "destructive"}>
+          <AlertTitle>{publicOriginNotConfigured ? t("analytics.publicOriginNotConfigured") : t("analytics.loadErrorTitle")}</AlertTitle>
+          <AlertDescription>{publicOriginNotConfigured ? t("analytics.publicOriginNotConfiguredDescription") : t("analytics.installationLoadError")}</AlertDescription>
+        </Alert> : null}
+        {installationQuery.data ? <div className="space-y-3">
+          <p className="text-sm font-medium">{t("analytics.trackingCode")}</p>
+          <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs"><code>{installationQuery.data.snippet}</code></pre>
+          <Button variant="outline" onClick={copyTrackingCode}>{t("analytics.copyCode")}</Button>
+        </div> : null}
+          </section>
+        </div>
+      </> : selectedSite ? <section className="space-y-4 rounded-xl border bg-card p-5" aria-labelledby="analytics-tracking-setup">
+        <h2 id="analytics-tracking-setup" className="text-lg font-semibold">{t("analytics.trackingSetup")}</h2>
         {installationQuery.isPending ? <p className="text-sm text-muted-foreground">{t("analytics.installationLoading")}</p> : null}
         {installationQuery.isError ? <Alert variant={publicOriginNotConfigured ? "default" : "destructive"}>
           <AlertTitle>{publicOriginNotConfigured ? t("analytics.publicOriginNotConfigured") : t("analytics.loadErrorTitle")}</AlertTitle>

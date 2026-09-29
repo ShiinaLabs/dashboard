@@ -54,12 +54,18 @@ test("Web Analytics adds and selects sites before showing 7-day metrics", async 
   await selector.click();
   await page.getByRole("option", { name: /Example Site/ }).click();
   await expect(page.getByText("Last 7 days")).toBeVisible();
-  await expect(page.getByText("Views")).toBeVisible();
-  await expect(page.getByText("Visitors")).toBeVisible();
-  await expect(page.getByText("Visits")).toBeVisible();
+  await expect(page.getByText("Views").first()).toBeVisible();
+  await expect(page.getByText("Visitors").first()).toBeVisible();
+  await expect(page.getByText("Visits").first()).toBeVisible();
   await expect(page.getByText("12,842")).toBeVisible();
   await expect(page.getByText("2,931")).toBeVisible();
   await expect(page.getByText("4,102")).toBeVisible();
+  await expect(page.getByText("Traffic over time", { exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Traffic over time" })).toBeVisible();
+  await expect(page.getByText("Top Pages", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("/", { exact: true })).toBeVisible();
+  await expect(page.getByTitle("/pricing", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tracking Setup" })).toBeVisible();
 });
 
 test("dashboard routes render without horizontal overflow at desktop and tablet widths", async ({ page }) => {

@@ -206,6 +206,13 @@
   "analytics": {
     "heading": "Web Analytics",
     "period": "Last 7 days",
+    "trafficOverTime": "Traffic over time",
+    "trafficChartA11y": "Traffic over time",
+    "topPages": "Top Pages",
+    "page": "Page",
+    "share": "Share",
+    "noPageViews": "No page views in this period",
+    "trafficUnavailable": "Analytics traffic unavailable",
     "views": "Views",
     "visitors": "Visitors",
     "visits": "Visits",

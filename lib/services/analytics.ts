@@ -1,19 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { analyticsPublicOrigin, isMockMode } from "../config";
+import { analyticsPublicOrigin } from "../config";
 import {
   createAnalyticsSite as createSite,
   getAnalyticsSiteById as findSite,
   getAnalyticsSites as listSites,
   type AnalyticsSiteRow,
 } from "../repositories/analytics-sites";
-import { getAnalyticsTrafficSummary } from "../repositories/analytics-events";
-
-export interface AnalyticsOverview {
-  period: "7d";
-  views: number;
-  visitors: number;
-  visits: number;
-}
+import { getAnalyticsTrafficReport, type AnalyticsTrafficReport } from "../repositories/analytics-events";
 
 export interface AnalyticsSiteInput {
   name: string;
@@ -69,12 +62,22 @@ export async function getAnalyticsSiteById(id: number): Promise<AnalyticsSiteRow
   return findSite(id);
 }
 
-export async function getAnalyticsOverviewForSite(siteId: number, viewer: AnalyticsViewer): Promise<AnalyticsOverview> {
+function isValidTimezone(timezone: string): boolean {
+  if (typeof timezone !== "string" || timezone.length === 0 || timezone.length > 100) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function getAnalyticsTrafficForSite(siteId: number, viewer: AnalyticsViewer, timezone: string): Promise<AnalyticsTrafficReport> {
   const site = await getAnalyticsSiteById(siteId);
   if (!site) throw new AnalyticsSiteError("not_found");
   if (viewer.role !== "admin" && site.owner_id !== viewer.id) throw new AnalyticsSiteError("forbidden");
-  if (isMockMode()) return { period: "7d", views: 12_842, visitors: 2_931, visits: 4_102 };
-  return { period: "7d", ...await getAnalyticsTrafficSummary(site.id, 7) };
+  if (!isValidTimezone(timezone)) throw new AnalyticsSiteError("invalid_input");
+  return getAnalyticsTrafficReport(site.id, timezone);
 }
 
 export interface AnalyticsInstallation {

@@ -32,7 +32,7 @@ export default [
   route("api/auth/me", "api/auth/me/route.ts"),
   route("api/analytics/sites", "api/analytics/sites/route.ts"),
   route("api/analytics/sites/:id/installation", "api/analytics/sites/[id]/installation/route.ts"),
-  route("api/analytics/sites/:id/overview", "api/analytics/sites/[id]/overview/route.ts"),
+  route("api/analytics/sites/:id/traffic", "api/analytics/sites/[id]/traffic/route.ts"),
   route("api/bing-wallpaper", "api/bing-wallpaper/route.ts"),
   route("api/confirm/token", "api/confirm/token/route.ts"),
   route("api/fetch/:id", "api/fetch/[id]/route.ts"),

@@ -9,9 +9,12 @@ export function cn(...inputs: ClassValue[]) {
 const TICK_FONT = "11px system-ui";
 const PADDING = 12;
 
-export function calcYAxisWidth(data: Record<string, unknown>[], ...keys: string[]) {
+export function calcYAxisWidth<T extends object>(data: T[], ...keys: string[]) {
   if (!data.length || !keys.length) return 30;
-  const max = Math.max(...data.map(d => Math.max(...keys.map(k => Number(d[k] ?? 0)))));
+  const max = Math.max(...data.map(item => {
+    const values = item as Record<string, unknown>;
+    return Math.max(...keys.map(key => Number(values[key] ?? 0)));
+  }));
   const formatted = max.toLocaleString();
   const prepared = prepareWithSegments(formatted, TICK_FONT);
   const textWidth = measureNaturalWidth(prepared);

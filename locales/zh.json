@@ -206,6 +206,13 @@
   "analytics": {
     "heading": "网站分析",
     "period": "最近 7 天",
+    "trafficOverTime": "流量趋势",
+    "trafficChartA11y": "流量趋势",
+    "topPages": "热门页面",
+    "page": "页面",
+    "share": "占比",
+    "noPageViews": "此时间段暂无页面浏览",
+    "trafficUnavailable": "分析流量暂不可用",
     "views": "浏览量",
     "visitors": "访客",
     "visits": "访问次数",

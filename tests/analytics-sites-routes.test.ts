@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AnalyticsSiteError, createAnalyticsSite, getAnalyticsInstallationForSite, getAnalyticsOverviewForSite, getAnalyticsSites } from "../lib/services/analytics";
+import { AnalyticsSiteError, createAnalyticsSite, getAnalyticsInstallationForSite, getAnalyticsSites } from "../lib/services/analytics";
 import { loader as sitesLoader, action as sitesAction } from "../app/api/analytics/sites/route";
-import { loader as overviewLoader } from "../app/api/analytics/sites/[id]/overview/route";
 import { loader as installationLoader } from "../app/api/analytics/sites/[id]/installation/route";
 import { requireSession } from "../lib/auth-helpers";
 
@@ -11,7 +10,7 @@ vi.mock("../lib/auth-helpers", () => ({
 }));
 vi.mock("../lib/services/analytics", async (importOriginal) => {
   const original = await importOriginal<typeof import("../lib/services/analytics")>();
-  return { ...original, getAnalyticsSites: vi.fn(), createAnalyticsSite: vi.fn(), getAnalyticsOverviewForSite: vi.fn(), getAnalyticsInstallationForSite: vi.fn() };
+  return { ...original, getAnalyticsSites: vi.fn(), createAnalyticsSite: vi.fn(), getAnalyticsInstallationForSite: vi.fn() };
 });
 
 const request = (method = "GET", body?: unknown) => new Request("http://localhost/api/analytics/sites", {
@@ -39,22 +38,6 @@ describe("analytics site routes", () => {
     expect(createAnalyticsSite).toHaveBeenCalledWith(10, { name: "A", host: "a.example" });
     const created = await response.json();
     expect(created.site_key).not.toBe("victim-key");
-  });
-
-  it("maps inaccessible and missing overview sites to 403 and 404", async () => {
-    authAs(10);
-    vi.mocked(getAnalyticsOverviewForSite).mockRejectedValueOnce(new AnalyticsSiteError("forbidden"));
-    const forbidden = await overviewLoader({ request: request(), params: { id: "20" }, context: {} } as never);
-    expect(forbidden.status).toBe(403);
-    expect(getAnalyticsOverviewForSite).toHaveBeenLastCalledWith(20, { id: 10, role: "user" });
-    vi.mocked(getAnalyticsOverviewForSite).mockRejectedValueOnce(new AnalyticsSiteError("not_found"));
-    const missing = await overviewLoader({ request: request(), params: { id: "20" }, context: {} } as never);
-    expect(missing.status).toBe(404);
-    authAs(99, "admin");
-    vi.mocked(getAnalyticsOverviewForSite).mockResolvedValue({ period: "7d", views: 1, visitors: 1, visits: 1 });
-    const admin = await overviewLoader({ request: request(), params: { id: "20" }, context: {} } as never);
-    expect(admin.status).toBe(200);
-    expect(getAnalyticsOverviewForSite).toHaveBeenLastCalledWith(20, { id: 99, role: "admin" });
   });
 
   it("enforces installation ownership and allows admins to access the service", async () => {

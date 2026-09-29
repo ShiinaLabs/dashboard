@@ -17,11 +17,23 @@ import type {
   LoginResponse, AuthCheckResponse, UserPublic,
 } from "@/shared/types";
 
-export interface AnalyticsOverview {
-  period: "7d";
+export interface AnalyticsTrafficPoint {
+  date: string;
   views: number;
   visitors: number;
   visits: number;
+}
+
+export interface AnalyticsTopPage {
+  path: string;
+  views: number;
+}
+
+export interface AnalyticsTraffic {
+  period: { days: 7; timezone: string };
+  overview: { views: number; visitors: number; visits: number };
+  timeline: AnalyticsTrafficPoint[];
+  topPages: AnalyticsTopPage[];
 }
 
 export interface AnalyticsSite {
@@ -167,7 +179,8 @@ export const api = {
   getAnalyticsSites: () => apiJson<{ sites: AnalyticsSite[] }>("/analytics/sites"),
   createAnalyticsSite: (data: { name: string; host: string }) =>
     apiJson<AnalyticsSite>("/analytics/sites", { method: "POST", body: JSON.stringify(data) }),
-  getAnalyticsOverview: (siteId: number) => apiJson<AnalyticsOverview>(`/analytics/sites/${siteId}/overview`),
+  getAnalyticsTraffic: (siteId: number, timezone: string) =>
+    apiJson<AnalyticsTraffic>(`/analytics/sites/${siteId}/traffic?timezone=${encodeURIComponent(timezone)}`),
   getAnalyticsInstallation: (siteId: number) => apiJson<AnalyticsInstallation>(`/analytics/sites/${siteId}/installation`),
 
   // AI and Settings

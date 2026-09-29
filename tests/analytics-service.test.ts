@@ -1,20 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { analyticsPublicOrigin, isMockMode } from "../lib/config";
-import { createAnalyticsSite, getAnalyticsInstallationForSite, getAnalyticsOverviewForSite, getAnalyticsSites, AnalyticsSiteError } from "../lib/services/analytics";
+import { analyticsPublicOrigin } from "../lib/config";
+import { createAnalyticsSite, getAnalyticsInstallationForSite, getAnalyticsTrafficForSite, getAnalyticsSites } from "../lib/services/analytics";
 import * as sitesRepo from "../lib/repositories/analytics-sites";
 import * as eventsRepo from "../lib/repositories/analytics-events";
 
-vi.mock("../lib/config", () => ({ analyticsPublicOrigin: vi.fn(), isMockMode: vi.fn() }));
+vi.mock("../lib/config", () => ({ analyticsPublicOrigin: vi.fn() }));
 vi.mock("../lib/repositories/analytics-sites", () => ({
   getAnalyticsSites: vi.fn(), getAnalyticsSiteById: vi.fn(), getAnalyticsSiteByKey: vi.fn(), createAnalyticsSite: vi.fn(),
 }));
-vi.mock("../lib/repositories/analytics-events", () => ({ insertAnalyticsEvent: vi.fn(), getAnalyticsTrafficSummary: vi.fn() }));
+vi.mock("../lib/repositories/analytics-events", () => ({ insertAnalyticsEvent: vi.fn(), getAnalyticsTrafficReport: vi.fn() }));
 
 const siteA = { id: 10, owner_id: 1, name: "A", site_key: "site-a", host: "a.example", created_at: "now", updated_at: "now", deleted_at: null };
+const trafficReport = {
+  period: { days: 7 as const, timezone: "Asia/Tokyo" },
+  overview: { views: 3, visitors: 1, visits: 2 },
+  timeline: [],
+  topPages: [],
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(isMockMode).mockReturnValue(false);
   vi.mocked(analyticsPublicOrigin).mockReturnValue("https://dashboard.example");
   vi.mocked(sitesRepo.getAnalyticsSiteById).mockResolvedValue(siteA);
 });
@@ -47,25 +52,30 @@ describe("analytics service", () => {
     expect(sitesRepo.createAnalyticsSite).not.toHaveBeenCalled();
   });
 
-  it("queries the selected site's PostgreSQL summary for its owner and admin", async () => {
-    vi.mocked(eventsRepo.getAnalyticsTrafficSummary).mockResolvedValue({ views: 100, visitors: 25, visits: 40 });
-    await expect(getAnalyticsOverviewForSite(10, { id: 1, role: "user" })).resolves.toEqual({ period: "7d", views: 100, visitors: 25, visits: 40 });
-    await getAnalyticsOverviewForSite(10, { id: 99, role: "admin" });
-    expect(eventsRepo.getAnalyticsTrafficSummary).toHaveBeenNthCalledWith(1, 10, 7);
-    expect(eventsRepo.getAnalyticsTrafficSummary).toHaveBeenNthCalledWith(2, 10, 7);
+  it("loads the traffic report for an owner and an admin", async () => {
+    vi.mocked(eventsRepo.getAnalyticsTrafficReport).mockResolvedValue(trafficReport);
+    await expect(getAnalyticsTrafficForSite(10, { id: 1, role: "user" }, "Asia/Tokyo")).resolves.toEqual(trafficReport);
+    await getAnalyticsTrafficForSite(10, { id: 99, role: "admin" }, "Asia/Tokyo");
+    expect(eventsRepo.getAnalyticsTrafficReport).toHaveBeenNthCalledWith(1, 10, "Asia/Tokyo");
+    expect(eventsRepo.getAnalyticsTrafficReport).toHaveBeenNthCalledWith(2, 10, "Asia/Tokyo");
   });
 
-  it("blocks foreign sites before querying PostgreSQL and reports missing sites", async () => {
-    await expect(getAnalyticsOverviewForSite(10, { id: 2, role: "user" })).rejects.toBeInstanceOf(AnalyticsSiteError);
-    expect(eventsRepo.getAnalyticsTrafficSummary).not.toHaveBeenCalled();
+  it("blocks foreign sites before querying events and reports missing sites", async () => {
+    await expect(getAnalyticsTrafficForSite(10, { id: 2, role: "user" }, "UTC")).rejects.toMatchObject({ code: "forbidden" });
+    expect(eventsRepo.getAnalyticsTrafficReport).not.toHaveBeenCalled();
     vi.mocked(sitesRepo.getAnalyticsSiteById).mockResolvedValue(undefined);
-    await expect(getAnalyticsOverviewForSite(99, { id: 2, role: "user" })).rejects.toMatchObject({ code: "not_found" });
+    await expect(getAnalyticsTrafficForSite(99, { id: 2, role: "user" }, "UTC")).rejects.toMatchObject({ code: "not_found" });
+    expect(eventsRepo.getAnalyticsTrafficReport).not.toHaveBeenCalled();
   });
 
-  it("returns mock totals without querying PostgreSQL", async () => {
-    vi.mocked(isMockMode).mockReturnValue(true);
-    await expect(getAnalyticsOverviewForSite(10, { id: 1, role: "admin" })).resolves.toEqual({ period: "7d", views: 12_842, visitors: 2_931, visits: 4_102 });
-    expect(eventsRepo.getAnalyticsTrafficSummary).not.toHaveBeenCalled();
+  it.each(["Not/AZone", "../../etc", "x".repeat(101)])("rejects invalid timezone %s", async (timezone) => {
+    await expect(getAnalyticsTrafficForSite(10, { id: 1, role: "user" }, timezone)).rejects.toMatchObject({ code: "invalid_input" });
+    expect(eventsRepo.getAnalyticsTrafficReport).not.toHaveBeenCalled();
+  });
+
+  it("propagates a traffic repository failure for the route to map", async () => {
+    vi.mocked(eventsRepo.getAnalyticsTrafficReport).mockRejectedValue(new Error("database details"));
+    await expect(getAnalyticsTrafficForSite(10, { id: 1, role: "user" }, "UTC")).rejects.toThrow("database details");
   });
 
   it("returns an escaped installation snippet to the owner and admin", async () => {

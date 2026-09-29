@@ -31,7 +31,7 @@ import { getTopContent } from "../lib/services/top-content";
 import { SyncTelemetry } from "../lib/application/usecases/SyncTelemetry";
 import { createUser } from "../lib/services/users";
 import { createAnalyticsSite, getAnalyticsSiteById, getAnalyticsSiteByKey, getAnalyticsSites } from "../lib/repositories/analytics-sites";
-import { getAnalyticsTrafficSummary, insertAnalyticsEvent } from "../lib/repositories/analytics-events";
+import { getAnalyticsTrafficReport, insertAnalyticsEvent } from "../lib/repositories/analytics-events";
 import { ensureAnalyticsSiteConstraints } from "../lib/setup";
 
 beforeAll(async () => {
@@ -184,22 +184,80 @@ describe("analytics site queries", () => {
 });
 
 describe("analytics event queries", () => {
-  it("stores events, scopes summaries to a site and time window, and creates only the site-time index", async () => {
+  it("builds timezone-aware summaries, zero-filled timelines, and deterministic top pages per site", async () => {
     const suffix = Date.now();
     const owner = await usersQ.insertUser({ username: `analytics_events_${suffix}`, password_hash: "hash", role: "user" });
     const otherOwner = await usersQ.insertUser({ username: `analytics_events_other_${suffix}`, password_hash: "hash", role: "user" });
     const site = await createAnalyticsSite({ owner_id: owner.id, name: "Event Site", site_key: `123e4567-e89b-42d3-a456-${String(suffix).slice(-12).padStart(12, "0")}`, host: "events.example" });
     const otherSite = await createAnalyticsSite({ owner_id: otherOwner.id, name: "Other Site", site_key: `223e4567-e89b-42d3-a456-${String(suffix).slice(-12).padStart(12, "0")}`, host: "other.example" });
+    const reportSite = await createAnalyticsSite({ owner_id: owner.id, name: "Report Site", site_key: `323e4567-e89b-42d3-a456-${String(suffix + 1).slice(-12).padStart(12, "0")}`, host: "report.example" });
     expect(await getAnalyticsSiteByKey(site.site_key)).toMatchObject({ id: site.id });
     const event = { site_id: site.id, path: "/", referrer_host: "", os: "Other", browser: "Other", country: "Unknown", device_type: "Desktop", visitor: false, visit: false };
     await insertAnalyticsEvent({ ...event, visitor: true, visit: true });
-    await insertAnalyticsEvent({ ...event, visitor: false, visit: true });
     await insertAnalyticsEvent({ ...event, visitor: false, visit: false });
-    await insertAnalyticsEvent({ ...event, site_id: otherSite.id, visitor: true, visit: true });
-    await getTestPool().query("INSERT INTO analytics_events(site_id, path, os, browser, country, device_type, visitor, visit, recorded_at) VALUES ($1, '/old', 'Other', 'Other', 'Unknown', 'Desktop', TRUE, TRUE, NOW() - INTERVAL '8 days')", [site.id]);
+    await insertAnalyticsEvent({ ...event, visitor: false, visit: true });
+    const summary = await getAnalyticsTrafficReport(site.id, "UTC");
+    expect(summary.overview).toEqual({ views: 3, visitors: 1, visits: 2 });
+    expect(summary.period).toEqual({ days: 7, timezone: "UTC" });
+    expect(summary.timeline).toHaveLength(7);
+    expect(summary.timeline.map((point) => point.date)).toEqual([...summary.timeline.map((point) => point.date)].sort());
+    expect(summary.timeline.reduce((total, point) => total + point.views, 0)).toBe(summary.overview.views);
+    expect(summary.timeline.reduce((total, point) => total + point.visitors, 0)).toBe(summary.overview.visitors);
+    expect(summary.timeline.reduce((total, point) => total + point.visits, 0)).toBe(summary.overview.visits);
+    expect(summary.topPages).toEqual([{ path: "/", views: 3 }]);
+    expect(Object.keys(summary.topPages[0]).sort()).toEqual(["path", "views"]);
 
-    await expect(getAnalyticsTrafficSummary(site.id, 7)).resolves.toEqual({ views: 3, visitors: 1, visits: 2 });
-    await expect(getAnalyticsTrafficSummary(otherSite.id, 7)).resolves.toEqual({ views: 1, visitors: 1, visits: 1 });
+    const insertAtTokyoDay = async (siteId: number, path: string, daysAgo: number, visitor = false, visit = false) => {
+      await getTestPool().query(`
+        INSERT INTO analytics_events(site_id, path, referrer_host, os, browser, country, device_type, visitor, visit, recorded_at)
+        SELECT $1, $2, '', 'Other', 'Other', 'Unknown', 'Desktop', $4, $5,
+          ((((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')::date - $3::integer)::timestamp) AT TIME ZONE 'Asia/Tokyo') + INTERVAL '12 hours'
+      `, [siteId, path, daysAgo, visitor, visit]);
+    };
+    const reportEvents = { site_id: reportSite.id, path: "/a", referrer_host: "", os: "Other", browser: "Other", country: "Unknown", device_type: "Desktop", visitor: false, visit: false };
+    for (let index = 0; index < 10; index += 1) await insertAnalyticsEvent(reportEvents);
+    for (let index = 0; index < 5; index += 1) await insertAnalyticsEvent({ ...reportEvents, path: "/b", visitor: index === 0, visit: index === 0 });
+    for (let index = 0; index < 5; index += 1) await insertAnalyticsEvent({ ...reportEvents, path: "/c" });
+    for (const path of ["/d", "/e", "/f", "/g", "/h", "/i", "/j", "/k", "/l"]) {
+      await insertAnalyticsEvent({ ...reportEvents, path });
+    }
+    await insertAtTokyoDay(reportSite.id, "/two-days-ago", 2);
+    await insertAtTokyoDay(reportSite.id, "/eight-days-ago", 8, true, true);
+    const otherEvents = { site_id: otherSite.id, path: "/path-b", referrer_host: "", os: "Other", browser: "Other", country: "Unknown", device_type: "Desktop", visitor: false, visit: false };
+    for (let index = 0; index < 20; index += 1) await insertAnalyticsEvent(otherEvents);
+
+    const { rows: [clock] } = await getTestPool().query(`
+      SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')::date::text AS tokyo_today,
+        (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date::text AS utc_today
+    `);
+    const tokyoReport = await getAnalyticsTrafficReport(reportSite.id, "Asia/Tokyo");
+    expect(tokyoReport.period).toEqual({ days: 7, timezone: "Asia/Tokyo" });
+    expect(tokyoReport.timeline).toHaveLength(7);
+    expect(tokyoReport.timeline.at(-1)?.date).toBe(clock.tokyo_today);
+    expect(tokyoReport.timeline.filter((point) => point.views === 0)).toHaveLength(5);
+    expect(tokyoReport.timeline.find((point) => point.date === tokyoReport.timeline.at(-3)?.date)?.views).toBe(1);
+    expect(tokyoReport.overview.views).toBe(30);
+    expect(tokyoReport.topPages).toHaveLength(10);
+    expect(tokyoReport.topPages.slice(0, 3)).toEqual([
+      { path: "/a", views: 10 }, { path: "/b", views: 5 }, { path: "/c", views: 5 },
+    ]);
+    expect(tokyoReport.topPages.map((page) => page.path)).toEqual([
+      "/a", "/b", "/c", "/d", "/e", "/f", "/g", "/h", "/i", "/j",
+    ]);
+    expect(tokyoReport.timeline.reduce((total, point) => total + point.views, 0)).toBe(tokyoReport.overview.views);
+    expect(tokyoReport.timeline.reduce((total, point) => total + point.visitors, 0)).toBe(tokyoReport.overview.visitors);
+    expect(tokyoReport.timeline.reduce((total, point) => total + point.visits, 0)).toBe(tokyoReport.overview.visits);
+    expect(tokyoReport.topPages.map((page) => page.path)).not.toContain("/eight-days-ago");
+    expect(tokyoReport.topPages.map((page) => page.path)).not.toContain("/path-b");
+    expect(tokyoReport.topPages.every((page) => Object.keys(page).sort().join(",") === "path,views")).toBe(true);
+    const utcReport = await getAnalyticsTrafficReport(reportSite.id, "UTC");
+    expect(utcReport.timeline.at(-1)?.date).toBe(clock.utc_today);
+    expect(utcReport.overview.views).toBe(30);
+    const otherReport = await getAnalyticsTrafficReport(otherSite.id, "Asia/Tokyo");
+    expect(otherReport.overview.views).toBe(20);
+    expect(otherReport.timeline.reduce((total, point) => total + point.views, 0)).toBe(20);
+    expect(otherReport.topPages).toEqual([{ path: "/path-b", views: 20 }]);
+
     const indexes = await getTestPool().query("SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'analytics_events'");
     expect(indexes.rows.filter((row: { indexname: string }) => row.indexname !== "analytics_events_pkey")).toEqual([expect.objectContaining({
       indexname: "idx_analytics_events_site_recorded",
