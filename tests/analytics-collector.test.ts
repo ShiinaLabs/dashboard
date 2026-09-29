@@ -56,6 +56,28 @@ describe("analytics collector application service", () => {
     expect(stored).not.toContain("203.0.113.40");
   });
 
+  it.each([
+    {
+      label: "desktop",
+      userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126.0.0.0 Safari/537.36",
+      expected: { browser: "Chrome", os: "macOS", device_type: "Desktop" },
+    },
+    {
+      label: "mobile",
+      userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+      expected: { browser: "Mobile Safari", os: "iOS", device_type: "Mobile" },
+    },
+    {
+      label: "unknown",
+      userAgent: "Mozilla/5.0 (Unknown Platform)",
+      expected: { browser: "Other", os: "Other", device_type: "Desktop" },
+    },
+  ])("keeps browser, OS, and device normalization for $label user agents", async ({ userAgent, expected }) => {
+    await expect(collectAnalyticsEvent({ payload: validPayload, origin: "https://wifi-lens.app", userAgent }))
+      .resolves.toBe("recorded");
+    expect(insertAnalyticsEvent).toHaveBeenCalledWith(expect.objectContaining(expected));
+  });
+
   it("requires an existing site key and rejects payload or Origin host mismatches", async () => {
     getAnalyticsSiteByKey.mockResolvedValueOnce(undefined);
     await expect(collectAnalyticsEvent({ payload: validPayload, origin: "https://wifi-lens.app" }))

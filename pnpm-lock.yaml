@@ -158,8 +158,8 @@ importers:
         specifier: ^5.0.0
         version: 5.9.3
       ua-parser-js:
-        specifier: ^2.0.10
-        version: 2.0.10
+        specifier: ^1.0.41
+        version: 1.0.41
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -2633,9 +2633,6 @@ packages:
   deep-is@0.1.4:
     resolution: {integrity: sha512-oIPzksmTg4/MriiaYGO+okXDT7ztn/w3Eptv/+gSIdMdKsJo0u4CfYNFJPy+4SKMuCqGw2wxnA+URMg3t8a/bQ==}
 
-  detect-europe-js@0.1.2:
-    resolution: {integrity: sha512-lgdERlL3u0aUdHocoouzT10d9I89VVhk0qNRmll7mXdGfJT1/wqZ2ZLA4oJAjeACPY5fT1wsbq2AT+GkuInsow==}
-
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
@@ -3002,9 +2999,6 @@ packages:
   is-glob@4.0.3:
     resolution: {integrity: sha512-xelSayHH36ZgE7ZWhli7pW34hNbNl8Ojv5KVmkJD4hBdD3th8Tfk9vYasLM+mXWOZhFkgZfxhLSnrwRr4elSSg==}
     engines: {node: '>=0.10.0'}
-
-  is-standalone-pwa@0.1.1:
-    resolution: {integrity: sha512-9Cbovsa52vNQCjdXOzeQq5CnCbAcRk05aU62K20WO372NrTv0NxibLFCK6lQ4/iZEFdEA3p3t2VNOn8AJ53F5g==}
 
   isbot@5.2.1:
     resolution: {integrity: sha512-dJ+LpKyClQZ7NG+j3OensC/mAZkGpukE9YUrgPYvAZj2doVL0edfDgywTUh5CXa0o+nW9a1V9e5+CJTX8+SxRw==}
@@ -3597,11 +3591,8 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
-  ua-is-frozen@0.1.2:
-    resolution: {integrity: sha512-RwKDW2p3iyWn4UbaxpP2+VxwqXh0jpvdxsYpZ5j/MLLiQOfbsV5shpgQiw93+KMYQPcteeMQ289MaAFzs3G9pw==}
-
-  ua-parser-js@2.0.10:
-    resolution: {integrity: sha512-t+3Ktbq0Ies2vaSezfOaWiolH4OigQIO1dk+1xDpOydB1COVPocVYOrEV5rqZ0kFY9XYG1v9LutCyMgYBpABcw==}
+  ua-parser-js@1.0.41:
+    resolution: {integrity: sha512-LbBDqdIC5s8iROCUjMbW1f5dJQTEFB1+KO9ogbvlb3nm9n4YHa5p4KTvFPWvh2Hs8gZMBuiB1/8+pdfe/tDPug==}
     hasBin: true
 
   undici-types@8.3.0:
@@ -5910,8 +5901,6 @@ snapshots:
 
   deep-is@0.1.4: {}
 
-  detect-europe-js@0.1.2: {}
-
   detect-libc@2.1.2: {}
 
   detect-node-es@1.1.0: {}
@@ -6279,8 +6268,6 @@ snapshots:
   is-glob@4.0.3:
     dependencies:
       is-extglob: 2.1.1
-
-  is-standalone-pwa@0.1.1: {}
 
   isbot@5.2.1: {}
 
@@ -6816,13 +6803,7 @@ snapshots:
 
   typescript@5.9.3: {}
 
-  ua-is-frozen@0.1.2: {}
-
-  ua-parser-js@2.0.10:
-    dependencies:
-      detect-europe-js: 0.1.2
-      is-standalone-pwa: 0.1.1
-      ua-is-frozen: 0.1.2
+  ua-parser-js@1.0.41: {}
 
   undici-types@8.3.0: {}
 
