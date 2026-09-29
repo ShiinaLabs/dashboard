@@ -3,12 +3,17 @@ import { useTranslation } from "react-i18next";
 import { useTheme } from "@/components/useTheme";
 import { themes, type Theme, type ThemeSettings } from "@/lib/client/themes";
 import { api } from "@/lib/api";
-import { getTimezone, setTimezone } from "@/lib/client/datetime";
+import { getTimezone, setTimezone as saveTimezone } from "@/lib/client/datetime";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { validatePassword } from "@/lib/client/validatePassword";
 import { PasswordHints } from "@/components/ui/PasswordHints";
-import { Alert, Button, PasswordInput, SegmentedControl, Select, TextInput } from "@/components/ui/form-controls";
+import { PasswordInput, SegmentedControl, TextInput } from "@/components/ui/form-controls";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LoaderCircle } from "lucide-react";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 
 const titleKey = "nav.settings" satisfies PageTitleKey;
@@ -28,6 +33,7 @@ export default function Settings() {
   const [pwError, setPwError] = useState("");
   const [pwSuccess, setPwSuccess] = useState("");
   const [pwLoading, setPwLoading] = useState(false);
+  const [timezone, setTimezone] = useState(getTimezone);
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
   const pwRules = validatePassword(newPw).rules;
@@ -80,7 +86,6 @@ export default function Settings() {
     dark: t("settings.modeDark"),
   };
 
-  const tz = getTimezone();
   const COMMON_TIMEZONES = [
     "Asia/Shanghai",
     "Asia/Tokyo",
@@ -127,11 +132,13 @@ export default function Settings() {
       <section className="space-y-4 rounded-lg border bg-card p-5">
         <h3 className="text-sm font-semibold flex items-center gap-1.5"><Clock size={14} /> {t("settings.timezone")}</h3>
         <div>
-          <Select
-            value={tz}
-            onChange={(value) => { if (value) setTimezone(value); }}
-            data={COMMON_TIMEZONES.map((zone) => ({ value: zone, label: zone.replace(/_/g, " ") }))}
-            searchable
+          <SearchableSelect
+            value={timezone}
+            onValueChange={(nextTimezone) => { setTimezone(nextTimezone); saveTimezone(nextTimezone); }}
+            options={COMMON_TIMEZONES.map((zone) => ({ value: zone, label: zone.replace(/_/g, " ") }))}
+            searchPlaceholder={t("settings.searchTimezone")}
+            emptyMessage={t("settings.noTimezoneResults")}
+            aria-label={t("settings.timezone")}
           />
           <p className="text-xs text-[var(--muted-foreground)] mt-2">{t("settings.timezoneHint")}</p>
         </div>
@@ -161,13 +168,10 @@ export default function Settings() {
               />
               {pwMismatch && <p className="text-xs text-[var(--danger)] mt-1">{t("settings.passwordsDontMatch")}</p>}
             </div>
-            {pwError && <Alert color="danger" variant="light">{pwError}</Alert>}
-            {pwSuccess && <Alert color="success" variant="light">{pwSuccess}</Alert>}
-            <Button
-              type="submit" disabled={pwLoading}
-              loading={pwLoading}
-              className="sm:self-start"
-            >
+            {pwError && <Alert variant="destructive"><AlertDescription>{pwError}</AlertDescription></Alert>}
+            {pwSuccess && <Alert className="border-green-500/30 bg-green-500/10 text-green-800 dark:text-green-300"><AlertDescription>{pwSuccess}</AlertDescription></Alert>}
+            <Button type="submit" disabled={pwLoading} className="sm:self-start">
+              {pwLoading && <LoaderCircle className="animate-spin" aria-hidden="true" />}
               {t("settings.changePassword")}
             </Button>
           </form>
@@ -289,12 +293,10 @@ function ThemeSelect({
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
       <span className="text-sm text-[var(--muted-foreground)] sm:w-24 sm:shrink-0">{label}</span>
-      <Select
-        value={value}
-        onChange={(next) => { if (next) onChange(next); }}
-        data={options.map((theme) => ({ value: theme.id, label: theme.name }))}
-        className="flex-1"
-      />
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="flex-1" aria-label={label}><SelectValue /></SelectTrigger>
+        <SelectContent>{options.map((theme) => <SelectItem key={theme.id} value={theme.id}>{theme.name}</SelectItem>)}</SelectContent>
+      </Select>
     </div>
   );
 }

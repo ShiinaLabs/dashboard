@@ -525,6 +525,8 @@
     "darkTheme": "Dark theme",
     "theme": "Theme",
     "timezone": "Timezone",
+    "searchTimezone": "Search timezones...",
+    "noTimezoneResults": "No timezones found.",
     "timezoneHint": "Dates on this page will use the selected timezone.",
     "autoSchedule": "Auto · L0 24h / L1 90m / L2 8h"
   },

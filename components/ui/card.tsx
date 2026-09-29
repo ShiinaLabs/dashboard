@@ -8,12 +8,26 @@ type CardProps = React.ComponentProps<'div'> & {
 };
 
 function paddingClass(p: CardProps['p']) {
-  const size = (value: NonNullable<CardProps['p']>) => typeof value === 'number' ? `p-[${value}px]` : ({ xs: 'p-2', sm: 'p-3', md: 'p-4', lg: 'p-6', xl: 'p-8' }[value as 'xs' | 'sm' | 'md' | 'lg' | 'xl']);
-  if (typeof p === 'object') return cn(p.base !== undefined && size(p.base), p.sm !== undefined && `sm:${size(p.sm)}`);
-  return p !== undefined ? size(p) : undefined;
+  const classes = { xs: 'p-2', sm: 'p-3', md: 'p-4', lg: 'p-6', xl: 'p-8' } as const;
+  const responsiveClasses = { xs: 'sm:p-2', sm: 'sm:p-3', md: 'sm:p-4', lg: 'sm:p-6', xl: 'sm:p-8' } as const;
+  if (typeof p === 'object') return cn(
+    p.base !== undefined && typeof p.base === 'string' && classes[p.base],
+    p.sm !== undefined && typeof p.sm === 'string' && responsiveClasses[p.sm],
+    (typeof p.base === 'number' || typeof p.sm === 'number') && 'ui-card-responsive-padding',
+  );
+  return typeof p === 'string' ? classes[p] : p !== undefined ? 'ui-card-responsive-padding' : undefined;
 }
 
-function Card({ className, withBorder = true, radius = 'xl', p, ...props }: CardProps) {
+function paddingStyle(p: CardProps['p']) {
+  if (typeof p === 'number') return { padding: p };
+  if (!p || typeof p !== 'object') return undefined;
+  return {
+    ...(typeof p.base === 'number' ? { '--card-padding-base': `${p.base}px` } : {}),
+    ...(typeof p.sm === 'number' ? { '--card-padding-sm': `${p.sm}px` } : {}),
+  } as React.CSSProperties;
+}
+
+function Card({ className, withBorder = true, radius = 'xl', p, style, ...props }: CardProps) {
   return (
     <div
       data-slot='card'
@@ -24,6 +38,7 @@ function Card({ className, withBorder = true, radius = 'xl', p, ...props }: Card
         paddingClass(p),
         className
       )}
+      style={{ ...paddingStyle(p), ...style }}
       {...props}
     />
   )

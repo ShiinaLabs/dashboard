@@ -525,6 +525,8 @@
     "darkTheme": "深色主题",
     "theme": "主题",
     "timezone": "时区",
+    "searchTimezone": "搜索时区…",
+    "noTimezoneResults": "没有匹配的时区。",
     "timezoneHint": "此页面的日期将使用所选的时区。",
     "autoSchedule": "自动 · L0 24小时 / L1 90分钟 / L2 8小时"
   },
