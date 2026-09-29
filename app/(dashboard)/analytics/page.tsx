@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AnalyticsDimensionCard } from "@/components/domain/analytics/AnalyticsDimensionCard";
+import { AnalyticsWorldMap } from "@/components/domain/analytics/AnalyticsWorldMap";
 import { ChartCard } from "@/components/domain/shared/ChartCard";
 import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";
@@ -169,6 +170,19 @@ export default function WebAnalyticsPage() {
           ) : <div className="flex h-[210px] items-center justify-center text-sm text-muted-foreground">{t("common.loading")}</div>}
         </ChartCard>
 
+        {traffic ? <ChartCard title={t("analytics.visitorGeography")}>
+          <AnalyticsWorldMap
+            countries={dimensionData?.countries ?? []}
+            totalViews={totalViews}
+            locale={countryLocale}
+            title={t("analytics.visitorGeography")}
+            emptyMessage={t("analytics.noGeographicData")}
+            lessLabel={t("analytics.less")}
+            moreLabel={t("analytics.more")}
+            viewsLabel={t("analytics.views")}
+          />
+        </ChartCard> : null}
+
         <div className="grid min-w-0 gap-4 lg:grid-cols-2">
           <AnalyticsDimensionCard
             {...dimensionCardLabels}
@@ -196,7 +210,7 @@ export default function WebAnalyticsPage() {
             title={t("analytics.countries")}
             itemLabel={t("analytics.country")}
             emptyMessage={t("analytics.noCountryData")}
-            items={(dimensionData?.countries ?? []).map((item) => ({
+            items={(dimensionData?.countries ?? []).slice(0, 10).map((item) => ({
               key: item.country,
               label: countryLabel(item.country, countryLocale, t("analytics.unknown")),
               title: item.country,

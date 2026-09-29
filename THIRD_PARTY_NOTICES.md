@@ -29,3 +29,14 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Natural Earth
+
+The local country geometry in `components/domain/analytics/world-map/countries.json` is derived from Natural Earth 1:110m Admin 0 Countries, using the `ISO_A2_EH` identifier where it is a two-letter code. Upstream geometry is retained without boundary edits; unrelated source properties were removed to reduce the browser asset size.
+
+Natural Earth data is in the public domain. Attribution is provided here as a courtesy.
+
+Natural Earth, 1:110m Admin 0 Countries
+Public domain
+https://www.naturalearthdata.com/downloads/110m-cultural-vectors/110m-admin-0-countries/
+Upstream source snapshot: https://github.com/nvkelso/natural-earth-vector/tree/ca96624a56bd078437bca8184e78163e5039ad19

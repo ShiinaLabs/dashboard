@@ -214,7 +214,6 @@ export async function getAnalyticsTrafficReport(siteId: number, timezone: string
       FROM scoped_events
       GROUP BY country
       ORDER BY COUNT(*) DESC, country ASC
-      LIMIT 10
     ),
     top_browsers AS (
       SELECT browser, COUNT(*)::int AS views
