@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { analyticsPublicOrigin } from "../lib/config";
-import { createAnalyticsSite, getAnalyticsAcquisitionForSite, getAnalyticsInstallationForSite, getAnalyticsTrafficForSite, getAnalyticsSites } from "../lib/services/analytics";
+import { createAnalyticsSite, getAnalyticsAcquisitionForSite, getAnalyticsDashboardForSite, getAnalyticsInstallationForSite, getAnalyticsTrafficForSite, getAnalyticsSites } from "../lib/services/analytics";
 import * as sitesRepo from "../lib/repositories/analytics-sites";
 import * as eventsRepo from "../lib/repositories/analytics-events";
 
@@ -8,7 +8,7 @@ vi.mock("../lib/config", () => ({ analyticsPublicOrigin: vi.fn() }));
 vi.mock("../lib/repositories/analytics-sites", () => ({
   getAnalyticsSites: vi.fn(), getAnalyticsSiteById: vi.fn(), getAnalyticsSiteByKey: vi.fn(), createAnalyticsSite: vi.fn(),
 }));
-vi.mock("../lib/repositories/analytics-events", () => ({ insertAnalyticsEvent: vi.fn(), getAnalyticsTrafficReport: vi.fn(), getAnalyticsAcquisitionReport: vi.fn() }));
+vi.mock("../lib/repositories/analytics-events", () => ({ insertAnalyticsEvent: vi.fn(), getAnalyticsTrafficReport: vi.fn(), getAnalyticsAcquisitionReport: vi.fn(), getAnalyticsDashboardReport: vi.fn() }));
 
 const siteA = { id: 10, owner_id: 1, name: "A", site_key: "site-a", host: "a.example", created_at: "now", updated_at: "now", deleted_at: null };
 const trafficReport = {
@@ -85,6 +85,30 @@ describe("analytics service", () => {
   it("blocks foreign acquisition access before querying the repository", async () => {
     await expect(getAnalyticsAcquisitionForSite(10, { id: 2, role: "user" }, "UTC")).rejects.toMatchObject({ code: "forbidden" });
     expect(eventsRepo.getAnalyticsAcquisitionReport).not.toHaveBeenCalled();
+  });
+
+  it.each([7, 30, 90])("loads the %i-day dashboard for an authorized site", async (days) => {
+    const report = { period: { days, timezone: "Asia/Tokyo", startDate: "2026-09-01", endDate: "2026-09-30" } } as never;
+    vi.mocked(eventsRepo.getAnalyticsDashboardReport).mockResolvedValue(report);
+    await expect(getAnalyticsDashboardForSite(10, { id: 1, role: "user" }, "Asia/Tokyo", days)).resolves.toBe(report);
+    expect(eventsRepo.getAnalyticsDashboardReport).toHaveBeenCalledWith(10, "Asia/Tokyo", days);
+  });
+
+  it("allows an admin to load a dashboard regardless of site ownership", async () => {
+    vi.mocked(eventsRepo.getAnalyticsDashboardReport).mockResolvedValue({} as never);
+    await expect(getAnalyticsDashboardForSite(10, { id: 99, role: "admin" }, "UTC", 7)).resolves.toEqual({});
+    expect(eventsRepo.getAnalyticsDashboardReport).toHaveBeenCalledWith(10, "UTC", 7);
+  });
+
+  it("rejects unsupported dashboard ranges and invalid timezones before querying the repository", async () => {
+    await expect(getAnalyticsDashboardForSite(10, { id: 1, role: "user" }, "UTC", 14)).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(getAnalyticsDashboardForSite(10, { id: 1, role: "user" }, "Not/AZone", 7)).rejects.toMatchObject({ code: "invalid_input" });
+    expect(eventsRepo.getAnalyticsDashboardReport).not.toHaveBeenCalled();
+  });
+
+  it("blocks foreign dashboard access before querying the repository", async () => {
+    await expect(getAnalyticsDashboardForSite(10, { id: 2, role: "user" }, "UTC", 7)).rejects.toMatchObject({ code: "forbidden" });
+    expect(eventsRepo.getAnalyticsDashboardReport).not.toHaveBeenCalled();
   });
 
   it("rejects missing sites and invalid acquisition timezones before querying the repository", async () => {

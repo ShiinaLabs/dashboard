@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getAnalyticsAcquisition } from "@/lib/client/analytics-graphql";
+import { getAnalyticsAcquisition, getAnalyticsDashboard } from "@/lib/client/analytics-graphql";
 import { GraphQLRequestError, graphqlRequest } from "@/lib/client/graphql";
 
 describe("GraphQL client helper", () => {
@@ -64,5 +64,27 @@ describe("GraphQL client helper", () => {
     expect(url).toBe("/api/graphql");
     expect(JSON.parse(String(init?.body))).toMatchObject({ variables: { siteId: 12, timezone: "Asia/Tokyo" } });
     expect(JSON.parse(String(init?.body)).query).toContain("acquisition");
+  });
+
+  it("loads the complete ranged dashboard through one GraphQL request", async () => {
+    const dashboard = {
+      period: { days: 30, timezone: "Asia/Tokyo", startDate: "2026-08-31", endDate: "2026-09-29" },
+      previousPeriod: { days: 30, timezone: "Asia/Tokyo", startDate: "2026-08-01", endDate: "2026-08-30" },
+      overview: { views: 12, visits: 4, visitorDays: 8 },
+      previousOverview: { views: 10, visits: 3, visitorDays: 7 },
+      timeline: [], topPages: [],
+      dimensions: { countries: [], browsers: [], operatingSystems: [], devices: [] },
+      acquisition: { totalVisits: 4, referrers: [], entryPages: [] },
+    };
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: { analytics: { dashboard } } })));
+    await expect(getAnalyticsDashboard(12, "DAYS_30", "Asia/Tokyo")).resolves.toEqual(dashboard);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = vi.mocked(fetch).mock.calls[0];
+    const body = JSON.parse(String(init?.body));
+    expect(url).toBe("/api/graphql");
+    expect(body.variables).toEqual({ siteId: 12, range: "DAYS_30", timezone: "Asia/Tokyo" });
+    expect(body.query).toContain("previousOverview { views visits visitorDays }");
+    expect(body.query).toContain("dimensions {");
+    expect(body.query).toContain("acquisition { totalVisits");
   });
 });

@@ -25,7 +25,7 @@ test("mock login keeps its session and opens the requested route", async ({ page
   });
 });
 
-test("Web Analytics adds and selects sites before showing 7-day metrics", async ({ page }) => {
+test("Web Analytics adds and selects sites, then switches the complete dashboard across ranges", async ({ page }) => {
   await logIn(page);
   await page.getByRole("link", { name: "Web Analytics" }).click();
   await expect(page).toHaveURL(/\/analytics$/);
@@ -55,11 +55,15 @@ test("Web Analytics adds and selects sites before showing 7-day metrics", async 
   await page.getByRole("option", { name: /Example Site/ }).click();
   await expect(page.getByText("Last 7 days")).toBeVisible();
   await expect(page.getByText("Views").first()).toBeVisible();
-  await expect(page.getByText("Visitors").first()).toBeVisible();
+  await expect(page.getByText("Average Daily Visitors").first()).toBeVisible();
   await expect(page.getByText("Visits").first()).toBeVisible();
   await expect(page.getByText("12,842")).toBeVisible();
-  await expect(page.getByText("2,931")).toBeVisible();
+  await expect(page.getByText("419")).toBeVisible();
   await expect(page.getByText("4,102")).toBeVisible();
+  await expect(page.getByText("+12.5% vs previous period")).toBeVisible();
+  await expect(page.getByText("+4.5% vs previous period")).toBeVisible();
+  await expect(page.getByText("+6.0% vs previous period")).toBeVisible();
+  await expect(page.getByText(/Infinity/)).toHaveCount(0);
   await expect(page.getByText("Traffic over time", { exact: true })).toBeVisible();
   await expect(page.getByRole("img", { name: "Traffic over time" })).toBeVisible();
   await expect(page.getByRole("group", { name: "Visitor geography" })).toBeVisible();
@@ -121,9 +125,30 @@ test("Web Analytics adds and selects sites before showing 7-day metrics", async 
   await expect(page.getByText("macOS", { exact: true })).toBeVisible();
   await expect(page.getByText("Desktop", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Tracking Setup" })).toBeVisible();
+
+  const thirtyDayResponse = page.waitForResponse((response) => {
+    if (!response.url().endsWith("/api/graphql") || response.request().method() !== "POST") return false;
+    return JSON.parse(response.request().postData() ?? "{}").variables?.range === "DAYS_30";
+  });
+  await page.getByRole("button", { name: "30D" }).click();
+  const thirtyDayData = await thirtyDayResponse;
+  expect((await thirtyDayData.json()).data.analytics.dashboard.timeline).toHaveLength(30);
+  await expect(page.getByText("Last 30 days")).toBeVisible();
+  await expect(page.getByRole("button", { name: "30D" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("Average Daily Visitors").first()).toBeVisible();
+
+  const ninetyDayResponse = page.waitForResponse((response) => {
+    if (!response.url().endsWith("/api/graphql") || response.request().method() !== "POST") return false;
+    return JSON.parse(response.request().postData() ?? "{}").variables?.range === "DAYS_90";
+  });
+  await page.getByRole("button", { name: "90D" }).click();
+  const ninetyDayData = await ninetyDayResponse;
+  expect((await ninetyDayData.json()).data.analytics.dashboard.timeline).toHaveLength(90);
+  await expect(page.getByText("Last 90 days")).toBeVisible();
+  await expect(page.getByRole("button", { name: "90D" })).toHaveAttribute("aria-pressed", "true");
 });
 
-test("acquisition failures stay local to the acquisition section", async ({ page }) => {
+test("dashboard failures are reported while tracking setup remains available", async ({ page }) => {
   await logIn(page);
   await page.route("**/api/graphql", (route) => route.fulfill({
     status: 200,
@@ -131,22 +156,24 @@ test("acquisition failures stay local to the acquisition section", async ({ page
     body: JSON.stringify({ errors: [{ message: "Internal server error", extensions: { code: "INTERNAL_SERVER_ERROR" } }] }),
   }));
   await page.goto("/analytics");
-  await expect(page.getByText("Acquisition data unavailable")).toBeVisible();
-  await expect(page.getByRole("img", { name: "Traffic over time" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Top Pages", level: 2 })).toBeVisible();
-  await expect(page.getByRole("group", { name: "Visitor geography" })).toBeVisible();
+  await expect(page.getByText("Analytics data unavailable")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tracking Setup" })).toBeVisible();
 });
 
-test("acquisition shows separate empty states when the selected site has no visits", async ({ page }) => {
+test("dashboard shows separate acquisition empty states when the selected site has no visits", async ({ page }) => {
   await logIn(page);
   await page.route("**/api/graphql", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
-    body: JSON.stringify({ data: { analytics: { acquisition: {
-      period: { days: 7, timezone: "UTC" },
-      totalVisits: 0,
-      referrers: [],
-      entryPages: [],
+    body: JSON.stringify({ data: { analytics: { dashboard: {
+      period: { days: 7, timezone: "UTC", startDate: "2026-09-23", endDate: "2026-09-29" },
+      previousPeriod: { days: 7, timezone: "UTC", startDate: "2026-09-16", endDate: "2026-09-22" },
+      overview: { views: 0, visits: 0, visitorDays: 0 },
+      previousOverview: { views: 0, visits: 0, visitorDays: 0 },
+      timeline: Array.from({ length: 7 }, (_, i) => ({ date: `2026-09-${String(i + 23).padStart(2, "0")}`, views: 0, visitors: 0, visits: 0 })),
+      topPages: [],
+      dimensions: { countries: [], browsers: [], operatingSystems: [], devices: [] },
+      acquisition: { totalVisits: 0, referrers: [], entryPages: [] },
     } } } }),
   }));
   await page.goto("/analytics");

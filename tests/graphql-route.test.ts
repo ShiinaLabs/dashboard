@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getAnalyticsSites: vi.fn(),
   getAnalyticsTrafficForSite: vi.fn(),
   getAnalyticsAcquisitionForSite: vi.fn(),
+  getAnalyticsDashboardForSite: vi.fn(),
 }));
 
 vi.mock("@/lib/auth-helpers", () => ({
@@ -61,6 +62,23 @@ const acquisitionQuery = /* GraphQL */ `
         totalVisits
         referrers { referrer visits }
         entryPages { path visits }
+      }
+    }
+  }
+`;
+
+const dashboardQuery = /* GraphQL */ `
+  query AnalyticsDashboard($siteId: Int!, $range: AnalyticsRange!, $timezone: String!) {
+    analytics {
+      dashboard(siteId: $siteId, range: $range, timezone: $timezone) {
+        period { days timezone startDate endDate }
+        previousPeriod { days timezone startDate endDate }
+        overview { views visits visitorDays }
+        previousOverview { views visits visitorDays }
+        timeline { date views visitors visits }
+        topPages { path views }
+        dimensions { countries { country views } browsers { browser views } operatingSystems { os views } devices { device views } }
+        acquisition { totalVisits referrers { referrer visits } entryPages { path visits } }
       }
     }
   }
@@ -207,5 +225,36 @@ describe("authenticated GraphQL route", () => {
     mocks.getAnalyticsAcquisitionForSite.mockRejectedValueOnce(new AnalyticsSiteError("invalid_input"));
     const invalidTimezone = await routeCall(graphqlAction, request(acquisitionQuery, { siteId: 12, timezone: "Not/AZone" }));
     expect((await invalidTimezone.json()).errors[0].extensions.code).toBe("BAD_USER_INPUT");
+  });
+
+  it.each([["DAYS_7", 7], ["DAYS_30", 30], ["DAYS_90", 90]] as const)("maps %s to %i service days", async (range, days) => {
+    authAs(7, "user");
+    const dashboard = {
+      period: { days, timezone: "Asia/Tokyo", startDate: "2026-09-01", endDate: "2026-09-30" },
+      previousPeriod: { days, timezone: "Asia/Tokyo", startDate: "2026-08-02", endDate: "2026-08-31" },
+      overview: { views: 18, visits: 4, visitorDays: 12 },
+      previousOverview: { views: 15, visits: 3, visitorDays: 10 },
+      timeline: [], topPages: [], dimensions: { countries: [], browsers: [], operatingSystems: [], devices: [] },
+      acquisition: { totalVisits: 4, referrers: [], entryPages: [] },
+    };
+    mocks.getAnalyticsDashboardForSite.mockResolvedValueOnce(dashboard);
+    const response = await routeCall(graphqlAction, request(dashboardQuery, { siteId: 12, range, timezone: "Asia/Tokyo" }));
+    await expect(response.json()).resolves.toEqual({ data: { analytics: { dashboard } } });
+    expect(mocks.getAnalyticsDashboardForSite).toHaveBeenCalledWith(12, { id: 7, role: "user" }, "Asia/Tokyo", days);
+  });
+
+  it("rejects a dashboard range outside the public enum", async () => {
+    authAs();
+    const response = await routeCall(graphqlAction, request(dashboardQuery, { siteId: 12, range: "DAYS_14", timezone: "UTC" }));
+    expect((await response.json()).errors[0].message).toContain("DAYS_14");
+    expect(mocks.getAnalyticsDashboardForSite).not.toHaveBeenCalled();
+  });
+
+  it("defaults dashboard queries to seven UTC days", async () => {
+    authAs(7, "user");
+    mocks.getAnalyticsDashboardForSite.mockResolvedValueOnce({ overview: { visitorDays: 2 } } as never);
+    const response = await routeCall(graphqlAction, request("{ analytics { dashboard(siteId: 12) { overview { visitorDays } } } }"));
+    await expect(response.json()).resolves.toEqual({ data: { analytics: { dashboard: { overview: { visitorDays: 2 } } } } });
+    expect(mocks.getAnalyticsDashboardForSite).toHaveBeenCalledWith(12, { id: 7, role: "user" }, "UTC", 7);
   });
 });

@@ -47,6 +47,10 @@ describe("GraphQL dependency boundary", () => {
     expect(analytics).toContain("getAnalyticsTrafficForSite(");
     expect(analytics).toContain("getAnalyticsSites(");
     expect(analytics).toContain("getAnalyticsAcquisitionForSite(");
+    expect(analytics).toContain("getAnalyticsDashboardForSite(");
+    expect(analytics).toContain('case "DAYS_7": return 7');
+    expect(analytics).toContain('case "DAYS_30": return 30');
+    expect(analytics).toContain('case "DAYS_90": return 90');
   });
 
   it("keeps GraphQL browser requests on apiRequest", async () => {
@@ -61,5 +65,7 @@ describe("GraphQL dependency boundary", () => {
     expect(service).toContain("getAnalyticsAcquisitionReport(site.id, timezone)");
     expect(acquisitionClient).toContain('import { graphqlRequest } from "./graphql"');
     expect(acquisitionClient).not.toMatch(/\bfetch\s*\(|\bapiRequest\s*\(/);
+    expect(acquisitionClient).toContain("export async function getAnalyticsDashboard(");
+    expect(acquisitionClient).toContain("dashboard(siteId: $siteId, range: $range, timezone: $timezone)");
   });
 });

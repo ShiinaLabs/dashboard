@@ -31,7 +31,7 @@ import { getTopContent } from "../lib/services/top-content";
 import { SyncTelemetry } from "../lib/application/usecases/SyncTelemetry";
 import { createUser } from "../lib/services/users";
 import { createAnalyticsSite, getAnalyticsSiteById, getAnalyticsSiteByKey, getAnalyticsSites } from "../lib/repositories/analytics-sites";
-import { getAnalyticsAcquisitionReport, getAnalyticsTrafficReport, insertAnalyticsEvent } from "../lib/repositories/analytics-events";
+import { getAnalyticsAcquisitionReport, getAnalyticsDashboardReport, getAnalyticsTrafficReport, insertAnalyticsEvent } from "../lib/repositories/analytics-events";
 import { ensureAnalyticsSiteConstraints } from "../lib/setup";
 
 beforeAll(async () => {
@@ -445,6 +445,77 @@ describe("analytics event queries", () => {
       indexname: "idx_analytics_events_site_recorded",
       indexdef: expect.stringMatching(/\(site_id, recorded_at DESC\)/),
     })]);
+  });
+
+  it.each([7, 30, 90])("builds a %i-day dashboard with an equal previous period and one consistent current read", async (days) => {
+    const suffix = `${Date.now()}_${days}`;
+    const owner = await usersQ.insertUser({ username: `analytics_dashboard_${suffix}`, password_hash: "hash", role: "user" });
+    const site = await createAnalyticsSite({ owner_id: owner.id, name: "Dashboard", site_key: `dashboard-${suffix}`, host: `dashboard-${days}.example` });
+    const insertAtTokyoDay = async (path: string, daysAgo: number, visitor: boolean, visit: boolean, country: string) => {
+      await getTestPool().query(`
+        INSERT INTO analytics_events(site_id, path, referrer_host, os, browser, country, device_type, visitor, visit, recorded_at)
+        SELECT $1, $2, 'source.example', 'Other', 'Other', $5, 'Desktop', $3, $4,
+          ((((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')::date - $6::integer)::timestamp) AT TIME ZONE 'Asia/Tokyo') + INTERVAL '12 hours'
+      `, [site.id, path, visitor, visit, country, daysAgo]);
+    };
+    await insertAtTokyoDay("/current-today", 0, true, true, "JP");
+    await insertAtTokyoDay("/current-start", days - 1, true, false, "US");
+    await insertAtTokyoDay("/previous-end", days, true, true, "DE");
+    await insertAtTokyoDay("/previous-start", days * 2 - 1, false, false, "FR");
+    await insertAtTokyoDay("/outside", days * 2, true, true, "CN");
+    await getTestPool().query(`
+      INSERT INTO analytics_events(site_id, path, referrer_host, os, browser, country, device_type, visitor, visit, recorded_at)
+      SELECT $1::int, '/current-start-boundary', 'source.example', 'Other', 'Other', 'JP', 'Desktop', FALSE, FALSE,
+        (((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')::date - ($2::integer - 1))::timestamp AT TIME ZONE 'Asia/Tokyo')
+      UNION ALL
+      SELECT $1, '/previous-start-boundary', 'source.example', 'Other', 'Other', 'FR', 'Desktop', FALSE, FALSE,
+        (((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')::date - ($2::integer * 2 - 1))::timestamp AT TIME ZONE 'Asia/Tokyo')
+      UNION ALL
+      SELECT $1, '/current-end-exclusive', 'source.example', 'Other', 'Other', 'CN', 'Desktop', TRUE, TRUE,
+        ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')::date + 1)::timestamp AT TIME ZONE 'Asia/Tokyo'
+    `, [site.id, days]);
+
+    const report = await getAnalyticsDashboardReport(site.id, "Asia/Tokyo", days);
+    expect(report.period).toEqual({ days, timezone: "Asia/Tokyo", startDate: report.timeline[0].date, endDate: report.timeline.at(-1)?.date });
+    expect(report.previousPeriod.days).toBe(days);
+    expect(report.previousPeriod.timezone).toBe("Asia/Tokyo");
+    const shiftDate = (dateText: string, offset: number) => {
+      const date = new Date(`${dateText}T00:00:00.000Z`);
+      date.setUTCDate(date.getUTCDate() + offset);
+      return date.toISOString().slice(0, 10);
+    };
+    expect(shiftDate(report.period.startDate, days - 1)).toBe(report.period.endDate);
+    expect(shiftDate(report.previousPeriod.startDate, days - 1)).toBe(report.previousPeriod.endDate);
+    expect(shiftDate(report.previousPeriod.endDate, 1)).toBe(report.period.startDate);
+    expect(report.timeline).toHaveLength(days);
+    expect(report.timeline.map(({ date }) => date)).toEqual([...report.timeline.map(({ date }) => date)].sort());
+    expect(report.timeline.filter(({ views }) => views === 0)).toHaveLength(days - 2);
+    expect(report.overview).toEqual({ views: 3, visits: 1, visitorDays: 2 });
+    expect(report.previousOverview).toEqual({ views: 3, visits: 1, visitorDays: 1 });
+    expect(report.timeline.reduce((sum, point) => sum + point.visitors, 0)).toBe(2);
+    expect(report.topPages.map(({ path }) => path)).toEqual(["/current-start", "/current-start-boundary", "/current-today"]);
+    expect(report.dimensions.countries.map(({ country }) => country)).toEqual(["JP", "US"]);
+    expect(report.acquisition.totalVisits).toBe(report.overview.visits);
+    expect(report.acquisition.referrers).toEqual([{ referrer: "source.example", visits: 1 }]);
+    expect(report.acquisition.entryPages).toEqual([{ path: "/current-today", visits: 1 }]);
+  });
+
+  it("uses viewer-local inclusive dates for UTC and Tokyo reports", async () => {
+    const suffix = Date.now();
+    const owner = await usersQ.insertUser({ username: `analytics_timezone_${suffix}`, password_hash: "hash", role: "user" });
+    const site = await createAnalyticsSite({ owner_id: owner.id, name: "Timezone", site_key: `timezone-${suffix}`, host: "timezone.example" });
+    const { rows: [today] } = await getTestPool().query(`
+      SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date::text AS utc_today,
+        (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')::date::text AS tokyo_today
+    `);
+    for (const timezone of ["UTC", "Asia/Tokyo"]) {
+      const report = await getAnalyticsDashboardReport(site.id, timezone, 30);
+      const expectedToday = timezone === "UTC" ? today.utc_today : today.tokyo_today;
+      expect(report.period.endDate).toBe(expectedToday);
+      expect(report.timeline.at(-1)?.date).toBe(expectedToday);
+      expect(report.timeline).toHaveLength(30);
+      expect(report.timeline.every((point) => point.views === 0 && point.visitors === 0 && point.visits === 0)).toBe(true);
+    }
   });
 });
 

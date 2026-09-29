@@ -22,14 +22,15 @@ describe("Web Analytics boundaries", () => {
     expect(service).not.toMatch(/cloudflare-analytics|Analytics Engine/);
   });
 
-  it("loads page data only through the API client", () => {
+  it("loads one ranged dashboard GraphQL read model and keeps sites and installation on REST", () => {
     const page = readFileSync("app/(dashboard)/analytics/page.tsx", "utf8");
     const client = readFileSync("lib/api.ts", "utf8");
     expect(page).toContain("api.getAnalyticsSites");
-    expect(page).toContain("api.getAnalyticsTraffic(selectedSite!.id, timezone!)");
     expect(page).toContain("api.getAnalyticsInstallation(selectedSite!.id)");
-    expect(page).toContain("getAnalyticsAcquisition");
-    expect(page).toContain("getAnalyticsAcquisition(selectedSite!.id, timezone!)");
+    expect(page).toContain("getAnalyticsDashboard(selectedSite!.id, selectedRange, timezone!)");
+    expect(page).toContain('["analytics", "dashboard", selectedSite?.id, selectedRange, timezone]');
+    expect(page).not.toContain("api.getAnalyticsTraffic(");
+    expect(page).not.toContain("getAnalyticsAcquisition(");
     expect(page).not.toContain("dimensionData?.referrers");
     expect(page).not.toMatch(/\bfetch\s*\(/);
     expect(page).not.toMatch(/fetch\s*\(\s*[`"']\/api\/graphql/);
@@ -40,6 +41,9 @@ describe("Web Analytics boundaries", () => {
     expect(client).toContain("operatingSystems: AnalyticsOperatingSystemDimension[]");
     const graphqlClient = readFileSync("lib/client/analytics-graphql.ts", "utf8");
     expect(graphqlClient).toContain("graphqlRequest<");
+    expect(graphqlClient).toContain("export async function getAnalyticsDashboard");
+    expect(graphqlClient).toContain("previousOverview { views visits visitorDays }");
+    expect(graphqlClient).toContain("timeline { date views visitors visits }");
   });
 
   it("keeps the public collector as an HTTP adapter and the exact tracker file allow-listed", () => {
