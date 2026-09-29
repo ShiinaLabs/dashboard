@@ -54,6 +54,10 @@ Public API paths: `POST /auth/login`, `GET /auth/me`, `GET /reddit/callback`, `G
 
 ## Web Analytics
 
+### GraphQL query endpoint
+
+`GET` and `POST /graphql` (under the `/api` base path) provide an authenticated, query-only GraphQL view over analytics sites and traffic. The endpoint requires the existing session cookie; unauthenticated requests receive `401`. The GraphQL traffic resolver delegates ownership and timezone validation to the same service as the REST endpoint. GraphiQL is available only in development, batching is disabled, and mutations/subscriptions are not defined. Existing REST endpoints below remain supported. See [GraphQL Query Layer](GRAPHQL.md) for schema and example queries.
+
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/analytics/sites` | List sites owned by the current user; admins see all sites |
