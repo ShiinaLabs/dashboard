@@ -46,7 +46,7 @@ dashboard/
 │   ├── auth-middleware.server.ts  # Session/auth middleware + application readiness gate
 │   ├── providers.tsx           # QueryClientProvider + ThemeProvider + Sonner toaster
 │   ├── globals.css             # Tailwind v4 preflight, theme tokens and animations
-│   ├── (dashboard)/            # Dashboard layout + pages (overview, accounts, x, github, gitlab, reddit, settings, admin)
+│   ├── (dashboard)/            # Dashboard layout + pages (overview, analytics, accounts, x, github, gitlab, reddit, settings, admin)
 │   ├── login/                  # Login page
 │   ├── a/e/                    # Public analytics event route (validated by collector service)
 │   ├── api/                    # API route handlers, one file per endpoint

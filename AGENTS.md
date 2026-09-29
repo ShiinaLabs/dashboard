@@ -1,44 +1,24 @@
-# Dashboard
+# Dashboard Agent Guide
 
-Multi-platform data dashboard with web UI. Track activity and stats across X (Twitter), GitHub, GitLab, and Reddit — all in one place.
+Multi-platform dashboard for X, GitHub, GitLab, Reddit, and first-party Web Analytics.
 
-## Tech Stack
+## Project Context
 
-Node.js + pnpm + React Router 7 Framework Mode + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui + Drizzle ORM + PostgreSQL
-
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `pnpm run dev` | Start React Router dev server |
-| `pnpm run mock` | Dev server in mock/fixture mode (no DB needed) |
-| `pnpm run build` | Build client + server (memory-bounded passes) |
-| `pnpm run start` | Run the production server |
-| `pnpm run lint` | Run ESLint |
-| `pnpm run typecheck` | Run TypeScript type check |
-| `pnpm test` | Run the Vitest test suite |
+- **Runtime:** Node.js + pnpm + React Router 7 Framework Mode + React 19 + TypeScript
+- **UI:** Tailwind CSS v4 + shadcn/ui and Radix UI
+- **Data:** PostgreSQL + Drizzle ORM
+- **Commands:** `pnpm run dev`, `pnpm run mock`, `pnpm run build`, `pnpm run start`, `pnpm run lint`, `pnpm run typecheck`, `pnpm test`, `pnpm test:e2e`, `pnpm license:check`
 
 ## Context Routing
 
-Read the relevant resource only when the task needs it. Do not load everything up front.
+Read only the resource relevant to the task:
 
-- **Project overview & setup** — read [README.md](README.md)
-- **Human-facing documentation** — `docs/` (Architecture, Database, Frontend, API, Fetchers, Configuration, Deployment, Testing, Scripts, TODO, Issues)
-- **Behavior rules for agents** — read `.agents/COLLABORATION_RULES.md` before making commits, destructive changes, or new docs
-- **Implementation plans** — `.agents/plans/` (read when executing or updating a planned migration)
-- **Design specs** — `.agents/specs/` (read when implementing a designed feature)
-- **Framework/research evaluations** — `.agents/research/` (read before any framework migration decision)
+- [README](README.md) — product overview and quick start
+- [Human documentation index](docs/README.md) — all durable user and maintainer guides
+- [Collaboration rules](.agents/COLLABORATION_RULES.md) — required before commits, destructive changes, or new docs
+- `.agents/plans/` — current implementation plans, when executing one
+- `.agents/specs/` — design specifications, when implementing one
+- `.agents/research/` — agent-only evaluations and audit records
+- `.agents/archive/` — non-authoritative historical records; do not execute archived plans unless explicitly asked
 
-## Documentation Index
-
-- [Architecture](docs/ARCHITECTURE.md) — Tech stack, source layout, data flow, key patterns
-- [Database](docs/DATABASE.md) — Schema files, table definitions, migration process, conventions
-- [Frontend](docs/FRONTEND.md) — React architecture, routing, i18n, theming
-- [API Reference](docs/API.md) — REST endpoints (auth, users, accounts, per-platform data)
-- [Fetchers](docs/FETCHERS.md) — Platform fetcher internals, fetch flow, rate limiting, hardening
-- [Configuration](docs/CONFIGURATION.md) — Environment variables, database, proxy, logging
-- [Deployment](docs/DEPLOYMENT.md) — Docker, standalone, Kubernetes, reverse proxy
-- [Testing](docs/TESTING.md) — Test setup, coverage, how to add tests
-- [Scripts](docs/SCRIPTS.md) — Utility scripts (X data dump, fetch algorithm test)
-- [TODO](docs/TODO.md) — Feature backlog and completed items
-- [Issues](docs/ISSUES.md) — Known bugs, regressions, open issues
+Human-facing documentation belongs in `docs/`. Agent plans, specs, research, and archives belong in `.agents/`; do not write agent execution plans or scratchpads under `docs/`.

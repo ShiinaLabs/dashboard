@@ -27,7 +27,7 @@ app/
 ├── (dashboard)/
 │   ├── layout.tsx      # Dashboard shell: Layout + MockModeBanner
 │   ├── page.tsx        # Redirects / → /overview
-│   ├── overview/       # Cross-platform KPIs, pulse/health, top content and platform tabs
+│   ├── overview/       # Cross-platform KPIs, Web Analytics portfolio, pulse/health, top content and platform tabs
 │   ├── accounts/       # Account management
 │   ├── admin/          # User management (admin only)
 │   ├── settings/       # App settings
@@ -66,7 +66,8 @@ Routes are declared in `app/routes.ts` (React Router Framework Mode). All pages 
 |------|-------------|
 | `/login` | Login page (redirects to a validated `?from=` destination or `/overview`) |
 | `/` | Redirects to `/overview` |
-| `/overview` | Overview dashboard |
+| `/overview` | Cross-platform overview and Web Analytics portfolio summary |
+| `/analytics` | Site-level first-party Web Analytics dashboard |
 | `/accounts` | Account management |
 | `/x` | X account list |
 | `/x/:id` | X account detail |
