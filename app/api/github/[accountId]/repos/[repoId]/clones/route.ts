@@ -1,6 +1,6 @@
 import { json, getSearchParams } from "@/lib/api-server";
 import type { LoaderFunctionArgs } from "react-router";
-import { getGithubTrafficClones } from "@/lib/repositories/github";
+import { getGithubTrafficClones } from "@/lib/services/github";
 import { requireSession, authorizeAccountOwner } from "@/lib/auth-helpers";
 
 async function GET(req: Request, params: Record<string, string>) {

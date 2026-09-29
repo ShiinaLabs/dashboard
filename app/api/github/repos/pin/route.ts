@@ -1,6 +1,6 @@
 import { json } from "@/lib/api-server";
 import type { ActionFunctionArgs } from "react-router";
-import { setPinnedRepos } from "@/lib/repositories/github";
+import { setPinnedRepos } from "@/lib/services/github";
 import { requireSession, authorizeAccountOwner } from "@/lib/auth-helpers";
 
 async function PUT(req: Request) {

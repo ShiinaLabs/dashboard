@@ -1,6 +1,6 @@
 import { json, getSearchParams } from "@/lib/api-server";
 import type { LoaderFunctionArgs } from "react-router";
-import { getTimeline } from "@/lib/repositories/twitter";
+import { getTimeline } from "@/lib/services/twitter";
 import { requireSession, filterOwnedAccountIds } from "@/lib/auth-helpers";
 
 async function GET(req: Request) {

@@ -6,6 +6,7 @@ import { isSupportedPlatform } from "../platforms";
 import { validateUpstreamUrl } from "../ssrf-guard";
 
 export type AccountMetadata = Omit<AccountRow, "auth_token">;
+export type { AccountRow };
 
 function toMetadata({ auth_token: _authToken, ...account }: AccountRow): AccountMetadata {
   return account;

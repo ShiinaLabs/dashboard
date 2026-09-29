@@ -1,6 +1,6 @@
 import { json } from "@/lib/api-server";
 import type { LoaderFunctionArgs } from "react-router";
-import { getGithubReleaseDownloadTimeline } from "@/lib/repositories/github";
+import { getGithubReleaseDownloadTimeline } from "@/lib/services/github";
 import { requireSession, authorizeAccountOwner } from "@/lib/auth-helpers";
 
 const ALLOWED_DAYS = new Set([7, 14, 30]);

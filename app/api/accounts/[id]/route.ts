@@ -2,7 +2,7 @@ import { json } from "@/lib/api-server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { getAccountById, updateAccount, deleteAccount, assertSafeInstanceUrl } from "@/lib/services/accounts";
 import { validateConfirmToken } from "@/lib/confirm-helpers";
-import { getLatestUserStats } from "@/lib/repositories/twitter";
+import { getLatestUserStats } from "@/lib/services/twitter";
 import { getRecentFetchRuns } from "@/lib/services/fetch-health";
 import { requireSession, authorizeAccountOwner } from "@/lib/auth-helpers";
 

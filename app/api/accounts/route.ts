@@ -1,7 +1,7 @@
 import { json } from "@/lib/api-server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { getAccounts, createAccount, assertSafeInstanceUrl } from "@/lib/services/accounts";
-import { getOverviewStats } from "@/lib/repositories/twitter";
+import { getOverviewStats } from "@/lib/services/twitter";
 import { isSupportedPlatform } from "@/lib/platforms";
 import { requireSession, getOwnerId } from "@/lib/auth-helpers";
 

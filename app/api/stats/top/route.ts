@@ -1,6 +1,6 @@
 import { json, getSearchParams } from "@/lib/api-server";
 import type { LoaderFunctionArgs } from "react-router";
-import { getTopTweets } from "@/lib/repositories/twitter";
+import { getTopTweets } from "@/lib/services/twitter";
 import { requireSession, getOwnerId } from "@/lib/auth-helpers";
 import { getAccounts } from "@/lib/services/accounts";
 

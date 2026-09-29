@@ -1,6 +1,6 @@
 import { json } from "@/lib/api-server";
 import type { LoaderFunctionArgs } from "react-router";
-import { getTweetById } from "@/lib/repositories/twitter";
+import { getTweetById } from "@/lib/services/twitter";
 import { requireSession, authorizeAccountOwner } from "@/lib/auth-helpers";
 
 async function GET(req: Request, params: Record<string, string>) {

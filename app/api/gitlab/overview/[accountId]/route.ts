@@ -1,6 +1,6 @@
 import { json } from "@/lib/api-server";
 import type { LoaderFunctionArgs } from "react-router";
-import { getGitlabOverview } from "@/lib/repositories/gitlab";
+import { getGitlabOverview } from "@/lib/services/gitlab";
 import { requireSession, authorizeAccountOwner } from "@/lib/auth-helpers";
 
 async function GET(req: Request, params: Record<string, string>) {

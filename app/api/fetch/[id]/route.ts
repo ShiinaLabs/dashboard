@@ -4,7 +4,7 @@ import { getAccountByIdWithCredential, updateAccount } from "@/lib/services/acco
 import { isMockMode } from "@/lib/config";
 import { dispatchFetch } from "@/lib/fetch-dispatch";
 import { requireSession, authorizeAccountOwner } from "@/lib/auth-helpers";
-import type { AccountRow } from "@/lib/repositories/accounts";
+import type { AccountRow } from "@/lib/services/accounts";
 
 async function POST(req: Request, params: Record<string, string>) {
   const auth = await requireSession(req);

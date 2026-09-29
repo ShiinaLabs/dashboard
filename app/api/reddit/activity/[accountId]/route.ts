@@ -1,6 +1,6 @@
 import { json, getSearchParams } from "@/lib/api-server";
 import type { LoaderFunctionArgs } from "react-router";
-import { getRedditDailyActivity, getRedditDailyCommentActivity } from "@/lib/repositories/reddit";
+import { getRedditDailyActivity, getRedditDailyCommentActivity } from "@/lib/services/reddit";
 import { requireSession, authorizeAccountOwner } from "@/lib/auth-helpers";
 
 async function GET(req: Request, params: Record<string, string>) {

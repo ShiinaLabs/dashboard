@@ -1,6 +1,6 @@
 import { json } from "@/lib/api-server";
 import type { ActionFunctionArgs } from "react-router";
-import { setPinnedGitlabProjects } from "@/lib/repositories/gitlab";
+import { setPinnedGitlabProjects } from "@/lib/services/gitlab";
 import { requireSession, authorizeAccountOwner } from "@/lib/auth-helpers";
 
 async function PUT(req: Request) {

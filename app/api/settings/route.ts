@@ -1,8 +1,7 @@
 import { json } from "@/lib/api-server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { requireSession } from "@/lib/auth-helpers";
-import { getSetting, setSetting } from "@/lib/repositories/settings";
-import { aiConfig } from "@/lib/config";
+import { getAiSettings, updateAiSettings } from "@/lib/services/settings";
 
 async function requireAdmin(req: Request) {
   const auth = await requireSession(req);
@@ -12,25 +11,12 @@ async function requireAdmin(req: Request) {
 
 async function GET(req: Request) {
   if (!(await requireAdmin(req))) return json({ error: "Forbidden" }, { status: 403 });
-  const baseUrl = await getSetting("ai_base_url");
-  const baseKey = await getSetting("ai_base_key");
-  const model = await getSetting("ai_model");
-  return json({
-    ai: {
-      baseUrl: baseUrl || "",
-      apiKey: baseKey ? "••••••••" : "",
-      model: model || aiConfig().model,
-    },
-  });
+  return json(await getAiSettings());
 }
 
 async function PUT(req: Request) {
   if (!(await requireAdmin(req))) return json({ error: "Forbidden" }, { status: 403 });
-  const { baseUrl, apiKey, model } = await req.json();
-  if (baseUrl !== undefined) await setSetting("ai_base_url", baseUrl);
-  if (apiKey !== undefined && apiKey !== "••••••••") await setSetting("ai_base_key", apiKey);
-  if (model !== undefined) await setSetting("ai_model", model);
-  return json({ ok: true });
+  return json(await updateAiSettings(await req.json()));
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {

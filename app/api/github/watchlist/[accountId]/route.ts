@@ -3,7 +3,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { requireSession, authorizeAccountOwner } from "@/lib/auth-helpers";
 import { getAccountByIdWithCredential } from "@/lib/services/accounts";
 import { GithubWatchlistService } from "@/lib/services/github-watchlist";
-import type { AccountRow } from "@/lib/repositories/accounts";
+import type { AccountRow } from "@/lib/services/accounts";
 
 /**
  * Resolve the account for this route: authenticated, owned (or admin), and
