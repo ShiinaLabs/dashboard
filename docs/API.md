@@ -1,6 +1,6 @@
 # API Reference
 
-Base path: `/api` (fixed in `lib/api.ts` as `API_BASE = "/api"`; routes are declared in `app/routes.ts` and implemented as React Router route handlers under `app/api/*/route.ts`).
+Base path: `/api` by default. Browser requests go through `lib/api.ts` and `lib/client/api-transport.ts`; `VITE_API_BASE_URL` can set a build-time API root. Routes are declared in `app/routes.ts` and implemented as React Router route handlers under `app/api/*/route.ts`. See [API Boundary Inventory](API-BOUNDARY.md) for the complete route-to-service map.
 
 All endpoints except the public list below require a valid `dash_session` cookie. `app/auth-middleware.server.ts` returns `401` for unauthenticated API calls (or `302` to `/login` for pages).
 

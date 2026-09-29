@@ -25,6 +25,12 @@ cp .env.example .env
 | `DATA_DIR` | `./data` | Root data directory (logs, legacy SQLite db/dumps) |
 | `NODE_ENV` | — | Set `production` for prod mode |
 
+## Browser API
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_API_BASE_URL` | `/api` | Build-time API root used by the browser transport. Set to a full API root such as `https://api.example.com/api` only when the target deployment has separately configured compatible authentication and CORS. |
+
 ## Database
 
 The app uses PostgreSQL via Drizzle ORM + `pg` driver. SQLite is legacy only.
