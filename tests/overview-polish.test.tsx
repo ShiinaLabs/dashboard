@@ -8,234 +8,161 @@ function render(element: React.ReactElement) {
   return renderToStaticMarkup(<>{element}</>);
 }
 
-describe("overview visual contracts", () => {
-  it("keeps metric status in the content without a top color rail", () => {
-    const html = render(
-      <MetricCard
-        icon={<span>!</span>}
-        label="Failed"
-        value={2}
-        hint="Needs attention"
-        tone="danger"
-      />,
-    );
+function source(path: string) {
+  return readFileSync(path, "utf8");
+}
 
-    expect(html).not.toContain('data-slot="metric-accent"');
-    expect(html).toContain('data-tone="danger"');
+describe("dashboard presentation and behavior", () => {
+  it("exposes metric status and data in readable semantic content", () => {
+    const html = render(<MetricCard icon={<span>!</span>} label="Failed" value={2} hint="Needs attention" tone="danger" />);
+    expect(html).toContain("Failed");
+    expect(html).toContain(">2<");
+    expect(html).toContain("Needs attention");
     expect(html).toContain('data-slot="metric-value"');
     expect(html).toContain('data-slot="metric-hint"');
   });
 
-  it("gives every overview section a consistent heading structure", () => {
-    const html = render(
-      <SectionShell icon={<span>icon</span>} title="Fetch health">
-        <p>Content</p>
-      </SectionShell>,
-    );
-
-    expect(html).toContain('data-slot="overview-section"');
-    expect(html).toContain('data-slot="overview-section-heading"');
-    expect(html).toContain('data-slot="overview-section-icon"');
+  it("renders section titles, optional descriptions, actions and children", () => {
+    const html = render(<SectionShell icon={<span>icon</span>} title="Fetch health" description="Account sync status" action={<button>Refresh</button>}><p>Healthy accounts</p></SectionShell>);
+    expect(html).toContain('data-slot="insight-card"');
     expect(html).toContain("Fetch health");
+    expect(html).toContain("Account sync status");
+    expect(html).toContain("Refresh");
+    expect(html).toContain("Healthy accounts");
   });
 
-  it("keeps pulse highlight cards readable before the tablet breakpoint", () => {
-    const css = readFileSync("app/globals.css", "utf8");
-    const pulse = readFileSync("app/(dashboard)/overview/PulseSection.tsx", "utf8");
-
-    expect(pulse).toContain("overview-highlight-grid");
-    expect(css).toMatch(/\.overview-highlight-grid\s*\{[\s\S]*grid-template-columns:\s*1fr;/);
-    expect(css).toContain("repeat(var(--highlight-columns), minmax(0, 1fr))");
+  it("uses responsive utility grids for the pulse highlights", () => {
+    const pulse = source("app/(dashboard)/overview/PulseSection.tsx");
+    expect(pulse).toContain("grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3");
+    expect(pulse).not.toContain("overview-highlight-grid");
   });
 
-  it("keeps content links inside the dashboard visual system", () => {
-    const css = readFileSync("app/globals.css", "utf8");
-
-    expect(css).toMatch(/(^|\n)a\s*\{[\s\S]*color:\s*inherit;[\s\S]*text-decoration:\s*none;/);
+  it("keeps links inheriting the active theme colors", () => {
+    expect(source("app/globals.css")).toMatch(/(^|\n)a\s*\{[\s\S]*color:\s*inherit;[\s\S]*text-decoration:\s*none;/);
   });
 
-  it("uses one heading treatment for health and pulse sections", () => {
-    const health = readFileSync("app/(dashboard)/overview/FetchHealthSection.tsx", "utf8");
-    const pulse = readFileSync("app/(dashboard)/overview/PulseSection.tsx", "utf8");
-
-    expect(health).toContain("SectionShell");
-    expect(pulse).toContain("SectionShell");
+  it("groups pulse and fetch-health content into titled cards", () => {
+    expect(source("app/(dashboard)/overview/FetchHealthSection.tsx")).toContain("SectionShell");
+    expect(source("app/(dashboard)/overview/PulseSection.tsx")).toContain("SectionShell");
   });
 
-  it("gives overview account chips explicit icon and text spacing", () => {
-    const overview = readFileSync("app/(dashboard)/overview/page.tsx", "utf8");
-    const css = readFileSync("app/globals.css", "utf8");
-
-    expect(overview).toContain('className="overview-account-chip"');
-    expect(overview).toContain("leftSection=");
-    expect(overview).toContain("rightSection=");
-    expect(css).toMatch(/\.overview-account-chip\s*\{[\s\S]*align-items:\s*center;[\s\S]*padding/);
+  it("offers account management and only renders tabs for connected platforms", () => {
+    const overview = source("app/(dashboard)/overview/page.tsx");
+    expect(overview).toContain('to="/accounts"');
+    expect(overview).toContain("TabsTrigger");
+    expect(overview).toContain('value: "x"');
+    expect(overview).toContain('value: "github"');
+    expect(overview).toContain('value: "gitlab"');
+    expect(overview).toContain('value: "reddit"');
+    expect(overview).toContain("platform.enabled");
   });
 
-  it("gives overview and detail chart cards a padded body around the plotting area", () => {
-    const xDetail = readFileSync("app/(dashboard)/x/[id]/page.tsx", "utf8");
-    const xOverview = readFileSync("app/(dashboard)/overview/XSection.tsx", "utf8");
-    const css = readFileSync("app/globals.css", "utf8");
-
-    expect(xDetail).toContain("ChartCard");
-    expect(xOverview).toContain("overview-chart-body");
-    expect(css).toMatch(/\.overview-chart-body\s*\{[\s\S]*padding:/);
+  it("retains chart descriptions and constrains chart surfaces", () => {
+    const xOverview = source("app/(dashboard)/overview/XSection.tsx");
+    const chartCard = source("components/domain/shared/ChartCard.tsx");
+    expect(xOverview).toContain('role="img"');
+    expect(xOverview).toContain("overview.charts.tweetActivity");
+    expect(xOverview).toContain("ResponsiveContainer");
+    expect(chartCard).toContain("min-w-0 overflow-hidden");
   });
 
-  it("provides the admin role translation and labeled form fields", () => {
-    const zh = JSON.parse(readFileSync("locales/zh.json", "utf8")) as { admin: { role?: string } };
-    const en = JSON.parse(readFileSync("locales/en.json", "utf8")) as { admin: { role?: string } };
-    const admin = readFileSync("app/(dashboard)/admin/page.tsx", "utf8");
-
+  it("keeps admin role labels, form names and protected visibility", () => {
+    const zh = JSON.parse(source("locales/zh.json")) as { admin: { role?: string } };
+    const en = JSON.parse(source("locales/en.json")) as { admin: { role?: string } };
+    const admin = source("app/(dashboard)/admin/page.tsx");
     expect(zh.admin.role).toBeTruthy();
     expect(en.admin.role).toBeTruthy();
     expect(admin).toContain('label={t("admin.password")}');
     expect(admin).toContain('label={t("admin.confirmPassword")}');
-    expect(admin).toContain("admin-create-card");
+    expect(admin).toContain('authData?.role !== "admin"');
   });
 
-  it("gives account cards separate content and action insets", () => {
-    const accounts = readFileSync("app/(dashboard)/accounts/page.tsx", "utf8");
-    const accountList = readFileSync("components/AccountListPage.tsx", "utf8");
-    const css = readFileSync("app/globals.css", "utf8");
-
-    expect(accounts).toContain("account-card-content");
-    expect(accounts).toContain("account-card-main");
-    expect(accounts).toContain("account-card-actions");
-    expect(accountList).toContain('className="account-card-content"');
-    expect(accountList).toContain('<div className="account-card-content">');
-    expect(accountList).not.toContain('<CardContent className="account-card-content">');
-    expect(accountList).toContain("account-card-main");
-    expect(accountList).toContain("account-card-meta");
-    expect(css).toMatch(/\.account-card-actions\s*\{[\s\S]*padding:/);
-    expect(css).toMatch(/\.account-card-content\s*\{[\s\S]*padding:\s*1\.25rem\s*!important/);
+  it("keeps account identity separate from its action controls", () => {
+    const accounts = source("app/(dashboard)/accounts/page.tsx");
+    const accountList = source("components/AccountListPage.tsx");
+    expect(accounts).toContain("data-account-actions");
+    expect(accounts).toContain("aria-label={`${currentTab.formatUsername(account)}");
+    expect(accounts).toContain("settings.edit");
+    expect(accounts).toContain("settings.delete");
+    expect(accountList).toContain("formatUsername(account)");
+    expect(accountList).toContain("accountCard.last");
   });
 
-  it("keeps fetch run history rows inside one padded list surface", () => {
-    const history = readFileSync("components/FetchRunHistory.tsx", "utf8");
-    const css = readFileSync("app/globals.css", "utf8");
-
-    expect(history).toContain('<div className="fetch-history-content">');
-    expect(history).toContain("fetch-history-list");
-    expect(history).not.toContain('<CardContent className="p-3 pt-3 sm:p-3 sm:pt-3">');
-    expect(history).not.toContain('className="-mx-2 space-y-0.5"');
-    expect(css).toMatch(/\.fetch-history-content\s*\{[\s\S]*padding:/);
-    expect(css).toMatch(/\.fetch-history-list\s*\{[\s\S]*display:\s*grid;[\s\S]*gap:/);
+  it("keeps fetch history grouped with responsive rows", () => {
+    const history = source("components/FetchRunHistory.tsx");
+    expect(history).toContain("grid gap-2 pt-3");
+    expect(history).toContain("hover:bg-[var(--muted)]");
+    expect(history).toContain("text-[var(--muted-foreground)]");
   });
 
-  it("uses one padded layout contract for all detail-page content lists", () => {
-    const sources = [
-      readFileSync("app/(dashboard)/x/[id]/page.tsx", "utf8"),
-      readFileSync("app/(dashboard)/github/[accountId]/page.tsx", "utf8"),
-      readFileSync("app/(dashboard)/gitlab/[accountId]/page.tsx", "utf8"),
-      readFileSync("app/(dashboard)/reddit/[id]/page.tsx", "utf8"),
-    ];
-    const css = readFileSync("app/globals.css", "utf8");
-
-    for (const source of sources) {
-      expect(source).toContain("detail-list-card");
-      expect(source).toContain("detail-list-card-header");
-      expect(source).toContain("detail-list-card-body");
-      expect(source).toContain("detail-list");
-      expect(source).toContain("detail-list-row");
+  it("keeps platform detail content in bordered card surfaces", () => {
+    const pages = ["app/(dashboard)/x/[id]/page.tsx", "app/(dashboard)/github/[accountId]/page.tsx", "app/(dashboard)/gitlab/[accountId]/page.tsx", "app/(dashboard)/reddit/[id]/page.tsx"].map(source);
+    for (const page of pages) {
+      expect(page).toContain("rounded-lg border bg-card");
+      expect(page).toContain("border-b px-5 py-4");
+      expect(page).toContain("min-w-0 p-5");
     }
-    expect(css).toMatch(/\.detail-list-card-header\s*\{[\s\S]*padding:/);
-    expect(css).toMatch(/\.detail-list-card-body\s*\{[\s\S]*padding:/);
-    expect(css).toMatch(/\.detail-list\s*\{[\s\S]*display:\s*grid;[\s\S]*gap:/);
-    expect(css).toMatch(/\.detail-list-row\s*\{[\s\S]*padding:/);
   });
 
-  it("keeps fetch-health issue rows inside one consistent padded surface", () => {
-    const health = readFileSync("app/(dashboard)/overview/FetchHealthSection.tsx", "utf8");
-    const css = readFileSync("app/globals.css", "utf8");
-
-    expect(health).toContain("overview-health-issues");
-    expect(health).toContain("overview-health-issue-row");
-    expect(css).toMatch(/\.overview-health-issue-list\s*\{[\s\S]*padding:/);
-    expect(css).toContain('@import "tailwindcss";');
+  it("presents fetch-health issues as separate readable rows", () => {
+    const health = source("app/(dashboard)/overview/FetchHealthSection.tsx");
+    expect(health).toContain("grid content-start gap-2 p-4");
+    expect(health).toContain("issue.accountId");
+    expect(health).toContain("issue.latestError");
+    expect(source("app/globals.css")).toContain('@import "tailwindcss";');
   });
 
-  it("gives top-content rows a dedicated icon slot", () => {
-    const topContent = readFileSync("app/(dashboard)/overview/TopContentSection.tsx", "utf8");
-    const css = readFileSync("app/globals.css", "utf8");
-
-    expect(topContent).toContain("top-content-icon");
-    expect(topContent).toContain("top-content-primary");
-    expect(css).toMatch(/\.top-content-icon\s*\{[\s\S]*width:[\s\S]*height:/);
+  it("gives top-content rows a platform icon and primary content column", () => {
+    const topContent = source("app/(dashboard)/overview/TopContentSection.tsx");
+    expect(topContent).toContain("grid size-7 shrink-0 place-items-center");
+    expect(topContent).toContain("min-w-0 flex-1");
+    expect(topContent).toContain("item.title");
   });
 
-  it("uses real chart body wrappers so card padding is not eaten by Card.Section", () => {
-    const xDetail = readFileSync("app/(dashboard)/x/[id]/page.tsx", "utf8");
-    const xOverview = readFileSync("app/(dashboard)/overview/XSection.tsx", "utf8");
-    const css = readFileSync("app/globals.css", "utf8");
-
-    expect(xDetail).toContain("ChartCard");
-    expect(xOverview).toContain('<div className="overview-chart-body">');
-    expect(xDetail).not.toContain('<div className="overview-chart-title">');
-    expect(xOverview).toContain('<div className="overview-chart-title">');
-    expect(css).toMatch(/\.overview-chart-title\s*\{[\s\S]*padding:/);
+  it("pads chart titles and plots with independent responsive layout", () => {
+    const x = source("app/(dashboard)/overview/XSection.tsx");
+    expect(x).toContain("px-5 pt-5 pb-1");
+    expect(x).toContain("min-w-0 overflow-hidden px-4 pb-4 sm:px-5 sm:pb-5");
   });
 
-  it("keeps Reddit chart cards on the same title and body layout contract", () => {
-    const reddit = readFileSync("app/(dashboard)/overview/RedditSection.tsx", "utf8");
-
-    expect(reddit).toContain('<div className="overview-chart-title">');
-    expect(reddit).toContain('<div className="overview-chart-body">');
+  it("uses consistent chart containers for Reddit analytics", () => {
+    const reddit = source("app/(dashboard)/overview/RedditSection.tsx");
+    expect(reddit).toContain("overview.charts.redditKarma");
+    expect(reddit).toContain("overview.charts.redditActivity");
+    expect(reddit).toContain("ResponsiveContainer");
     expect(reddit).not.toContain("<Card.Section");
   });
 
-  it("audits detail chart cards through the shared layout", () => {
-    const chartCard = readFileSync("components/domain/shared/ChartCard.tsx", "utf8");
-    const followerGrowth = readFileSync("components/XFollowerGrowthChart.tsx", "utf8");
-    const repoDetail = readFileSync("app/(dashboard)/github/[accountId]/repos/[repoId]/page.tsx", "utf8");
-    const projectDetail = readFileSync("app/(dashboard)/gitlab/[accountId]/projects/[projectId]/page.tsx", "utf8");
-    const redditDetail = readFileSync("app/(dashboard)/reddit/[id]/page.tsx", "utf8");
-    const githubAccount = readFileSync("app/(dashboard)/github/[accountId]/page.tsx", "utf8");
-    const gitlabAccount = readFileSync("app/(dashboard)/gitlab/[accountId]/page.tsx", "utf8");
-    const skeleton = readFileSync("components/Skeleton.tsx", "utf8");
-    const xDetail = readFileSync("app/(dashboard)/x/[id]/page.tsx", "utf8");
-    const trafficList = readFileSync("components/TrafficMetricList.tsx", "utf8");
-
-    expect(chartCard).toContain("chart-card-title");
-    expect(chartCard).toContain("chart-card-body");
-    expect(followerGrowth).toContain("ChartCard");
-    expect(repoDetail).toContain("ChartCard");
-    expect((repoDetail.match(/<ChartCard/g) ?? []).length).toBeGreaterThanOrEqual(6);
-    expect(projectDetail).toContain("ChartCard");
-    expect(redditDetail).toContain("ChartCard");
-    expect(githubAccount).toContain("ChartCard");
-    expect(gitlabAccount).toContain("ChartCard");
-    expect((githubAccount.match(/<ChartCard/g) ?? []).length).toBeGreaterThanOrEqual(3);
-    expect((gitlabAccount.match(/<ChartCard/g) ?? []).length).toBeGreaterThanOrEqual(2);
-    expect((xDetail.match(/<ChartCard/g) ?? []).length).toBeGreaterThanOrEqual(4);
-    expect(skeleton).toContain('className="chart-card-title"');
-    expect(skeleton).toContain('className="chart-card-body"');
-    expect(trafficList).toContain("max-h-60");
-    expect(trafficList).not.toContain("flex h-60 flex-col");
+  it("shares chart cards across platform details and preserves chart loading placeholders", () => {
+    const paths = ["components/domain/shared/ChartCard.tsx", "components/XFollowerGrowthChart.tsx", "app/(dashboard)/github/[accountId]/repos/[repoId]/page.tsx", "app/(dashboard)/gitlab/[accountId]/projects/[projectId]/page.tsx", "app/(dashboard)/reddit/[id]/page.tsx", "app/(dashboard)/github/[accountId]/page.tsx", "app/(dashboard)/gitlab/[accountId]/page.tsx", "app/(dashboard)/x/[id]/page.tsx"];
+    for (const path of paths) expect(source(path)).toContain("ChartCard");
+    const chartCard = source("components/domain/shared/ChartCard.tsx");
+    expect(chartCard).toContain('data-slot="chart-card-title"');
+    expect(chartCard).toContain('data-slot="chart-card-body"');
+    expect(source("components/Skeleton.tsx")).toContain("ChartCardSkeleton");
+    expect(source("components/TrafficMetricList.tsx")).toContain("max-h-60");
   });
 
-  it("keeps the release asset chart y-axis compact", () => {
-    const repoDetail = readFileSync("app/(dashboard)/github/[accountId]/repos/[repoId]/page.tsx", "utf8");
-
+  it("keeps release chart axes readable at mobile widths", () => {
+    const repoDetail = source("app/(dashboard)/github/[accountId]/repos/[repoId]/page.tsx");
     expect(repoDetail).toContain("const RELEASE_Y_AXIS_WIDTH = isMobile ? 48 : 72;");
     expect(repoDetail).toContain("width={RELEASE_Y_AXIS_WIDTH}");
-    expect(repoDetail).not.toContain("width={isMobile ? 50 : 120}");
   });
 
-  it("gives pinned repository controls explicit name and metric spacing", () => {
-    const repoChip = readFileSync("components/ui/RepoChip.tsx", "utf8");
-    const css = readFileSync("app/globals.css", "utf8");
-
-    expect(repoChip).toContain('className="repo-chip h-auto min-w-0 justify-start px-3 py-2"');
-    expect(repoChip).toContain("repo-chip-name");
-    expect(repoChip).toContain("repo-chip-stats");
-    expect(css).toMatch(/\.repo-chip\s*\{[\s\S]*display:\s*flex;[\s\S]*align-items:\s*center;[\s\S]*gap:/);
+  it("keeps repository identity, language and metrics available to keyboard users", () => {
+    const repoChip = source("components/ui/RepoChip.tsx");
+    expect(repoChip).toContain('variant="outline"');
+    expect(repoChip).toContain("name: string");
+    expect(repoChip).toContain("stars.toLocaleString()");
+    expect(repoChip).toContain("forks.toLocaleString()");
+    expect(repoChip).toContain("min-w-0");
   });
 
-  it("centers metric content within the card's vertical inset", () => {
-    const metricCard = readFileSync("components/domain/shared/MetricCard.tsx", "utf8");
-
-    expect(metricCard).toContain('className="flex w-full min-w-0 items-center gap-3"');
-    expect(metricCard).toContain('justifyContent: "center"');
+  it("uses compact metric cards without preserving the old fixed minimum height", () => {
+    const html = render(<MetricCard icon={<span>icon</span>} label="Followers" value={12345} hint="Today +12" />);
+    expect(html).toContain("line-clamp-2");
+    expect(html).toContain("tabular-nums");
+    expect(html).not.toContain("min-height");
+    expect(html).not.toContain("metric-accent");
   });
 });

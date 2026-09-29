@@ -21,7 +21,8 @@ describe("MetricCard", () => {
     expect(html).toContain("data-slot=\"metric-label\"");
     expect(html).toContain("data-slot=\"metric-value\"");
     expect(html).toContain("data-slot=\"metric-hint\"");
-    expect(html).toContain("min-height:108px");
+    expect(html).not.toContain("min-height");
+    expect(html).toContain("line-clamp-2");
     expect(html).toContain("tabular-nums");
   });
 
@@ -42,7 +43,7 @@ describe("MetricCard", () => {
     expect(html).toContain('data-slot="metric-grid"');
     expect(html).toContain('data-columns="four"');
     expect(html).toContain("grid-cols-2");
-    expect(html).toContain("sm:grid-cols-4");
+    expect(html).toContain("xl:grid-cols-4");
   });
 
   it("supports three-column detail summaries without a page-local grid", () => {
@@ -54,6 +55,6 @@ describe("MetricCard", () => {
 
     expect(html).toContain('data-columns="three"');
     expect(html).toContain("grid-cols-2");
-    expect(html).toContain("sm:grid-cols-3");
+    expect(html).toContain("xl:grid-cols-3");
   });
 });

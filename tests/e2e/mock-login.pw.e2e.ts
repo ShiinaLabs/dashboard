@@ -28,9 +28,9 @@ test("mock login keeps its session and opens the requested route", async ({ page
 test("dashboard routes render without horizontal overflow at desktop and tablet widths", async ({ page }) => {
   await logIn(page);
   const routes = [
-    "/overview", "/accounts", "/x", "/x/1", "/github", "/github/1",
-    "/github/1/repos/1", "/gitlab", "/gitlab/1", "/gitlab/1/projects/1",
-    "/reddit", "/reddit/1", "/ai", "/settings", "/admin",
+    "/overview", "/accounts", "/x", "/x/1", "/github", "/github/2",
+    "/github/2/repos/1001", "/gitlab", "/gitlab/3", "/gitlab/3/projects/2001",
+    "/reddit", "/reddit/4", "/ai", "/settings", "/admin",
   ];
 
   for (const width of [390, 768, 1440]) {

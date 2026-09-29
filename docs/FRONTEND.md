@@ -27,24 +27,25 @@ app/
 ├── (dashboard)/
 │   ├── layout.tsx      # Dashboard shell: Layout + MockModeBanner
 │   ├── page.tsx        # Redirects / → /overview
-│   ├── overview/       # Overview dashboard (Business Pulse + per-platform sections)
+│   ├── overview/       # Cross-platform KPIs, pulse/health, top content and platform tabs
 │   ├── accounts/       # Account management
 │   ├── admin/          # User management (admin only)
 │   ├── settings/       # App settings
 │   ├── x/              # X account list + detail
 │   ├── github/         # GitHub account list + detail + repo detail
 │   ├── gitlab/         # GitLab account list + detail + project detail
-│   └── reddit/         # Reddit account list + detail
+│   ├── reddit/         # Reddit account list + detail
+│   └── ai/             # AI chat workspace
 ├── login/page.tsx      # Login page
 └── api/                # React Router route handlers (auth, accounts, fetchers, stats, …)
 components/
-├── Layout.tsx          # Sidebar + title bar + content shell (responsive)
+├── layout/             # shadcn-admin-style authenticated sidebar, header and content shell
 ├── AccountListPage.tsx # Reusable account list component
 ├── BrandIcons.tsx      # Platform brand icons
 ├── domain/shared/      # Canonical MetricCard, MetricGrid and data-display components
 ├── Skeleton.tsx        # Skeleton loading primitives
-├── NavigationProgress.tsx # Top progress bar on route changes
-├── NavigatingOverlay.tsx  # Full-screen spinner overlay during navigation
+├── NavigationProgress.tsx # Top progress bar while a React Router navigation is pending
+├── NavigatingOverlay.tsx  # Loading surface while a React Router navigation is pending
 ├── ThemeProvider.tsx   # Theme context provider
 ├── MockModeBanner.tsx  # MOCK MODE indicator when running on fixtures
 └── ui/                 # shadcn/ui primitives and dashboard controls
@@ -63,7 +64,7 @@ Routes are declared in `app/routes.ts` (React Router Framework Mode). All pages 
 
 | Path | Description |
 |------|-------------|
-| `/login` | Login page (redirects to `/` after successful login) |
+| `/login` | Login page (redirects to a validated `?from=` destination or `/overview`) |
 | `/` | Redirects to `/overview` |
 | `/overview` | Overview dashboard |
 | `/accounts` | Account management |
@@ -77,14 +78,15 @@ Routes are declared in `app/routes.ts` (React Router Framework Mode). All pages 
 | `/gitlab/:accountId/projects/:projectId` | GitLab project detail |
 | `/reddit` | Reddit account list |
 | `/reddit/:id` | Reddit account detail |
+| `/ai` | AI chat workspace |
 | `/admin` | User management (admin only) |
 | `/settings` | App settings |
 
 ## Auth Flow
 
 1. Login form calls `api.login(username, password)`; the API sets an httpOnly JWT cookie.
-2. On success the login page redirects to `/`.
-3. `Layout` calls `api.checkAuth()` to resolve the current user and admin role; API requests automatically include the httpOnly cookie.
+2. On success the login page redirects to a safe internal `?from=` path or `/overview`.
+3. `AuthenticatedLayout` calls `api.checkAuth()` to resolve the current user and admin role; API requests automatically include the httpOnly cookie.
 4. Logout calls `api.logout()` and redirects to `/login`.
 
 ## Data Fetching
@@ -102,12 +104,14 @@ Routes are declared in `app/routes.ts` (React Router Framework Mode). All pages 
 
 ## Layout & Sidebar
 
-The authenticated layout (`components/layout/authenticated-layout.tsx`) uses the shadcn-admin sidebar composition:
+The authenticated layout (`components/layout/authenticated-layout.tsx`) follows the shadcn-admin composition and neutral visual system:
 
 - **Sidebar** — `SidebarProvider`, `AppSidebar` and `SidebarInset`; desktop collapse state remains persisted under `sidebar-state`.
 - **Header and content** — `Header` and `Main` preserve the safe area and page content width.
 - **Mobile navigation** — Radix Sheet overlay closes on Escape, backdrop click, or route selection; focus is managed by Radix.
 - **Navigation** — React Router links preserve existing route URLs and active-route behavior.
+- **Overview** — cross-platform KPI cards lead into Business Pulse and Fetch Health, followed by Top Content and tabs for connected platforms.
+- **Page surfaces** — management and detail pages use consistent page headings, bordered cards, compact metric grids and responsive action groups. The authenticated shell has no wallpaper background.
 
 ## Theming
 
@@ -134,7 +138,7 @@ Multi-layered loading strategy for smooth UX on slow networks:
 
 1. **Providers hydration guard** — a minimal background shell renders before the client shell mounts, preventing SSR/client mismatch
 2. **Auth check** — non-blocking; the layout renders immediately
-3. **Navigating overlay** — semi-transparent backdrop + spinner during route transitions
-4. **Progress bar** — animated gradient bar at top of page on navigation
+3. **Navigating overlay** — semi-transparent backdrop + spinner only while React Router reports a pending navigation
+4. **Progress bar** — animated gradient bar at top of page only while navigation is pending
 5. **Skeleton loading** — `MetricCardSkeleton` / `ChartCardSkeleton` replace "Loading…" text
 6. **Fade-in animation** — `page-enter` class on route content for smooth appearance; disabled under `prefers-reduced-motion`

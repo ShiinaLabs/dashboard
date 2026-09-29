@@ -51,14 +51,16 @@ describe("mobile layout contracts", () => {
     const xDetail = readProjectFile("app/(dashboard)/x/[id]/page.tsx");
     const repoDetail = readProjectFile("app/(dashboard)/github/[accountId]/repos/[repoId]/page.tsx");
 
-    expect(xDetail).toContain('className="mobile-detail-controls"');
-    expect(repoDetail).toContain('className="mobile-detail-controls"');
+    expect(xDetail).toContain("flex w-full items-center sm:ml-auto sm:w-auto sm:justify-end");
+    expect(repoDetail).toContain("flex w-full items-center sm:ml-auto sm:w-auto sm:justify-end");
   });
 
   it("keeps detail header actions at their intrinsic width", () => {
-    const styles = readProjectFile("app/globals.css");
+    const xDetail = readProjectFile("app/(dashboard)/x/[id]/page.tsx");
+    const repoDetail = readProjectFile("app/(dashboard)/github/[accountId]/repos/[repoId]/page.tsx");
 
-    expect(styles).toMatch(/\.detail-header-actions\s*\{[^}]*align-self:\s*flex-start/s);
+    expect(xDetail).toContain("flex shrink-0 flex-wrap items-center justify-start gap-2 sm:justify-end");
+    expect(repoDetail).toContain("flex shrink-0 flex-wrap items-center justify-start gap-2 sm:justify-end");
   });
 
   it("balances the four repository metrics in a two-column layout", () => {
@@ -88,15 +90,15 @@ describe("mobile layout contracts", () => {
     }
 
     const metricGrid = readProjectFile("components/domain/shared/MetricGrid.tsx");
-    expect(metricGrid).toContain('four: "sm:grid-cols-4"');
+    expect(metricGrid).toContain('four: "xl:grid-cols-4"');
   });
 
   it("separates account information from mobile card actions", () => {
     const source = readProjectFile("app/(dashboard)/accounts/page.tsx");
 
-    expect(source).toContain("mobile-tab-strip");
-    expect(source).toContain("mobile-account-card");
-    expect(source).toContain("account-card-actions");
+    expect(source).toContain("TabsList");
+    expect(source).toContain('data-account-actions');
+    expect(source).toContain('role="link"');
   });
 
   it("stacks admin and settings controls on narrow screens", () => {
@@ -120,7 +122,9 @@ describe("mobile layout contracts", () => {
     const login = readProjectFile("app/login/page.tsx");
     const confirmDialog = readProjectFile("components/ui/ConfirmDialog.tsx");
 
-    expect(login).toContain("p-5 sm:p-8");
+    expect(login).toContain("min-h-dvh");
+    expect(login).toContain('autoComplete="username"');
+    expect(login).toContain('autoComplete="current-password"');
     expect(login.match(/<(TextInput|PasswordInput|Button|Alert)\b/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
     expect(confirmDialog).toContain("<AlertDialog");
     expect(confirmDialog).toContain("<Input");
