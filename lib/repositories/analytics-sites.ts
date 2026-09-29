@@ -16,7 +16,7 @@ export interface AnalyticsSiteRow {
 }
 
 const mockSites: AnalyticsSiteRow[] = [
-  { id: 1, owner_id: 1, name: "Example Site", site_key: "example-site", host: "example.com", created_at: new Date(0).toISOString(), updated_at: new Date(0).toISOString(), deleted_at: null },
+  { id: 1, owner_id: 1, name: "Example Site", site_key: "123e4567-e89b-42d3-a456-426614174000", host: "example.com", created_at: new Date(0).toISOString(), updated_at: new Date(0).toISOString(), deleted_at: null },
 ];
 let nextMockId = 2;
 
@@ -31,6 +31,13 @@ export async function getAnalyticsSiteById(id: number): Promise<AnalyticsSiteRow
   if (isMockMode()) return mockSites.find((site) => site.id === id && site.deleted_at === null);
   const rows = await getDb().select().from(analytics_sites)
     .where(and(eq(analytics_sites.id, id), isNull(analytics_sites.deleted_at))).limit(1);
+  return rows[0];
+}
+
+export async function getAnalyticsSiteByKey(siteKey: string): Promise<AnalyticsSiteRow | undefined> {
+  if (isMockMode()) return mockSites.find((site) => site.site_key === siteKey && site.deleted_at === null);
+  const rows = await getDb().select().from(analytics_sites)
+    .where(and(eq(analytics_sites.site_key, siteKey), isNull(analytics_sites.deleted_at))).limit(1);
   return rows[0];
 }
 

@@ -30,7 +30,8 @@ import {
 import { getTopContent } from "../lib/services/top-content";
 import { SyncTelemetry } from "../lib/application/usecases/SyncTelemetry";
 import { createUser } from "../lib/services/users";
-import { createAnalyticsSite, getAnalyticsSiteById, getAnalyticsSites } from "../lib/repositories/analytics-sites";
+import { createAnalyticsSite, getAnalyticsSiteById, getAnalyticsSiteByKey, getAnalyticsSites } from "../lib/repositories/analytics-sites";
+import { getAnalyticsTrafficSummary, insertAnalyticsEvent } from "../lib/repositories/analytics-events";
 import { ensureAnalyticsSiteConstraints } from "../lib/setup";
 
 beforeAll(async () => {
@@ -179,6 +180,31 @@ describe("analytics site queries", () => {
     expect(indexesAfterUpgrade.rows.map((row: { indexname: string }) => row.indexname)).not.toContain("idx_analytics_sites_owner_site_key");
     await expect(getAnalyticsSiteById((await getAnalyticsSites(ownerA.id)).find((site) => site.site_key === legacyKey)!.id))
       .resolves.toMatchObject({ site_key: legacyKey });
+  });
+});
+
+describe("analytics event queries", () => {
+  it("stores events, scopes summaries to a site and time window, and creates only the site-time index", async () => {
+    const suffix = Date.now();
+    const owner = await usersQ.insertUser({ username: `analytics_events_${suffix}`, password_hash: "hash", role: "user" });
+    const otherOwner = await usersQ.insertUser({ username: `analytics_events_other_${suffix}`, password_hash: "hash", role: "user" });
+    const site = await createAnalyticsSite({ owner_id: owner.id, name: "Event Site", site_key: `123e4567-e89b-42d3-a456-${String(suffix).slice(-12).padStart(12, "0")}`, host: "events.example" });
+    const otherSite = await createAnalyticsSite({ owner_id: otherOwner.id, name: "Other Site", site_key: `223e4567-e89b-42d3-a456-${String(suffix).slice(-12).padStart(12, "0")}`, host: "other.example" });
+    expect(await getAnalyticsSiteByKey(site.site_key)).toMatchObject({ id: site.id });
+    const event = { site_id: site.id, path: "/", referrer_host: "", os: "Other", browser: "Other", country: "Unknown", device_type: "Desktop", visitor: false, visit: false };
+    await insertAnalyticsEvent({ ...event, visitor: true, visit: true });
+    await insertAnalyticsEvent({ ...event, visitor: false, visit: true });
+    await insertAnalyticsEvent({ ...event, visitor: false, visit: false });
+    await insertAnalyticsEvent({ ...event, site_id: otherSite.id, visitor: true, visit: true });
+    await getTestPool().query("INSERT INTO analytics_events(site_id, path, os, browser, country, device_type, visitor, visit, recorded_at) VALUES ($1, '/old', 'Other', 'Other', 'Unknown', 'Desktop', TRUE, TRUE, NOW() - INTERVAL '8 days')", [site.id]);
+
+    await expect(getAnalyticsTrafficSummary(site.id, 7)).resolves.toEqual({ views: 3, visitors: 1, visits: 2 });
+    await expect(getAnalyticsTrafficSummary(otherSite.id, 7)).resolves.toEqual({ views: 1, visitors: 1, visits: 1 });
+    const indexes = await getTestPool().query("SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'analytics_events'");
+    expect(indexes.rows.filter((row: { indexname: string }) => row.indexname !== "analytics_events_pkey")).toEqual([expect.objectContaining({
+      indexname: "idx_analytics_events_site_recorded",
+      indexdef: expect.stringMatching(/\(site_id, recorded_at DESC\)/),
+    })]);
   });
 });
 

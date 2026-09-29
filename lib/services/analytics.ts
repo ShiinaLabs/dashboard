@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { analyticsCollectorUrl, cloudflareAnalyticsConfig, isMockMode } from "../config";
+import { analyticsPublicOrigin, isMockMode } from "../config";
 import {
   createAnalyticsSite as createSite,
   getAnalyticsSiteById as findSite,
   getAnalyticsSites as listSites,
   type AnalyticsSiteRow,
 } from "../repositories/analytics-sites";
-import { getTrafficSummary } from "../integrations/cloudflare-analytics";
+import { getAnalyticsTrafficSummary } from "../repositories/analytics-events";
 
 export interface AnalyticsOverview {
   period: "7d";
@@ -26,7 +26,7 @@ export interface AnalyticsViewer {
 }
 
 export class AnalyticsSiteError extends Error {
-  constructor(readonly code: "invalid_input" | "not_found" | "forbidden" | "collector_not_configured") {
+  constructor(readonly code: "invalid_input" | "not_found" | "forbidden" | "public_origin_not_configured") {
     super(code);
     this.name = "AnalyticsSiteError";
   }
@@ -74,9 +74,7 @@ export async function getAnalyticsOverviewForSite(siteId: number, viewer: Analyt
   if (!site) throw new AnalyticsSiteError("not_found");
   if (viewer.role !== "admin" && site.owner_id !== viewer.id) throw new AnalyticsSiteError("forbidden");
   if (isMockMode()) return { period: "7d", views: 12_842, visitors: 2_931, visits: 4_102 };
-  const config = cloudflareAnalyticsConfig();
-  if (!config) throw new Error("Cloudflare Analytics is not configured");
-  return { period: "7d", ...await getTrafficSummary(config, site.site_key) };
+  return { period: "7d", ...await getAnalyticsTrafficSummary(site.id, 7) };
 }
 
 export interface AnalyticsInstallation {
@@ -92,10 +90,10 @@ export async function getAnalyticsInstallationForSite(siteId: number, viewer: An
   const site = await getAnalyticsSiteById(siteId);
   if (!site) throw new AnalyticsSiteError("not_found");
   if (viewer.role !== "admin" && site.owner_id !== viewer.id) throw new AnalyticsSiteError("forbidden");
-  const collectorUrl = analyticsCollectorUrl();
-  if (!collectorUrl) throw new AnalyticsSiteError("collector_not_configured");
+  const publicOrigin = analyticsPublicOrigin();
+  if (!publicOrigin) throw new AnalyticsSiteError("public_origin_not_configured");
 
-  const trackerUrl = `${collectorUrl}/tracker.js`;
+  const trackerUrl = `${publicOrigin}/a/t.js`;
   const snippet = `<script defer src="${escapeHtmlAttribute(trackerUrl)}" data-site-id="${escapeHtmlAttribute(site.site_key)}" data-site-host="${escapeHtmlAttribute(site.host)}"></script>`;
   return { trackerUrl, snippet };
 }

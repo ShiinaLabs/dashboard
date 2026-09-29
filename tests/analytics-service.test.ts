@@ -1,23 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { analyticsCollectorUrl, cloudflareAnalyticsConfig, isMockMode } from "../lib/config";
-import { getTrafficSummary } from "../lib/integrations/cloudflare-analytics";
+import { analyticsPublicOrigin, isMockMode } from "../lib/config";
 import { createAnalyticsSite, getAnalyticsInstallationForSite, getAnalyticsOverviewForSite, getAnalyticsSites, AnalyticsSiteError } from "../lib/services/analytics";
 import * as sitesRepo from "../lib/repositories/analytics-sites";
+import * as eventsRepo from "../lib/repositories/analytics-events";
 
-vi.mock("../lib/config", () => ({ analyticsCollectorUrl: vi.fn(), cloudflareAnalyticsConfig: vi.fn(), isMockMode: vi.fn() }));
-vi.mock("../lib/integrations/cloudflare-analytics", () => ({ getTrafficSummary: vi.fn() }));
+vi.mock("../lib/config", () => ({ analyticsPublicOrigin: vi.fn(), isMockMode: vi.fn() }));
 vi.mock("../lib/repositories/analytics-sites", () => ({
-  getAnalyticsSites: vi.fn(), getAnalyticsSiteById: vi.fn(), createAnalyticsSite: vi.fn(),
+  getAnalyticsSites: vi.fn(), getAnalyticsSiteById: vi.fn(), getAnalyticsSiteByKey: vi.fn(), createAnalyticsSite: vi.fn(),
 }));
+vi.mock("../lib/repositories/analytics-events", () => ({ insertAnalyticsEvent: vi.fn(), getAnalyticsTrafficSummary: vi.fn() }));
 
-const configured = { accountId: "account-id", apiToken: "test-token", dataset: "AnalyticsDataset" };
 const siteA = { id: 10, owner_id: 1, name: "A", site_key: "site-a", host: "a.example", created_at: "now", updated_at: "now", deleted_at: null };
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(isMockMode).mockReturnValue(false);
-  vi.mocked(analyticsCollectorUrl).mockReturnValue("https://collector.example");
-  vi.mocked(cloudflareAnalyticsConfig).mockReturnValue(configured);
+  vi.mocked(analyticsPublicOrigin).mockReturnValue("https://dashboard.example");
   vi.mocked(sitesRepo.getAnalyticsSiteById).mockResolvedValue(siteA);
 });
 
@@ -49,37 +47,35 @@ describe("analytics service", () => {
     expect(sitesRepo.createAnalyticsSite).not.toHaveBeenCalled();
   });
 
-  it("queries the selected site's key for its owner and admin", async () => {
-    vi.mocked(getTrafficSummary).mockResolvedValue({ views: 100, visitors: 25, visits: 40 });
+  it("queries the selected site's PostgreSQL summary for its owner and admin", async () => {
+    vi.mocked(eventsRepo.getAnalyticsTrafficSummary).mockResolvedValue({ views: 100, visitors: 25, visits: 40 });
     await expect(getAnalyticsOverviewForSite(10, { id: 1, role: "user" })).resolves.toEqual({ period: "7d", views: 100, visitors: 25, visits: 40 });
     await getAnalyticsOverviewForSite(10, { id: 99, role: "admin" });
-    expect(getTrafficSummary).toHaveBeenNthCalledWith(1, configured, "site-a");
-    expect(getTrafficSummary).toHaveBeenNthCalledWith(2, configured, "site-a");
+    expect(eventsRepo.getAnalyticsTrafficSummary).toHaveBeenNthCalledWith(1, 10, 7);
+    expect(eventsRepo.getAnalyticsTrafficSummary).toHaveBeenNthCalledWith(2, 10, 7);
   });
 
-  it("blocks foreign sites before querying Cloudflare and reports missing sites", async () => {
-    vi.mocked(getTrafficSummary).mockResolvedValue({ views: 0, visitors: 0, visits: 0 });
+  it("blocks foreign sites before querying PostgreSQL and reports missing sites", async () => {
     await expect(getAnalyticsOverviewForSite(10, { id: 2, role: "user" })).rejects.toBeInstanceOf(AnalyticsSiteError);
-    expect(getTrafficSummary).not.toHaveBeenCalled();
+    expect(eventsRepo.getAnalyticsTrafficSummary).not.toHaveBeenCalled();
     vi.mocked(sitesRepo.getAnalyticsSiteById).mockResolvedValue(undefined);
     await expect(getAnalyticsOverviewForSite(99, { id: 2, role: "user" })).rejects.toMatchObject({ code: "not_found" });
   });
 
-  it("returns mock totals without requiring Cloudflare configuration", async () => {
+  it("returns mock totals without querying PostgreSQL", async () => {
     vi.mocked(isMockMode).mockReturnValue(true);
     await expect(getAnalyticsOverviewForSite(10, { id: 1, role: "admin" })).resolves.toEqual({ period: "7d", views: 12_842, visitors: 2_931, visits: 4_102 });
-    expect(cloudflareAnalyticsConfig).not.toHaveBeenCalled();
-    expect(getTrafficSummary).not.toHaveBeenCalled();
+    expect(eventsRepo.getAnalyticsTrafficSummary).not.toHaveBeenCalled();
   });
 
   it("returns an escaped installation snippet to the owner and admin", async () => {
     const site = { ...siteA, site_key: "123e4567-e89b-42d3-a456-426614174000", host: "site.example" };
     vi.mocked(sitesRepo.getAnalyticsSiteById).mockResolvedValue(site);
     await expect(getAnalyticsInstallationForSite(10, { id: 1, role: "user" })).resolves.toEqual({
-      trackerUrl: "https://collector.example/tracker.js",
-      snippet: '<script defer src="https://collector.example/tracker.js" data-site-id="123e4567-e89b-42d3-a456-426614174000" data-site-host="site.example"></script>',
+      trackerUrl: "https://dashboard.example/a/t.js",
+      snippet: '<script defer src="https://dashboard.example/a/t.js" data-site-id="123e4567-e89b-42d3-a456-426614174000" data-site-host="site.example"></script>',
     });
-    await expect(getAnalyticsInstallationForSite(10, { id: 99, role: "admin" })).resolves.toMatchObject({ trackerUrl: "https://collector.example/tracker.js" });
+    await expect(getAnalyticsInstallationForSite(10, { id: 99, role: "admin" })).resolves.toMatchObject({ trackerUrl: "https://dashboard.example/a/t.js" });
     expect(sitesRepo.getAnalyticsSiteById).toHaveBeenCalledWith(10);
   });
 
@@ -88,7 +84,7 @@ describe("analytics service", () => {
     vi.mocked(sitesRepo.getAnalyticsSiteById).mockResolvedValue(undefined);
     await expect(getAnalyticsInstallationForSite(99, { id: 2, role: "user" })).rejects.toMatchObject({ code: "not_found" });
     vi.mocked(sitesRepo.getAnalyticsSiteById).mockResolvedValue(siteA);
-    vi.mocked(analyticsCollectorUrl).mockReturnValue(null);
-    await expect(getAnalyticsInstallationForSite(10, { id: 1, role: "user" })).rejects.toMatchObject({ code: "collector_not_configured" });
+    vi.mocked(analyticsPublicOrigin).mockReturnValue(null);
+    await expect(getAnalyticsInstallationForSite(10, { id: 1, role: "user" })).rejects.toMatchObject({ code: "public_origin_not_configured" });
   });
 });
