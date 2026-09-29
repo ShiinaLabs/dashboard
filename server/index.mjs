@@ -143,6 +143,7 @@ function listener(req, res) {
     const pathname = req.url?.split("?", 1)[0] ?? "/";
     if (
       pathname.startsWith("/assets/") ||
+      pathname === "/a/t.js" ||
       pathname === "/favicon.ico" ||
       pathname === "/favicon.png" ||
       pathname === "/apple-touch-icon.png"

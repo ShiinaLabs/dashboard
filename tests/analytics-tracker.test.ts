@@ -2,14 +2,14 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync(new URL("../analytics/collector/public/tracker.js", import.meta.url), "utf8");
+const source = readFileSync(new URL("../public/a/t.js", import.meta.url), "utf8");
 const site = "123e4567-e89b-42d3-a456-426614174000";
 
 function runTracker(options: { siteId?: string; siteHost?: string; locationHost?: string; path?: string; referrer?: string; storage?: Map<string, string>; now?: number } = {}) {
   const storage = options.storage ?? new Map<string, string>();
   const requests: Array<{ url: string; init: RequestInit }> = [];
   const document = {
-    currentScript: { src: "https://collector.example/tracker.js", dataset: { siteId: options.siteId ?? site, siteHost: options.siteHost ?? "wifi-lens.app" } },
+    currentScript: { src: "https://dashboard.example/a/t.js", dataset: { siteId: options.siteId ?? site, siteHost: options.siteHost ?? "wifi-lens.app" } },
     referrer: options.referrer ?? "",
   };
   const location = { host: options.locationHost ?? "wifi-lens.app", pathname: options.path ?? "/pricing/", href: `https://${options.locationHost ?? "wifi-lens.app"}/pricing/?private=1#hash` };
@@ -39,7 +39,7 @@ describe("analytics tracker", () => {
   it("posts a privacy-safe page load to the collector with daily visitor and 30-minute visit flags", () => {
     const first = runTracker({ referrer: "https://source.example/path?secret=1" });
     expect(first.requests).toHaveLength(1);
-    expect(first.requests[0].url).toBe("https://collector.example/collect");
+    expect(first.requests[0].url).toBe("https://dashboard.example/a/e");
     expect(first.requests[0].init).toMatchObject({ method: "POST", keepalive: true, credentials: "omit" });
     expect(JSON.parse(String(first.requests[0].init.body))).toEqual({
       site,
@@ -64,7 +64,7 @@ describe("analytics tracker", () => {
     const requests: unknown[] = [];
     class FixedDate extends Date { static now() { return 1_782_000_000_000; } }
     vm.runInNewContext(source, {
-      document: { currentScript: { src: "https://collector.example/tracker.js", dataset: { siteId: site, siteHost: "wifi-lens.app" } }, referrer: "" },
+      document: { currentScript: { src: "https://dashboard.example/a/t.js", dataset: { siteId: site, siteHost: "wifi-lens.app" } }, referrer: "" },
       location: { host: "wifi-lens.app", pathname: "/", href: "https://wifi-lens.app/" },
       localStorage: { getItem() { throw new Error("blocked"); }, setItem() { throw new Error("blocked"); } },
       URL,

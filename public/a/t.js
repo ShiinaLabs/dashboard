@@ -39,7 +39,7 @@
       visitor,
       visit,
     };
-    fetch(`${collectorOrigin}/collect`, {
+    fetch(`${collectorOrigin}/a/e`, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=UTF-8" },
       body: JSON.stringify(payload),

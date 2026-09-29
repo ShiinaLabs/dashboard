@@ -44,7 +44,7 @@ test("Web Analytics adds and selects sites before showing 7-day metrics", async 
   await expect(page.getByRole("heading", { name: "Tracking Setup" })).toBeVisible();
   const code = page.getByRole("region", { name: "Tracking Setup" }).locator("code");
   await expect(code).toContainText(createdSite.site_key);
-  await expect(code).toContainText("https://collector.example/tracker.js");
+  await expect(code).toContainText("https://dashboard.example/a/t.js");
   await expect(page.getByText("Receiving data")).toBeVisible();
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.getByRole("button", { name: "Copy tracking code" }).click();

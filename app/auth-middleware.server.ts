@@ -58,6 +58,11 @@ async function authMiddleware({ request }: { request: Request }): Promise<Respon
     return;
   }
 
+  // Public browser analytics collector; event integrity is validated by its service.
+  if (pathname === "/a/e" && (request.method === "POST" || request.method === "OPTIONS")) {
+    return;
+  }
+
   // Public API endpoints — pass through
   if (PUBLIC_API_PATHS.includes(pathname)) {
     return;

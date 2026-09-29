@@ -6,13 +6,17 @@ describe("Web Analytics boundaries", () => {
     const listRoute = readFileSync("app/api/analytics/sites/route.ts", "utf8");
     const overviewRoute = readFileSync("app/api/analytics/sites/[id]/overview/route.ts", "utf8");
     const installationRoute = readFileSync("app/api/analytics/sites/[id]/installation/route.ts", "utf8");
+    const eventRoute = readFileSync("app/a/e/route.ts", "utf8");
     const service = readFileSync("lib/services/analytics.ts", "utf8");
     for (const route of [listRoute, overviewRoute, installationRoute]) {
       expect(route).toContain("@/lib/services/analytics");
       expect(route).not.toMatch(/repositories\/analytics-sites|cloudflare-analytics|@\/db\/schema/);
     }
-    expect(service).toContain("getTrafficSummary");
+    expect(service).toContain("getAnalyticsTrafficSummary");
     expect(service).toContain("../repositories/analytics-sites");
+    expect(eventRoute).toContain("@/lib/services/analytics-collector");
+    expect(eventRoute).not.toMatch(/repositories\/|@\/db\/|from ["']pg["']|drizzle-orm/);
+    expect(service).not.toMatch(/cloudflare-analytics|Analytics Engine/);
   });
 
   it("loads page data only through the API client", () => {
@@ -25,5 +29,15 @@ describe("Web Analytics boundaries", () => {
     expect(client).toContain('"/analytics/sites"');
     expect(client).toContain("/analytics/sites/${siteId}/overview");
     expect(client).toContain("/analytics/sites/${siteId}/installation");
+  });
+
+  it("keeps the public collector as an HTTP adapter and the exact tracker file allow-listed", () => {
+    const collectorService = readFileSync("lib/services/analytics-collector.ts", "utf8");
+    const middleware = readFileSync("app/auth-middleware.server.ts", "utf8");
+    const server = readFileSync("server/index.mjs", "utf8");
+    expect(collectorService).not.toMatch(/from ["']react-router|Request|Response|@\/lib\/api-server/);
+    expect(middleware).toContain('pathname === "/a/e"');
+    expect(server).toContain('"/a/t.js"');
+    expect(server).not.toMatch(/\/a\/\*|\/a\/\//);
   });
 });

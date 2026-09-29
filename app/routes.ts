@@ -23,7 +23,8 @@ export default [
     route("admin", "(dashboard)/admin/page.tsx"),
   ]),
 
-route("api/accounts/:id", "api/accounts/[id]/route.ts"),
+  route("a/e", "a/e/route.ts"),
+  route("api/accounts/:id", "api/accounts/[id]/route.ts"),
   route("api/accounts", "api/accounts/route.ts"),
   route("api/auth/change-password", "api/auth/change-password/route.ts"),
   route("api/auth/login", "api/auth/login/route.ts"),
