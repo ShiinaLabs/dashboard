@@ -1,27 +1,9 @@
 import { jwtVerify } from "jose";
 import { json } from "@/lib/api-server";
 import { isMockMode } from "@/lib/config";
-import { bootstrap } from "@/lib/setup";
-import { ensureRuntime } from "@/lib/startup";
+import { ensureApplicationReady } from "@/lib/startup";
 
 const SESSION_COOKIE = "dash_session";
-
-// The production node server (server/index.mjs) only wires up the React
-// Router request listener; it never ran the logger/scheduler/DB bootstrap
-// (pool, schema, admin seed) that Next.js used to trigger via lib/startup.ts.
-// Initialize everything lazily on the first request instead, once per
-// process. Mock mode is a no-op inside bootstrap(), so this is safe for
-// `pnpm dev`/`pnpm mock`.
-let bootstrapPromise: Promise<void> | null = null;
-function ensureBootstrap(): Promise<void> {
-  if (!bootstrapPromise) {
-    bootstrapPromise = bootstrap().catch((err) => {
-      bootstrapPromise = null; // allow retry on transient DB failures
-      throw err;
-    });
-  }
-  return bootstrapPromise;
-}
 
 /** Decode a 64-char hex string to a 32-byte Uint8Array. */
 function hexToBytes(hex: string): Uint8Array {
@@ -67,12 +49,9 @@ function getCookie(request: Request, name: string): string | undefined {
 async function authMiddleware({ request }: { request: Request }): Promise<Response | void> {
   const { pathname } = new URL(request.url);
 
-  // First request initializes the logger + background scheduler, then
-  // PostgreSQL (schema + admin user). Keep this in the server-only middleware
-  // so it never leaks into the client bundle, and so /login works before any
-  // DB work is reachable elsewhere.
-  ensureRuntime();
-  await ensureBootstrap();
+  // Startup ordering is centralized: logger, bootstrap, then scheduler.
+  // Await readiness before auth can reach application data.
+  await ensureApplicationReady();
 
   // Static assets — pass through
   if (pathname.startsWith("/assets")) {

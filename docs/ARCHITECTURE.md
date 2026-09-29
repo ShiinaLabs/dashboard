@@ -43,7 +43,7 @@ dashboard/
 ├── app/                        # React Router Framework Mode (pages + API)
 │   ├── root.tsx                # Root layout: html shell, globals.css, Providers
 │   ├── routes.ts               # Declarative route table (pages + API)
-│   ├── auth-middleware.server.ts  # Session/auth middleware + lazy DB bootstrap
+│   ├── auth-middleware.server.ts  # Session/auth middleware + application readiness gate
 │   ├── providers.tsx           # QueryClientProvider + ThemeProvider + Sonner toaster
 │   ├── globals.css             # Tailwind v4 preflight, theme tokens and animations
 │   ├── (dashboard)/            # Dashboard layout + pages (overview, accounts, x, github, gitlab, reddit, settings, admin)
@@ -92,7 +92,7 @@ dashboard/
 │   ├── http.ts                 # fetchWithConfig (TLS-configurable wrapper)
 │   ├── mock/                   # Fixture data for MOCK_DATA=1 debug mode
 │   ├── setup.ts                # bootstrap(): pool, schema, admin seed, token re-encryption
-│   └── startup.ts              # Startup helpers (bootstrap + logger + scheduler)
+│   └── startup.ts              # ensureApplicationReady(): logger, bootstrap, scheduler
 ├── server/
 │   └── index.mjs               # Production entry: node http + @react-router/node + static serving
 ├── shared/
@@ -131,7 +131,7 @@ UI pages and components use the API client for browser requests. They do not acc
 
 The scheduler is a background entry point into dispatch and application operations; it does not pass through an HTTP route. Repositories may use Drizzle and `pg` directly. Fetchers and integration clients communicate with external APIs.
 
-Browser requests flow through `app/auth-middleware.server.ts` (session check + lazy bootstrap) into either:
+Browser requests flow through `app/auth-middleware.server.ts` (application readiness + session check) into either:
 
 - **Pages** — React Router route modules under `app/(dashboard)/`, rendered server-side with client hydration
 - **API** — route handlers under `app/api/*/route.ts` that adapt HTTP requests to application services
@@ -140,14 +140,14 @@ Browser requests flow through `app/auth-middleware.server.ts` (session check + l
 
 1. `server/index.mjs` creates a `node:http` server; static assets under `/assets/`, `/favicon.*` are served from `build/client` by the hand-written static handler
 2. Everything else goes through `createRequestListener` from `@react-router/node`
-3. `app/auth-middleware.server.ts` runs first: it lazily runs `bootstrap()` once per process (idempotent), then enforces auth (public paths pass through, API returns 401, pages redirect to `/login`)
+3. `app/auth-middleware.server.ts` awaits `ensureApplicationReady()` before auth handling. Startup initializes the logger, awaits `bootstrap()`, then starts the scheduler; mock mode skips scheduler startup. Concurrent requests share the same startup promise, and a failed bootstrap can be retried by a later request.
 4. API route handlers and page loaders execute within the same process
 
 ## Key Patterns
 
 - **Singleton Drizzle client** — `getDb()` in `lib/db/connection.ts` returns a cached drizzle instance wrapping a shared `pg` pool (max 5 connections). No per-request connections.
 - **Dependency boundaries** — Browser UI → API client → HTTP route adapters → application services → repositories/integrations. Routes do not import repositories, database drivers, fetchers, or dispatch implementations. Services do not depend on HTTP request/response helpers.
-- **Lazy bootstrap** — `bootstrap()` in `lib/setup.ts` (PostgreSQL pool, missing-table creation, admin seed, plaintext-token re-encryption) is triggered on the first request via `app/auth-middleware.server.ts`, so the production Node server starts without a DB dependency and `MOCK_DATA=1` never touches PostgreSQL.
+- **Application readiness** — `ensureApplicationReady()` in `lib/startup.ts` is the single startup contract: initialize logger, await `bootstrap()` in `lib/setup.ts` (PostgreSQL pool, missing-table creation, admin seed, plaintext-token re-encryption), then start the scheduler once per process. `MOCK_DATA=1` keeps bootstrap a no-op and does not start the scheduler.
 - **Soft-delete** — All destructive operations set `deleted_at = NOW()` instead of DELETE. List queries filter with `deleted_at IS NULL`. Users with the same username can be revived on re-creation.
 - **Confirmation tokens** — Destructive operations (delete account, delete user) require a 6-character random token with 5-minute TTL, stored in an in-memory `Map` (`lib/confirm-helpers.ts`).
 - **Encrypted credentials** — Auth tokens and API keys are encrypted with AES-256-GCM before storage (`lib/crypto.ts`). Decrypted in-memory during fetch cycles. `bootstrap()` re-encrypts any legacy plaintext tokens.
