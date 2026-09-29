@@ -305,7 +305,7 @@ export function GithubWatchlistModal({ accountId, opened, onClose }: { accountId
   const ready = enabled && watchlist.data !== undefined && watchlist.isFetchedAfterMount;
 
   return (
-    <Modal opened={opened} onClose={onClose} title={t("githubWatchlist.title")} size="lg" centered>
+    <Modal opened={opened} onClose={onClose} title={t("githubWatchlist.title")} size="lg">
       {ready ? (
         <GithubWatchlistDialog
           accountId={accountId}

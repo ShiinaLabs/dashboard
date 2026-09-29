@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Pause, Play } from "lucide-react";
 import { api } from "@/lib/api";
-import { Button } from "@/components/ui/form-controls";
+import { Button } from "@/components/ui/button";
 
 // Toggles whether an account is active (fetching enabled). Uses an explicit
 // pause/play icon + label instead of the old ambiguous RefreshCw glyph.
@@ -17,13 +17,12 @@ export function AccountActiveButton({ accountId, isActive }: { accountId: number
     <Button
       onClick={() => toggle.mutate()}
       disabled={toggle.isPending}
-      variant="light"
-      color="gray"
+      variant="secondary"
       size="sm"
-      leftSection={isActive ? <Pause size={14} /> : <Play size={14} />}
       title={isActive ? t("accountActive.pause") : t("accountActive.resume")}
       aria-label={isActive ? t("accountActive.pause") : t("accountActive.resume")}
     >
+      {isActive ? <Pause size={14} aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
       {isActive ? t("accountActive.pause") : t("accountActive.resume")}
     </Button>
   );

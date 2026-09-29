@@ -24,8 +24,6 @@ export function TimeRangeSelector({ value, onChange, options = OPTIONS }: Props)
       onChange={(next) => onChange(Number(next))}
       data={options.map((o) => ({ value: String(o.value), label: t(o.labelKey) }))}
       fullWidth
-      radius="md"
-      size="sm"
     />
   );
 }

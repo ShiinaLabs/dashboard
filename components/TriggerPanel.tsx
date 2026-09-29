@@ -4,7 +4,8 @@ import { useTranslation } from "react-i18next";
 import { Play } from "lucide-react";
 import { api } from "@/lib/api";
 import { getPlatformFetchLevels } from "@/lib/application/scheduler/fetchPolicy";
-import { Button, Select } from "@/components/ui/form-controls";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Which trigger levels a platform supports. Sourced from the shared
 // fetchPolicy table so the UI can never offer a level the backend cannot run.
@@ -34,21 +35,17 @@ export function TriggerPanel({ accountId, platform = "github" }: { accountId: nu
   return (
     // stopPropagation so a trigger click doesn't bubble into a parent card's navigation
     <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-      <Select
-        value={level}
-        onChange={(next) => setLevel(next ?? "all")}
-        data={levels.map((l) => ({ value: l, label: t(`fetchLevel.${l}.label`) }))}
-        size="sm"
-        aria-label={t("fetchLevel.select")}
-      />
+      <Select value={level} onValueChange={setLevel}>
+        <SelectTrigger aria-label={t("fetchLevel.select")}><SelectValue /></SelectTrigger>
+        <SelectContent>{levels.map((fetchLevel) => <SelectItem key={fetchLevel} value={fetchLevel}>{t(`fetchLevel.${fetchLevel}.label`)}</SelectItem>)}</SelectContent>
+      </Select>
       <Button
         onClick={() => trigger.mutate()}
         disabled={trigger.isPending}
-        variant="light"
-        color="gray"
+        variant="secondary"
         size="sm"
-        leftSection={<Play size={12} />}
       >
+        <Play size={12} aria-hidden="true" />
         {trigger.isPending ? t(`${ns}.fetching`) : t(`${ns}.fetchNow`)}
       </Button>
     </div>

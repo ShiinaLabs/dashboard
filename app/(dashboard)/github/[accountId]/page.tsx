@@ -266,7 +266,7 @@ export default function GitHubDetail() {
                   {overview.repos.map((repo: GithubRepo) => (
                     <Link key={repo.id}
                       to={`/github/${accountId}/repos/${repo.repo_id}`}
-                      className="min-w-0 rounded-md p-3 flex items-center gap-3 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] cursor-pointer transition-colors"
+                      className="min-w-0 p-3 flex items-center gap-3 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] cursor-pointer transition-colors"
                     >
                       <BookOpen size={16} className="text-[var(--muted-foreground)] shrink-0" />
                       <div className="min-w-0 flex-1">
@@ -293,7 +293,7 @@ export default function GitHubDetail() {
             </div>
           </Card>
 
-          <Modal opened={showPinDialog} onClose={() => setShowPinDialog(false)} title={t("githubDetail.managePins")} centered>
+          <Modal opened={showPinDialog} onClose={() => setShowPinDialog(false)} title={t("githubDetail.managePins")}>
             <Stack gap="xs">
               {overview.allRepos?.map((repo: GithubRepo) => (
                 <Checkbox key={repo.id} checked={pinnedIds.has(repo.repo_id)} onChange={(e) => {

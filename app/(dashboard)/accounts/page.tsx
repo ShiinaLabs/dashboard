@@ -9,10 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { GithubIcon, GitlabIcon, RedditIcon, XIcon } from "@/components/BrandIcons";
 import { formatDateTime } from "@/lib/client/datetime";
 import { useNow } from "@/lib/client/use-now";
-import { Pencil, Plus, PlayCircle, PauseCircle, Trash2, AlertCircle, ArrowUpRight } from "lucide-react";
+import { Pencil, Plus, PlayCircle, PauseCircle, Trash2, AlertCircle, ArrowUpRight, LoaderCircle } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TriggerPanel } from "@/components/TriggerPanel";
-import { ActionIcon, Button, PasswordInput, TextInput } from "@/components/ui/form-controls";
+import { ActionIcon, PasswordInput, TextInput } from "@/components/ui/form-controls";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 
@@ -85,8 +86,8 @@ export default function AccountsPage() {
         </div>
         <Button
           onClick={() => { setEditing(null); setAdding(true); }}
-          leftSection={<Plus size={16} />}
         >
+          <Plus size={16} aria-hidden="true" />
           {t("settings.addAccount")}
         </Button>
       </div>
@@ -198,8 +199,8 @@ export default function AccountsPage() {
               <p className="text-sm text-[var(--muted-foreground)] mb-4">{t("settings.noAccountsDesc")}</p>
               <Button
                 onClick={() => setAdding(true)}
-                leftSection={<Plus size={14} />}
               >
+                <Plus size={14} aria-hidden="true" />
                 {t("settings.addFirstAccount")}
               </Button>
             </CardContent>
@@ -310,7 +311,7 @@ function AccountFormPanel({
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">{editing ? t("editAccountForm.title") : t("addAccountForm.title")}</h3>
-        <Button onClick={onClose} variant="subtle" color="gray" size="sm">
+        <Button onClick={onClose} variant="ghost" size="sm">
           {t("addAccountForm.cancel")}
         </Button>
       </div>
@@ -320,10 +321,9 @@ function AccountFormPanel({
       {!editing && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {TABS.map(({ key, Icon }) => (
-            <Button key={key} type="button" onClick={() => setPlatform(key)}
-              variant={platform === key ? "light" : "default"} color={platform === key ? "primary" : "gray"}
-              leftSection={<Icon size={16} />} size="sm"
-            >{t(`nav.${key === "twitter" ? "x" : key}`)}</Button>
+            <Button key={key} type="button" onClick={() => setPlatform(key)} variant="secondary" size="sm">
+              <Icon size={16} aria-hidden="true" />{t(`nav.${key === "twitter" ? "x" : key}`)}
+            </Button>
           ))}
         </div>
       )}
@@ -350,8 +350,8 @@ function AccountFormPanel({
           <fieldset>
             <legend className="text-sm font-medium mb-1.5">{t("addAccountForm.redditAuthType")}</legend>
             <div className="grid grid-cols-2 gap-2">
-              <Button type="button" onClick={() => setAuthType(null)} variant={authType !== "reddit_public" ? "light" : "default"} color={authType !== "reddit_public" ? "primary" : "gray"}>{t("addAccountForm.redditOAuth")}</Button>
-              <Button type="button" onClick={() => setAuthType("reddit_public")} variant={authType === "reddit_public" ? "light" : "default"} color={authType === "reddit_public" ? "primary" : "gray"}>{t("addAccountForm.redditPublic")}</Button>
+              <Button type="button" onClick={() => setAuthType(null)} variant="secondary">{t("addAccountForm.redditOAuth")}</Button>
+              <Button type="button" onClick={() => setAuthType("reddit_public")} variant="secondary">{t("addAccountForm.redditPublic")}</Button>
             </div>
             <p className="text-[12px] text-[var(--muted-foreground)] mt-1">
               {isRedditPublic ? t("addAccountForm.helpRedditPublicMode") : t("addAccountForm.helpRedditOAuthMode")}
@@ -437,7 +437,8 @@ function AccountFormPanel({
         </fieldset>
       </div>
 
-      <Button onClick={() => mutation.mutate()} disabled={!canSubmit} fullWidth loading={mutation.isPending}>
+      <Button onClick={() => mutation.mutate()} disabled={!canSubmit} className="w-full">
+        {mutation.isPending && <LoaderCircle className="animate-spin" aria-hidden="true" />}
         {mutation.isPending ? (editing ? t("editAccountForm.saving") : t("addAccountForm.adding")) : (editing ? t("editAccountForm.save") : t("addAccountForm.addAccount"))}
       </Button>
     </div>
@@ -495,7 +496,7 @@ function CookieTable({
           </tbody>
         </table>
       </div>
-      <Button onClick={addRow} variant="default" color="gray" fullWidth>
+      <Button onClick={addRow} variant="secondary" className="w-full">
         + {t("addAccountForm.addCookieRow")}
       </Button>
     </div>

@@ -2,8 +2,12 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AudioLines, LogIn } from "lucide-react";
-import { Alert, Button, PasswordInput, TextInput } from "@/components/ui/form-controls";
+import { AudioLines, LoaderCircle, LogIn } from "lucide-react";
+import { PasswordInput } from "@/components/ui/form-controls";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 
@@ -98,14 +102,17 @@ export default function Login() {
           </div>
 
           <form onSubmit={handleSubmit} className="grid gap-5">
-            <TextInput
-              label={t("login.username")}
-              value={username}
-              onChange={(e) => setUsername(e.currentTarget.value)}
-              placeholder="admin"
-              autoComplete="username"
-              aria-label={t("login.username")}
-            />
+            <div className="grid gap-1.5">
+              <Label htmlFor="login-username">{t("login.username")}</Label>
+              <Input
+                id="login-username"
+                value={username}
+                onChange={(e) => setUsername(e.currentTarget.value)}
+                placeholder="admin"
+                autoComplete="username"
+                aria-label={t("login.username")}
+              />
+            </div>
             <PasswordInput
               label={t("login.password")}
               value={password}
@@ -115,11 +122,11 @@ export default function Login() {
               aria-label={t("login.password")}
             />
 
-            {isMock && <Alert color="yellow">{t("login.mockHint")}</Alert>}
-            {error && <Alert color="danger">{error}</Alert>}
+            {isMock && <Alert className="border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300"><AlertDescription>{t("login.mockHint")}</AlertDescription></Alert>}
+            {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
 
-            <Button type="submit" disabled={loading || (!password && !isMock)} loading={loading} fullWidth className="mt-1">
-              <LogIn aria-hidden="true" />{t("login.login")}
+            <Button type="submit" disabled={loading || (!password && !isMock)} className="mt-1 w-full">
+              {loading ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <LogIn aria-hidden="true" />}{t("login.login")}
             </Button>
           </form>
         </div>

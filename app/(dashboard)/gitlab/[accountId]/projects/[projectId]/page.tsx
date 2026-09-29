@@ -92,7 +92,7 @@ export default function ProjectDetail() {
         </div>
         </div>
         <a href={`${instanceUrl}/${project.path_with_namespace}`} target="_blank" rel="noopener noreferrer"
-          className="flex shrink-0 flex-wrap items-center justify-start gap-2 sm:justify-end flex items-center gap-1.5 px-3 py-2.5 min-h-11 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] transition-colors text-xs">
+          className="flex min-h-11 shrink-0 flex-wrap items-center justify-start gap-1.5 rounded-lg bg-[var(--muted)] px-3 py-2.5 text-xs transition-colors hover:bg-[var(--border)] sm:justify-end">
           <ExternalLink size={12} /> {t("projectDetail.open")}
         </a>
       </div>

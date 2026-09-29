@@ -5,6 +5,12 @@ import { cn } from "@/lib/utils";
 
 export type MetricCardDensity = "default" | "compact";
 export type MetricCardTone = "primary" | "success" | "warn" | "danger";
+const toneClass: Record<MetricCardTone, string> = {
+  primary: "text-foreground",
+  success: "text-[var(--success)]",
+  warn: "text-[var(--warn)]",
+  danger: "text-[var(--danger)]",
+};
 
 export interface MetricCardProps {
   icon: ReactNode;
@@ -30,7 +36,7 @@ export function MetricCard({ icon, label, value, hint, density = "default", tone
         <span data-slot="metric-icon" className="shrink-0 text-muted-foreground [&_svg]:size-4 [&_svg]:stroke-[1.75]" aria-hidden="true">{icon}</span>
       </div>
       <div className="min-w-0">
-        <span data-slot="metric-value" className="block truncate text-2xl font-semibold tracking-tight tabular-nums">{formattedValue}</span>
+        <span data-slot="metric-value" className={cn("block truncate text-2xl font-semibold tracking-tight tabular-nums", toneClass[tone])}>{formattedValue}</span>
         {hint != null && <span data-slot="metric-hint" className="mt-1 block line-clamp-2 text-xs text-muted-foreground">{hint}</span>}
       </div>
     </Card>

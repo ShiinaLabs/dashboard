@@ -285,7 +285,7 @@ export default function RedditDetail() {
               {postsData?.data && postsData.data.length > 0 ? (
                 <div className="detail-list">
                   {postsData.data.slice(0, 10).map((post: RedditPost) => (
-                    <div key={post.id} className="min-w-0 rounded-md p-3 flex items-start gap-3 rounded-lg bg-[var(--muted)]">
+                    <div key={post.id} className="min-w-0 p-3 flex items-start gap-3 rounded-lg bg-[var(--muted)]">
                       <ThumbsUp size={16} className="text-[var(--chart-4)] mt-1 shrink-0" />
                       <div className="min-w-0 flex-1">
                         <a href={`https://reddit.com${post.permalink}`} target="_blank" rel="noopener noreferrer" className="min-h-11 text-sm font-medium hover:underline line-clamp-2">{post.title}</a>
@@ -317,7 +317,7 @@ export default function RedditDetail() {
               {commentsData?.data && commentsData.data.length > 0 ? (
                 <div className="detail-list">
                   {commentsData.data.slice(0, 10).map((comment: RedditComment) => (
-                    <div key={comment.id} className="min-w-0 rounded-md p-3 flex items-start gap-3 rounded-lg bg-[var(--muted)]">
+                    <div key={comment.id} className="min-w-0 p-3 flex items-start gap-3 rounded-lg bg-[var(--muted)]">
                       <MessageSquare size={16} className="text-[var(--chart-1)] mt-1 shrink-0" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm line-clamp-3">{comment.body}</p>

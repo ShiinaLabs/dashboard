@@ -105,3 +105,13 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 }
+
+.ui-card-responsive-padding {
+  padding: var(--card-padding-base, 0);
+}
+
+@media (min-width: 40rem) {
+  .ui-card-responsive-padding {
+    padding: var(--card-padding-sm, var(--card-padding-base, 0));
+  }
+}

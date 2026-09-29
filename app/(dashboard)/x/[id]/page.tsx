@@ -53,7 +53,7 @@ function TweetListItem({ tweet, screenName }: { tweet: Tweet; screenName: string
       href={`https://x.com/${screenName}/status/${tweet.id}`}
       target="_blank"
       rel="noopener noreferrer"
-      className="min-w-0 rounded-md p-3 block rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] transition-colors space-y-2 group"
+      className="min-w-0 p-3 block rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] transition-colors space-y-2 group"
     >
       <div className="flex items-start justify-between gap-2">
         <p className="text-sm whitespace-pre-wrap break-words">{tweet.full_text}</p>

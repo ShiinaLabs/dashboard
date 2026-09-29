@@ -254,7 +254,7 @@ export default function GitLabDetail() {
                   {overview.projects.map((p: GitlabProject) => (
                     <Link key={p.id}
                       to={`/gitlab/${accountId}/projects/${p.project_id}`}
-                      className="min-w-0 rounded-md p-3 flex items-center gap-3 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] cursor-pointer transition-colors"
+                      className="min-w-0 p-3 flex items-center gap-3 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] cursor-pointer transition-colors"
                     >
                       <BookOpen size={16} className="text-[var(--muted-foreground)] shrink-0" />
                       <div className="min-w-0 flex-1">
@@ -282,7 +282,7 @@ export default function GitLabDetail() {
             </div>
           </Card>
 
-          <Modal opened={showPinDialog} onClose={() => setShowPinDialog(false)} title={t("gitlabDetail.managePins")} centered>
+          <Modal opened={showPinDialog} onClose={() => setShowPinDialog(false)} title={t("gitlabDetail.managePins")}>
             <Stack gap="xs">
               {overview.allProjects?.map((p: GitlabProject) => (
                 <Checkbox key={p.id} checked={pinnedIds.has(p.project_id)} onChange={(e) => {
