@@ -278,8 +278,8 @@ export default function WebAnalyticsPage() {
                 value: item.visits,
               }))}
             />
-            <AnalyticsDimensionCard
-              title={t("analytics.entryPages")}
+          <AnalyticsDimensionCard
+            title={t("analytics.entryPages")}
               itemLabel={t("analytics.entryPage")}
               metricLabel={t("analytics.visits")}
               totalValue={acquisition?.totalVisits ?? 0}
@@ -294,6 +294,27 @@ export default function WebAnalyticsPage() {
                 value: item.visits,
               }))}
             />
+          <AnalyticsDimensionCard
+            title={t("analytics.campaigns")}
+            itemLabel={t("analytics.campaign")}
+            metricLabel={t("analytics.visits")}
+            totalValue={acquisition?.totalVisits ?? 0}
+            shareLabel={t("analytics.share")}
+            emptyMessage={t("analytics.noCampaignData")}
+            loadingLabel={t("common.loading")}
+            loading={!dashboard}
+            items={(acquisition?.campaigns ?? []).map((item) => {
+              const source = item.source || "—";
+              const medium = item.medium || "—";
+              const label = item.campaign ? `${item.campaign} · ${source} / ${medium}` : `${source} / ${medium}`;
+              return {
+                key: `${item.source}\u0000${item.medium}\u0000${item.campaign}`,
+                label,
+                title: label,
+                value: item.visits,
+              };
+            })}
+          />
           </div>
         </section>
 

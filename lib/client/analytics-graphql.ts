@@ -10,6 +10,13 @@ export interface AnalyticsEntryPage {
   visits: number;
 }
 
+export interface AnalyticsCampaign {
+  source: string;
+  medium: string;
+  campaign: string;
+  visits: number;
+}
+
 export interface AnalyticsAcquisition {
   period: { days: 7; timezone: string };
   totalVisits: number;
@@ -39,6 +46,7 @@ interface AnalyticsAcquisitionSummary {
   totalVisits: number;
   referrers: AnalyticsAcquisitionReferrer[];
   entryPages: AnalyticsEntryPage[];
+  campaigns: AnalyticsCampaign[];
 }
 
 const acquisitionQuery = /* GraphQL */ `
@@ -78,7 +86,12 @@ const dashboardQuery = /* GraphQL */ `
           operatingSystems { os views }
           devices { device views }
         }
-        acquisition { totalVisits referrers { referrer visits } entryPages { path visits } }
+        acquisition {
+          totalVisits
+          referrers { referrer visits }
+          entryPages { path visits }
+          campaigns { source medium campaign visits }
+        }
       }
     }
   }

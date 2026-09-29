@@ -46,6 +46,9 @@ describe("analytics collector application service", () => {
       device_type: "Desktop",
       visitor: true,
       visit: false,
+      utm_source: "",
+      utm_medium: "",
+      utm_campaign: "",
     });
     const stored = JSON.stringify(insertAnalyticsEvent.mock.calls[0][0]);
     expect(stored).not.toContain("private-query");
@@ -84,5 +87,57 @@ describe("analytics collector application service", () => {
       country: "XX1",
     });
     expect(insertAnalyticsEvent).toHaveBeenCalledWith(expect.objectContaining({ referrer_host: "", country: "Unknown" }));
+  });
+
+  it("accepts legacy payloads without UTM fields and stores empty attribution", async () => {
+    await expect(collectAnalyticsEvent({ payload: { ...validPayload, visit: true }, origin: "https://wifi-lens.app" }))
+      .resolves.toBe("recorded");
+    expect(insertAnalyticsEvent).toHaveBeenCalledWith(expect.objectContaining({
+      visit: true,
+      utm_source: "",
+      utm_medium: "",
+      utm_campaign: "",
+    }));
+  });
+
+  it("normalizes explicit UTM values and persists them only on visit entries", async () => {
+    await collectAnalyticsEvent({
+      payload: { ...validPayload, visit: true, utmSource: "  Newsletter  ", utmMedium: " email ", utmCampaign: "Launch 2026 " },
+      origin: "https://wifi-lens.app",
+    });
+    expect(insertAnalyticsEvent).toHaveBeenCalledWith(expect.objectContaining({
+      visit: true,
+      utm_source: "Newsletter",
+      utm_medium: "email",
+      utm_campaign: "Launch 2026",
+    }));
+
+    await collectAnalyticsEvent({
+      payload: { ...validPayload, visit: false, utmSource: "google", utmMedium: "cpc", utmCampaign: "launch" },
+      origin: "https://wifi-lens.app",
+    });
+    expect(insertAnalyticsEvent).toHaveBeenLastCalledWith(expect.objectContaining({
+      visit: false,
+      utm_source: "",
+      utm_medium: "",
+      utm_campaign: "",
+    }));
+  });
+
+  it("drops UTM control characters and truncates values without rejecting the event", async () => {
+    await expect(collectAnalyticsEvent({
+      payload: {
+        ...validPayload,
+        visit: true,
+        utmSource: "bad\u0001source",
+        utmMedium: `  ${"m".repeat(205)}  `,
+        utmCampaign: "c".repeat(250),
+      },
+      origin: "https://wifi-lens.app",
+    })).resolves.toBe("recorded");
+    const stored = insertAnalyticsEvent.mock.calls[0][0];
+    expect(stored.utm_source).toBe("");
+    expect(stored.utm_medium).toBe("m".repeat(200));
+    expect(stored.utm_campaign).toBe("c".repeat(200));
   });
 });

@@ -74,7 +74,7 @@ describe("GraphQL client helper", () => {
       previousOverview: { views: 10, visits: 3, visitorDays: 7 },
       timeline: [], topPages: [],
       dimensions: { countries: [], browsers: [], operatingSystems: [], devices: [] },
-      acquisition: { totalVisits: 4, referrers: [], entryPages: [] },
+      acquisition: { totalVisits: 4, referrers: [], entryPages: [], campaigns: [{ source: "newsletter", medium: "email", campaign: "launch", visits: 2 }] },
     };
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: { analytics: { dashboard } } })));
     await expect(getAnalyticsDashboard(12, "DAYS_30", "Asia/Tokyo")).resolves.toEqual(dashboard);
@@ -85,6 +85,7 @@ describe("GraphQL client helper", () => {
     expect(body.variables).toEqual({ siteId: 12, range: "DAYS_30", timezone: "Asia/Tokyo" });
     expect(body.query).toContain("previousOverview { views visits visitorDays }");
     expect(body.query).toContain("dimensions {");
-    expect(body.query).toContain("acquisition { totalVisits");
+    expect(body.query).toContain("acquisition {");
+    expect(body.query).toContain("campaigns { source medium campaign visits }");
   });
 });

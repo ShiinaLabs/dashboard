@@ -14,6 +14,9 @@ export interface NewAnalyticsEvent {
   device_type: string;
   visitor: boolean;
   visit: boolean;
+  utm_source: string;
+  utm_medium: string;
+  utm_campaign: string;
 }
 
 export interface AnalyticsTrafficSummary {
@@ -82,6 +85,13 @@ export interface AnalyticsEntryPage {
   visits: number;
 }
 
+export interface AnalyticsCampaign {
+  source: string;
+  medium: string;
+  campaign: string;
+  visits: number;
+}
+
 export interface AnalyticsAcquisitionReport {
   period: { days: 7; timezone: string };
   totalVisits: number;
@@ -114,6 +124,7 @@ export interface AnalyticsDashboardReport {
     totalVisits: number;
     referrers: AnalyticsAcquisitionReferrer[];
     entryPages: AnalyticsEntryPage[];
+    campaigns: AnalyticsCampaign[];
   };
 }
 
@@ -152,6 +163,10 @@ function mockDashboardReport(timezone: string, days: number): AnalyticsDashboard
       totalVisits: 4_102,
       referrers: [{ referrer: "", visits: 2_100 }, { referrer: "google.com", visits: 980 }, { referrer: "github.com", visits: 520 }],
       entryPages: [{ path: "/", visits: 1_800 }, { path: "/pricing", visits: 900 }, { path: "/docs", visits: 600 }],
+      campaigns: [
+        { source: "newsletter", medium: "email", campaign: "launch", visits: 420 },
+        { source: "google", medium: "cpc", campaign: "wifi-tool", visits: 210 },
+      ],
     },
   };
 }
@@ -493,6 +508,7 @@ export async function getAnalyticsDashboardReport(siteId: number, timezone: stri
     scoped_events AS MATERIALIZED (
       SELECT event.path, event.visitor, event.visit,
         event.referrer_host, event.country, event.browser, event.os, event.device_type,
+        event.utm_source, event.utm_medium, event.utm_campaign,
         (event.recorded_at AT TIME ZONE bounds.timezone)::date AS local_date
       FROM analytics_events AS event
       CROSS JOIN bounds
@@ -553,7 +569,8 @@ export async function getAnalyticsDashboardReport(siteId: number, timezone: stri
       GROUP BY device_type ORDER BY COUNT(*) DESC, device_type ASC LIMIT 10
     ),
     visit_events AS MATERIALIZED (
-      SELECT path, referrer_host FROM current_events WHERE visit = TRUE
+      SELECT path, referrer_host, utm_source, utm_medium, utm_campaign
+      FROM current_events WHERE visit = TRUE
     ),
     top_referrers AS (
       SELECT referrer_host AS referrer, COUNT(*)::int AS visits FROM visit_events
@@ -562,6 +579,14 @@ export async function getAnalyticsDashboardReport(siteId: number, timezone: stri
     entry_pages AS (
       SELECT path, COUNT(*)::int AS visits FROM visit_events
       GROUP BY path ORDER BY COUNT(*) DESC, path ASC LIMIT 10
+    ),
+    top_campaigns AS (
+      SELECT utm_source AS source, utm_medium AS medium, utm_campaign AS campaign, COUNT(*)::int AS visits
+      FROM visit_events
+      WHERE utm_source <> '' OR utm_medium <> '' OR utm_campaign <> ''
+      GROUP BY utm_source, utm_medium, utm_campaign
+      ORDER BY COUNT(*) DESC, utm_campaign ASC, utm_source ASC, utm_medium ASC
+      LIMIT 10
     )
     SELECT bounds.timezone,
       to_char(bounds.current_start_date, 'YYYY-MM-DD') AS current_start_date,
@@ -586,7 +611,9 @@ export async function getAnalyticsDashboardReport(siteId: number, timezone: stri
       json_build_object(
         'totalVisits', current_summary.visits,
         'referrers', COALESCE((SELECT json_agg(json_build_object('referrer', referrer, 'visits', visits) ORDER BY visits DESC, referrer ASC) FROM top_referrers), '[]'::json),
-        'entryPages', COALESCE((SELECT json_agg(json_build_object('path', path, 'visits', visits) ORDER BY visits DESC, path ASC) FROM entry_pages), '[]'::json)
+        'entryPages', COALESCE((SELECT json_agg(json_build_object('path', path, 'visits', visits) ORDER BY visits DESC, path ASC) FROM entry_pages), '[]'::json),
+        'campaigns', COALESCE((SELECT json_agg(json_build_object('source', source, 'medium', medium, 'campaign', campaign, 'visits', visits)
+          ORDER BY visits DESC, campaign ASC, source ASC, medium ASC) FROM top_campaigns), '[]'::json)
       ) AS acquisition
     FROM bounds CROSS JOIN current_summary CROSS JOIN previous_summary
   `);

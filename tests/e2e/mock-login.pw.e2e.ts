@@ -110,6 +110,7 @@ test("Web Analytics adds and selects sites, then switches the complete dashboard
   }
   await expect(page.getByRole("heading", { name: "Acquisition", level: 2 })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Entry Pages", level: 2 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Campaigns", level: 2 })).toBeVisible();
   const referrerCard = page.getByRole("heading", { name: "Referrers", level: 2 }).locator("xpath=../..");
   const entryPageCard = page.getByRole("heading", { name: "Entry Pages", level: 2 }).locator("xpath=../..");
   await expect(referrerCard.getByText("Visits", { exact: true })).toBeVisible();
@@ -118,6 +119,11 @@ test("Web Analytics adds and selects sites, then switches the complete dashboard
   await expect(entryPageCard.getByTitle("/", { exact: true })).toBeVisible();
   await expect(entryPageCard.getByTitle("/pricing", { exact: true })).toBeVisible();
   await expect(entryPageCard.getByTitle("/docs", { exact: true })).toBeVisible();
+  const campaignCard = page.getByRole("heading", { name: "Campaigns", level: 2 }).locator("xpath=../..");
+  await expect(campaignCard.getByText("Visits", { exact: true })).toBeVisible();
+  await expect(campaignCard.getByTitle("launch · newsletter / email", { exact: true })).toBeVisible();
+  await expect(campaignCard.getByTitle("wifi-tool · google / cpc", { exact: true })).toBeVisible();
+  await expect(campaignCard.getByText("10.2%", { exact: true })).toBeVisible();
   await expect(page.getByText("Direct", { exact: true })).toBeVisible();
   await expect(page.getByText("google.com", { exact: true })).toBeVisible();
   await expect(page.getByText("Japan (JP)", { exact: true })).toBeVisible();
@@ -132,7 +138,9 @@ test("Web Analytics adds and selects sites, then switches the complete dashboard
   });
   await page.getByRole("button", { name: "30D" }).click();
   const thirtyDayData = await thirtyDayResponse;
-  expect((await thirtyDayData.json()).data.analytics.dashboard.timeline).toHaveLength(30);
+  const thirtyDayDashboard = (await thirtyDayData.json()).data.analytics.dashboard;
+  expect(thirtyDayDashboard.timeline).toHaveLength(30);
+  expect(thirtyDayDashboard.acquisition.campaigns).toHaveLength(2);
   await expect(page.getByText("Last 30 days")).toBeVisible();
   await expect(page.getByRole("button", { name: "30D" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText("Average Daily Visitors").first()).toBeVisible();
@@ -143,7 +151,9 @@ test("Web Analytics adds and selects sites, then switches the complete dashboard
   });
   await page.getByRole("button", { name: "90D" }).click();
   const ninetyDayData = await ninetyDayResponse;
-  expect((await ninetyDayData.json()).data.analytics.dashboard.timeline).toHaveLength(90);
+  const ninetyDayDashboard = (await ninetyDayData.json()).data.analytics.dashboard;
+  expect(ninetyDayDashboard.timeline).toHaveLength(90);
+  expect(ninetyDayDashboard.acquisition.campaigns).toHaveLength(2);
   await expect(page.getByText("Last 90 days")).toBeVisible();
   await expect(page.getByRole("button", { name: "90D" })).toHaveAttribute("aria-pressed", "true");
 });
@@ -152,7 +162,7 @@ test("Analytics card headers have the shared vertical inset", async ({ page }) =
   await logIn(page);
   await page.goto("/analytics");
   await page.setViewportSize({ width: 1440, height: 1000 });
-  for (const title of ["Traffic over time", "Visitor geography", "Top Pages", "Countries", "Browsers", "Operating Systems", "Devices", "Referrers", "Entry Pages"]) {
+  for (const title of ["Traffic over time", "Visitor geography", "Top Pages", "Countries", "Browsers", "Operating Systems", "Devices", "Referrers", "Entry Pages", "Campaigns"]) {
     const heading = page.locator('[data-slot="card-title"]').filter({ hasText: title }).first();
     const card = heading.locator("xpath=ancestor::*[@data-slot='card'][1]");
     const cardBounds = await card.boundingBox();
@@ -188,12 +198,13 @@ test("dashboard shows separate acquisition empty states when the selected site h
       timeline: Array.from({ length: 7 }, (_, i) => ({ date: `2026-09-${String(i + 23).padStart(2, "0")}`, views: 0, visitors: 0, visits: 0 })),
       topPages: [],
       dimensions: { countries: [], browsers: [], operatingSystems: [], devices: [] },
-      acquisition: { totalVisits: 0, referrers: [], entryPages: [] },
+      acquisition: { totalVisits: 0, referrers: [], entryPages: [], campaigns: [] },
     } } } }),
   }));
   await page.goto("/analytics");
   await expect(page.getByText("No acquisition referrer data in this period")).toBeVisible();
   await expect(page.getByText("No entry page data in this period")).toBeVisible();
+  await expect(page.getByText("No campaign data in this period")).toBeVisible();
   await expect(page.getByRole("img", { name: "Traffic over time" })).toBeVisible();
 });
 

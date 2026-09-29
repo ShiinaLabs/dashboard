@@ -107,6 +107,13 @@ export const analyticsTypeDefs = /* GraphQL */ `
     visits: Int!
   }
 
+  type AnalyticsCampaign {
+    source: String!
+    medium: String!
+    campaign: String!
+    visits: Int!
+  }
+
   type AnalyticsAcquisition {
     period: AnalyticsPeriod!
     totalVisits: Int!
@@ -138,6 +145,7 @@ export const analyticsTypeDefs = /* GraphQL */ `
     totalVisits: Int!
     referrers: [AnalyticsAcquisitionReferrer!]!
     entryPages: [AnalyticsEntryPage!]!
+    campaigns: [AnalyticsCampaign!]!
   }
 
   type AnalyticsDashboard {

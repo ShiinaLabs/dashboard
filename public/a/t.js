@@ -9,7 +9,7 @@
     const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!uuidV4.test(site) || !host || location.host.toLowerCase() !== host.toLowerCase()) return;
 
-    const collectorOrigin = new URL(script.src, location.href).origin;
+    const collectorOrigin = new URL(script.src).origin;
     const path = location.pathname.replace(/\/+$/, "") || "/";
     const now = Date.now();
     const date = new Date(now);
@@ -38,7 +38,18 @@
       referrer: document.referrer || "",
       visitor,
       visit,
+      utmSource: "",
+      utmMedium: "",
+      utmCampaign: "",
     };
+    try {
+      const params = new URLSearchParams(location.search);
+      payload.utmSource = (params.get("utm_source") || "").trim().slice(0, 200);
+      payload.utmMedium = (params.get("utm_medium") || "").trim().slice(0, 200);
+      payload.utmCampaign = (params.get("utm_campaign") || "").trim().slice(0, 200);
+    } catch {
+      // Query parsing must not interfere with page view delivery.
+    }
     fetch(`${collectorOrigin}/a/e`, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=UTF-8" },

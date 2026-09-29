@@ -26,6 +26,9 @@ export const analytics_events = pgTable("analytics_events", {
   device_type: text("device_type").notNull(),
   visitor: boolean("visitor").notNull(),
   visit: boolean("visit").notNull(),
+  utm_source: text("utm_source").notNull().default(""),
+  utm_medium: text("utm_medium").notNull().default(""),
+  utm_campaign: text("utm_campaign").notNull().default(""),
   recorded_at: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   siteRecorded: index("idx_analytics_events_site_recorded").on(table.site_id, table.recorded_at.desc()),

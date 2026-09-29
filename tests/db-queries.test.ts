@@ -32,7 +32,8 @@ import { SyncTelemetry } from "../lib/application/usecases/SyncTelemetry";
 import { createUser } from "../lib/services/users";
 import { createAnalyticsSite, getAnalyticsSiteById, getAnalyticsSiteByKey, getAnalyticsSites } from "../lib/repositories/analytics-sites";
 import { getAnalyticsAcquisitionReport, getAnalyticsDashboardReport, getAnalyticsTrafficReport, insertAnalyticsEvent } from "../lib/repositories/analytics-events";
-import { ensureAnalyticsSiteConstraints } from "../lib/setup";
+import { ensureAnalyticsSiteConstraints, ensureSchemaColumns } from "../lib/setup";
+import { collectAnalyticsEvent } from "../lib/services/analytics-collector";
 
 beforeAll(async () => {
   const databaseConfig = getTestDatabaseConfig();
@@ -184,6 +185,63 @@ describe("analytics site queries", () => {
 });
 
 describe("analytics event queries", () => {
+  it("upgrades legacy analytics events with defaulted UTM columns", async () => {
+    await getTestPool().query("ALTER TABLE analytics_events DROP COLUMN utm_source, DROP COLUMN utm_medium, DROP COLUMN utm_campaign");
+    const suffix = Date.now();
+    const owner = await usersQ.insertUser({ username: `analytics_legacy_utm_${suffix}`, password_hash: "hash", role: "user" });
+    const site = await createAnalyticsSite({ owner_id: owner.id, name: "Legacy UTM", site_key: `legacy-utm-${suffix}`, host: "legacy-utm.example" });
+    await getTestPool().query(`
+      INSERT INTO analytics_events(site_id, path, referrer_host, os, browser, country, device_type, visitor, visit)
+      VALUES ($1, '/', '', 'Other', 'Other', 'Unknown', 'Desktop', FALSE, TRUE)
+    `, [site.id]);
+    await ensureSchemaColumns(getTestPool());
+    const { rows } = await getTestPool().query(`
+      SELECT column_name, is_nullable, column_default
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'analytics_events'
+        AND column_name IN ('utm_source', 'utm_medium', 'utm_campaign')
+      ORDER BY column_name
+    `);
+    expect(rows).toEqual([
+      { column_name: "utm_campaign", is_nullable: "NO", column_default: "''::text" },
+      { column_name: "utm_medium", is_nullable: "NO", column_default: "''::text" },
+      { column_name: "utm_source", is_nullable: "NO", column_default: "''::text" },
+    ]);
+    const { rows: [legacyEvent] } = await getTestPool().query(
+      "SELECT utm_source, utm_medium, utm_campaign FROM analytics_events WHERE site_id = $1",
+      [site.id],
+    );
+    expect(legacyEvent).toEqual({ utm_source: "", utm_medium: "", utm_campaign: "" });
+  });
+
+  it("persists collector UTM values only for normalized visit entries", async () => {
+    const suffix = Date.now();
+    const owner = await usersQ.insertUser({ username: `analytics_collector_db_${suffix}`, password_hash: "hash", role: "user" });
+    const siteKey = `123e4567-e89b-42d3-a456-${String(suffix).slice(-12).padStart(12, "0")}`;
+    const site = await createAnalyticsSite({ owner_id: owner.id, name: "Collector DB", site_key: siteKey, host: "collector-db.example" });
+    const collect = (path: string, visit: boolean, utm: Record<string, string> = {}) => collectAnalyticsEvent({
+      payload: { site: site.site_key, host: site.host, path, referrer: "", visitor: true, visit, ...utm },
+      origin: `https://${site.host}`,
+      userAgent: "Mozilla/5.0 (X11; Linux x86_64) Gecko/20100101 Firefox/126.0",
+    });
+
+    await expect(collect("/legacy", true)).resolves.toBe("recorded");
+    await expect(collect("/campaign", true, { utmSource: " newsletter ", utmMedium: "email", utmCampaign: "launch" })).resolves.toBe("recorded");
+    await expect(collect("/page-view", false, { utmSource: "google", utmMedium: "cpc", utmCampaign: "launch" })).resolves.toBe("recorded");
+    await expect(collect("/malformed", true, { utmSource: "bad\u0001source", utmMedium: "m".repeat(205), utmCampaign: "c".repeat(201) })).resolves.toBe("recorded");
+
+    const { rows } = await getTestPool().query(`
+      SELECT path, visit, utm_source, utm_medium, utm_campaign
+      FROM analytics_events WHERE site_id = $1 ORDER BY id
+    `, [site.id]);
+    expect(rows).toEqual([
+      { path: "/legacy", visit: true, utm_source: "", utm_medium: "", utm_campaign: "" },
+      { path: "/campaign", visit: true, utm_source: "newsletter", utm_medium: "email", utm_campaign: "launch" },
+      { path: "/page-view", visit: false, utm_source: "", utm_medium: "", utm_campaign: "" },
+      { path: "/malformed", visit: true, utm_source: "", utm_medium: "m".repeat(200), utm_campaign: "c".repeat(200) },
+    ]);
+  });
+
   it("builds timezone-aware summaries, zero-filled timelines, and deterministic top pages per site", async () => {
     const suffix = Date.now();
     const owner = await usersQ.insertUser({ username: `analytics_events_${suffix}`, password_hash: "hash", role: "user" });
@@ -196,7 +254,7 @@ describe("analytics event queries", () => {
     const emptySite = await createAnalyticsSite({ owner_id: owner.id, name: "Empty Site", site_key: `623e4567-e89b-42d3-a456-${String(suffix + 4).slice(-12).padStart(12, "0")}`, host: "empty.example" });
     const countrySite = await createAnalyticsSite({ owner_id: owner.id, name: "Country Site", site_key: `723e4567-e89b-42d3-a456-${String(suffix + 5).slice(-12).padStart(12, "0")}`, host: "countries.example" });
     expect(await getAnalyticsSiteByKey(site.site_key)).toMatchObject({ id: site.id });
-    const event = { site_id: site.id, path: "/", referrer_host: "", os: "Other", browser: "Other", country: "Unknown", device_type: "Desktop", visitor: false, visit: false };
+    const event = { site_id: site.id, path: "/", referrer_host: "", os: "Other", browser: "Other", country: "Unknown", device_type: "Desktop", visitor: false, visit: false, utm_source: "", utm_medium: "", utm_campaign: "" };
     await insertAnalyticsEvent({ ...event, visitor: true, visit: true });
     await insertAnalyticsEvent({ ...event, visitor: false, visit: false });
     await insertAnalyticsEvent({ ...event, visitor: false, visit: true });
@@ -225,7 +283,7 @@ describe("analytics event queries", () => {
           ((((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')::date - $3::integer)::timestamp) AT TIME ZONE 'Asia/Tokyo') + INTERVAL '12 hours'
       `, [siteId, path, daysAgo, visitor, visit]);
     };
-    const reportEvents = { site_id: reportSite.id, path: "/a", referrer_host: "", os: "Other", browser: "Other", country: "Unknown", device_type: "Desktop", visitor: false, visit: false };
+    const reportEvents = { site_id: reportSite.id, path: "/a", referrer_host: "", os: "Other", browser: "Other", country: "Unknown", device_type: "Desktop", visitor: false, visit: false, utm_source: "", utm_medium: "", utm_campaign: "" };
     for (let index = 0; index < 10; index += 1) await insertAnalyticsEvent(reportEvents);
     for (let index = 0; index < 5; index += 1) await insertAnalyticsEvent({ ...reportEvents, path: "/b", visitor: index === 0, visit: index === 0 });
     for (let index = 0; index < 5; index += 1) await insertAnalyticsEvent({ ...reportEvents, path: "/c" });
@@ -234,10 +292,10 @@ describe("analytics event queries", () => {
     }
     await insertAtTokyoDay(reportSite.id, "/two-days-ago", 2);
     await insertAtTokyoDay(reportSite.id, "/eight-days-ago", 8, true, true);
-    const otherEvents = { site_id: otherSite.id, path: "/path-b", referrer_host: "bing.com", os: "Windows", browser: "Chrome", country: "US", device_type: "Desktop", visitor: false, visit: false };
+    const otherEvents = { site_id: otherSite.id, path: "/path-b", referrer_host: "bing.com", os: "Windows", browser: "Chrome", country: "US", device_type: "Desktop", visitor: false, visit: false, utm_source: "", utm_medium: "", utm_campaign: "" };
     for (let index = 0; index < 20; index += 1) await insertAnalyticsEvent(otherEvents);
 
-    const dimensionEvent = { site_id: dimensionSite.id, path: "/dimensions", referrer_host: "", os: "macOS", browser: "Safari", country: "JP", device_type: "Desktop", visitor: false, visit: false };
+    const dimensionEvent = { site_id: dimensionSite.id, path: "/dimensions", referrer_host: "", os: "macOS", browser: "Safari", country: "JP", device_type: "Desktop", visitor: false, visit: false, utm_source: "", utm_medium: "", utm_campaign: "" };
     const insertDimensionGroup = async (count: number, fields: Partial<typeof dimensionEvent>) => {
       for (let index = 0; index < count; index += 1) await insertAnalyticsEvent({ ...dimensionEvent, ...fields });
     };
@@ -253,7 +311,7 @@ describe("analytics event queries", () => {
 
     const insertCountForLimit = async (referrer: string, count: number) => {
       for (let index = 0; index < count; index += 1) {
-        await insertAnalyticsEvent({ site_id: limitSite.id, path: "/limit", referrer_host: referrer, os: "Other", browser: "Other", country: "Unknown", device_type: "Other", visitor: false, visit: false });
+        await insertAnalyticsEvent({ site_id: limitSite.id, path: "/limit", referrer_host: referrer, os: "Other", browser: "Other", country: "Unknown", device_type: "Other", visitor: false, visit: false, utm_source: "", utm_medium: "", utm_campaign: "" });
       }
     };
     await insertCountForLimit("a.example", 5);
@@ -263,7 +321,7 @@ describe("analytics event queries", () => {
     const countryCounts = [["JP", 20], ["US", 10], ["DE", 5], ...["AU", "BR", "CA", "CN", "ES", "FR", "GB", "IN", "IT"].map((country) => [country, 1] as const)] as const;
     for (const [country, count] of countryCounts) {
       for (let index = 0; index < count; index += 1) {
-        await insertAnalyticsEvent({ site_id: countrySite.id, path: `/country/${country}`, referrer_host: "geo.example", os: `OS ${country}`, browser: `Browser ${country}`, country, device_type: `Device ${country}`, visitor: false, visit: false });
+        await insertAnalyticsEvent({ site_id: countrySite.id, path: `/country/${country}`, referrer_host: "geo.example", os: `OS ${country}`, browser: `Browser ${country}`, country, device_type: `Device ${country}`, visitor: false, visit: false, utm_source: "", utm_medium: "", utm_campaign: "" });
       }
     }
 
@@ -362,6 +420,9 @@ describe("analytics event queries", () => {
       country: "Unknown",
       device_type: "Desktop",
       visitor: false,
+      utm_source: "",
+      utm_medium: "",
+      utm_campaign: "",
     };
     await insertAnalyticsEvent({ ...acquisitionEvent, path: "/landing", referrer_host: "google.com", visit: true });
     await insertAnalyticsEvent({ ...acquisitionEvent, path: "/campaign", referrer_host: "google.com", visit: true });
@@ -516,6 +577,71 @@ describe("analytics event queries", () => {
       expect(report.timeline).toHaveLength(30);
       expect(report.timeline.every((point) => point.views === 0 && point.visitors === 0 && point.visits === 0)).toBe(true);
     }
+  });
+
+  it("groups current visit-entry campaigns by the full UTM tuple and isolates sites", async () => {
+    const suffix = Date.now();
+    const owner = await usersQ.insertUser({ username: `analytics_campaigns_${suffix}`, password_hash: "hash", role: "user" });
+    const otherOwner = await usersQ.insertUser({ username: `analytics_campaigns_other_${suffix}`, password_hash: "hash", role: "user" });
+    const site = await createAnalyticsSite({ owner_id: owner.id, name: "Campaigns", site_key: `campaigns-${suffix}`, host: "campaigns.example" });
+    const otherSite = await createAnalyticsSite({ owner_id: otherOwner.id, name: "Other Campaigns", site_key: `campaigns-other-${suffix}`, host: "other-campaigns.example" });
+    const event = {
+      site_id: site.id,
+      path: "/landing",
+      referrer_host: "",
+      os: "Other",
+      browser: "Other",
+      country: "Unknown",
+      device_type: "Desktop",
+      visitor: false,
+      visit: true,
+      utm_source: "google",
+      utm_medium: "cpc",
+      utm_campaign: "launch",
+    };
+    await insertAnalyticsEvent(event);
+    for (let index = 0; index < 5; index += 1) {
+      await insertAnalyticsEvent({ ...event, path: `/follow-up-${index}`, visit: false });
+    }
+    await insertAnalyticsEvent({ ...event, utm_source: "newsletter", utm_medium: "email" });
+    await insertAnalyticsEvent({ ...event, utm_source: "", utm_medium: "", utm_campaign: "" });
+    await insertAnalyticsEvent({ ...event, site_id: otherSite.id, utm_source: "other-site", utm_campaign: "private" });
+    await getTestPool().query(`
+      INSERT INTO analytics_events(site_id, path, referrer_host, os, browser, country, device_type, visitor, visit,
+        utm_source, utm_medium, utm_campaign, recorded_at)
+      SELECT $1, '/previous-campaign', '', 'Other', 'Other', 'Unknown', 'Desktop', FALSE, TRUE,
+        'old-source', 'social', 'previous-only',
+        ((((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')::date - 8)::timestamp) AT TIME ZONE 'Asia/Tokyo') + INTERVAL '12 hours'
+    `, [site.id]);
+
+    const report = await getAnalyticsDashboardReport(site.id, "Asia/Tokyo", 7);
+    expect(report.overview.visits).toBe(3);
+    expect(report.acquisition.totalVisits).toBe(report.overview.visits);
+    expect(report.acquisition.campaigns).toEqual([
+      { campaign: "launch", source: "google", medium: "cpc", visits: 1 },
+      { campaign: "launch", source: "newsletter", medium: "email", visits: 1 },
+    ]);
+    expect(report.acquisition.campaigns).not.toContainEqual(expect.objectContaining({ campaign: "previous-only" }));
+    expect(report.acquisition.campaigns).not.toContainEqual(expect.objectContaining({ campaign: "private" }));
+  });
+
+  it("limits campaigns to ten rows with deterministic tuple tie ordering", async () => {
+    const suffix = Date.now();
+    const owner = await usersQ.insertUser({ username: `analytics_campaign_limit_${suffix}`, password_hash: "hash", role: "user" });
+    const site = await createAnalyticsSite({ owner_id: owner.id, name: "Campaign Limit", site_key: `campaign-limit-${suffix}`, host: "campaign-limit.example" });
+    const common = { site_id: site.id, path: "/", referrer_host: "", os: "Other", browser: "Other", country: "Unknown", device_type: "Desktop", visitor: false, visit: true };
+    for (const campaign of "abcdefg") {
+      await insertAnalyticsEvent({ ...common, utm_source: "source", utm_medium: "email", utm_campaign: campaign });
+    }
+    for (const [source, medium] of [["beta", "z"], ["alpha", "z"], ["zeta", "a"], ["alpha", "a"], ["beta", "a"]]) {
+      await insertAnalyticsEvent({ ...common, utm_source: source, utm_medium: medium, utm_campaign: "same" });
+    }
+    const report = await getAnalyticsDashboardReport(site.id, "UTC", 7);
+    expect(report.acquisition.campaigns).toHaveLength(10);
+    expect(report.acquisition.campaigns.map(({ campaign, source, medium }) => `${campaign}:${source}/${medium}`)).toEqual([
+      "a:source/email", "b:source/email", "c:source/email", "d:source/email", "e:source/email", "f:source/email", "g:source/email",
+      "same:alpha/a", "same:alpha/z", "same:beta/a",
+    ]);
   });
 });
 

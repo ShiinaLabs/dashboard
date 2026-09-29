@@ -6,6 +6,7 @@ import { insertAnalyticsEvent } from "../repositories/analytics-events";
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_HOST_LENGTH = 255;
 const MAX_PATH_LENGTH = 2048;
+const MAX_UTM_LENGTH = 200;
 
 export interface AnalyticsEventPayload {
   site: string;
@@ -14,6 +15,9 @@ export interface AnalyticsEventPayload {
   referrer: string;
   visitor: boolean;
   visit: boolean;
+  utmSource: string;
+  utmMedium: string;
+  utmCampaign: string;
 }
 
 export interface AnalyticsCollectorInput {
@@ -51,6 +55,11 @@ function hasControlCharacters(value: string): boolean {
   return false;
 }
 
+function normalizeUtm(value: unknown): string {
+  if (typeof value !== "string" || hasControlCharacters(value)) return "";
+  return value.trim().slice(0, MAX_UTM_LENGTH);
+}
+
 function parsePayload(value: unknown): AnalyticsEventPayload {
   if (!value || typeof value !== "object") throw new AnalyticsCollectorError("invalid_payload");
   const payload = value as Record<string, unknown>;
@@ -63,7 +72,17 @@ function parsePayload(value: unknown): AnalyticsEventPayload {
     || typeof payload.visitor !== "boolean" || typeof payload.visit !== "boolean") {
     throw new AnalyticsCollectorError("invalid_payload");
   }
-  return { site: payload.site, host, path: payload.path, referrer: payload.referrer, visitor: payload.visitor, visit: payload.visit };
+  return {
+    site: payload.site,
+    host,
+    path: payload.path,
+    referrer: payload.referrer,
+    visitor: payload.visitor,
+    visit: payload.visit,
+    utmSource: normalizeUtm(payload.utmSource),
+    utmMedium: normalizeUtm(payload.utmMedium),
+    utmCampaign: normalizeUtm(payload.utmCampaign),
+  };
 }
 
 function validatedOrigin(origin: string): string | null {
@@ -130,6 +149,9 @@ export async function collectAnalyticsEvent(input: AnalyticsCollectorInput): Pro
     device_type: normalizedDevice(parsed.device.type),
     visitor: payload.visitor,
     visit: payload.visit,
+    utm_source: payload.visit ? payload.utmSource : "",
+    utm_medium: payload.visit ? payload.utmMedium : "",
+    utm_campaign: payload.visit ? payload.utmCampaign : "",
   });
   return "recorded";
 }

@@ -78,7 +78,7 @@ const dashboardQuery = /* GraphQL */ `
         timeline { date views visitors visits }
         topPages { path views }
         dimensions { countries { country views } browsers { browser views } operatingSystems { os views } devices { device views } }
-        acquisition { totalVisits referrers { referrer visits } entryPages { path visits } }
+        acquisition { totalVisits referrers { referrer visits } entryPages { path visits } campaigns { source medium campaign visits } }
       }
     }
   }
@@ -235,7 +235,7 @@ describe("authenticated GraphQL route", () => {
       overview: { views: 18, visits: 4, visitorDays: 12 },
       previousOverview: { views: 15, visits: 3, visitorDays: 10 },
       timeline: [], topPages: [], dimensions: { countries: [], browsers: [], operatingSystems: [], devices: [] },
-      acquisition: { totalVisits: 4, referrers: [], entryPages: [] },
+      acquisition: { totalVisits: 4, referrers: [], entryPages: [], campaigns: [{ source: "newsletter", medium: "email", campaign: "launch", visits: 2 }] },
     };
     mocks.getAnalyticsDashboardForSite.mockResolvedValueOnce(dashboard);
     const response = await routeCall(graphqlAction, request(dashboardQuery, { siteId: 12, range, timezone: "Asia/Tokyo" }));

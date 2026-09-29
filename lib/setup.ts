@@ -99,7 +99,7 @@ export const SCHEMA = [
   { table: "users", sql: `CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'user', created_at TEXT NOT NULL DEFAULT NOW(), deleted_at TEXT)` },
   { table: "accounts", sql: `CREATE TABLE IF NOT EXISTS accounts (id SERIAL PRIMARY KEY, owner_id INTEGER NOT NULL REFERENCES users(id), screen_name TEXT NOT NULL, platform TEXT NOT NULL DEFAULT 'twitter', user_id TEXT, auth_token TEXT NOT NULL, fetch_interval INTEGER DEFAULT 30, is_active INTEGER DEFAULT 1, last_fetched_at TEXT, error_message TEXT, instance_url TEXT, auth_type TEXT, created_at TEXT NOT NULL DEFAULT NOW(), updated_at TEXT NOT NULL DEFAULT NOW(), deleted_at TEXT); CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_screen_name_platform ON accounts(owner_id, screen_name, platform)` },
   { table: "analytics_sites", sql: `CREATE TABLE IF NOT EXISTS analytics_sites (id SERIAL PRIMARY KEY, owner_id INTEGER NOT NULL REFERENCES users(id), name TEXT NOT NULL, site_key TEXT NOT NULL, host TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT NOW(), updated_at TEXT NOT NULL DEFAULT NOW(), deleted_at TEXT); CREATE UNIQUE INDEX IF NOT EXISTS idx_analytics_sites_site_key ON analytics_sites(site_key)` },
-  { table: "analytics_events", sql: `CREATE TABLE IF NOT EXISTS analytics_events (id SERIAL PRIMARY KEY, site_id INTEGER NOT NULL REFERENCES analytics_sites(id), path TEXT NOT NULL, referrer_host TEXT NOT NULL DEFAULT '', os TEXT NOT NULL, browser TEXT NOT NULL, country TEXT NOT NULL, device_type TEXT NOT NULL, visitor BOOLEAN NOT NULL, visit BOOLEAN NOT NULL, recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()); CREATE INDEX IF NOT EXISTS idx_analytics_events_site_recorded ON analytics_events(site_id, recorded_at DESC)` },
+  { table: "analytics_events", sql: `CREATE TABLE IF NOT EXISTS analytics_events (id SERIAL PRIMARY KEY, site_id INTEGER NOT NULL REFERENCES analytics_sites(id), path TEXT NOT NULL, referrer_host TEXT NOT NULL DEFAULT '', os TEXT NOT NULL, browser TEXT NOT NULL, country TEXT NOT NULL, device_type TEXT NOT NULL, visitor BOOLEAN NOT NULL, visit BOOLEAN NOT NULL, utm_source TEXT NOT NULL DEFAULT '', utm_medium TEXT NOT NULL DEFAULT '', utm_campaign TEXT NOT NULL DEFAULT '', recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()); CREATE INDEX IF NOT EXISTS idx_analytics_events_site_recorded ON analytics_events(site_id, recorded_at DESC)` },
   { table: "fetch_policy", sql: `CREATE TABLE IF NOT EXISTS fetch_policy (platform TEXT NOT NULL, level TEXT NOT NULL, interval_minutes INTEGER NOT NULL, PRIMARY KEY(platform, level)); INSERT INTO fetch_policy (platform, level, interval_minutes) VALUES ('github','l0',1440),('github','l1',90),('github','l2',480),('gitlab','l0',1440),('gitlab','l1',90),('gitlab','l2',480),('twitter','l0',1440),('twitter','l1',90),('twitter','l2',480),('reddit','l0',1440),('reddit','l1',90),('reddit','l2',480) ON CONFLICT DO NOTHING` },
   { table: "account_fetch_state", sql: `CREATE TABLE IF NOT EXISTS account_fetch_state (id SERIAL PRIMARY KEY, account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, level TEXT NOT NULL, last_fetched_at TEXT, next_due_at TEXT, UNIQUE(account_id, level)); CREATE INDEX IF NOT EXISTS idx_account_fetch_state_due ON account_fetch_state(next_due_at)` },
   { table: "fetch_runs", sql: `CREATE TABLE IF NOT EXISTS fetch_runs (id SERIAL PRIMARY KEY, account_id INTEGER NOT NULL REFERENCES accounts(id), trigger TEXT NOT NULL DEFAULT 'manual', status TEXT NOT NULL DEFAULT 'running', started_at TEXT NOT NULL DEFAULT NOW(), finished_at TEXT, duration_ms INTEGER, error_message TEXT, capability_gaps TEXT NOT NULL DEFAULT '[]'); CREATE INDEX IF NOT EXISTS idx_fetch_runs_account_started ON fetch_runs(account_id, started_at DESC); CREATE INDEX IF NOT EXISTS idx_fetch_runs_status ON fetch_runs(status)` },
@@ -153,6 +153,9 @@ export async function createMissingTables(pool: Pool = getPgPool()!): Promise<vo
 }
 
 const SCHEMA_COLUMNS = [
+  { table: "analytics_events", ddl: "ADD COLUMN IF NOT EXISTS utm_source TEXT NOT NULL DEFAULT ''" },
+  { table: "analytics_events", ddl: "ADD COLUMN IF NOT EXISTS utm_medium TEXT NOT NULL DEFAULT ''" },
+  { table: "analytics_events", ddl: "ADD COLUMN IF NOT EXISTS utm_campaign TEXT NOT NULL DEFAULT ''" },
   { table: "github_repos", ddl: "ADD COLUMN IF NOT EXISTS github_id BIGINT" },
   { table: "github_repos", ddl: "ADD COLUMN IF NOT EXISTS node_id TEXT" },
   { table: "github_repos", ddl: "ADD COLUMN IF NOT EXISTS instance TEXT NOT NULL DEFAULT 'github.com'" },
@@ -177,7 +180,7 @@ const SCHEMA_COLUMNS = [
   { table: "github_repo_snapshots", ddl: "ADD COLUMN IF NOT EXISTS open_pull_requests INTEGER" },
 ];
 
-async function ensureSchemaColumns(pool: Pool = getPgPool()!): Promise<void> {
+export async function ensureSchemaColumns(pool: Pool = getPgPool()!): Promise<void> {
   for (const { table, ddl } of SCHEMA_COLUMNS) {
     await pool.query(`ALTER TABLE ${table} ${ddl}`);
   }
