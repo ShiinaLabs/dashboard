@@ -15,6 +15,13 @@ const traffic = {
   overview: { views: 3, visitors: 1, visits: 2 },
   timeline: [],
   topPages: [],
+  dimensions: {
+    referrers: [{ referrer: "", views: 3 }],
+    countries: [{ country: "JP", views: 3 }],
+    browsers: [{ browser: "Safari", views: 3 }],
+    operatingSystems: [{ os: "macOS", views: 3 }],
+    devices: [{ device: "Desktop", views: 3 }],
+  },
 };
 const request = (method = "GET", url = "http://localhost/api/analytics/sites/12/traffic") => new Request(url, { method });
 const load = (req: Request, id = "12") => loader({ request: req, params: { id }, context: {} } as never);

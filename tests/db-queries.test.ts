@@ -191,6 +191,9 @@ describe("analytics event queries", () => {
     const site = await createAnalyticsSite({ owner_id: owner.id, name: "Event Site", site_key: `123e4567-e89b-42d3-a456-${String(suffix).slice(-12).padStart(12, "0")}`, host: "events.example" });
     const otherSite = await createAnalyticsSite({ owner_id: otherOwner.id, name: "Other Site", site_key: `223e4567-e89b-42d3-a456-${String(suffix).slice(-12).padStart(12, "0")}`, host: "other.example" });
     const reportSite = await createAnalyticsSite({ owner_id: owner.id, name: "Report Site", site_key: `323e4567-e89b-42d3-a456-${String(suffix + 1).slice(-12).padStart(12, "0")}`, host: "report.example" });
+    const dimensionSite = await createAnalyticsSite({ owner_id: owner.id, name: "Dimension Site", site_key: `423e4567-e89b-42d3-a456-${String(suffix + 2).slice(-12).padStart(12, "0")}`, host: "dimensions.example" });
+    const limitSite = await createAnalyticsSite({ owner_id: owner.id, name: "Limit Site", site_key: `523e4567-e89b-42d3-a456-${String(suffix + 3).slice(-12).padStart(12, "0")}`, host: "limit.example" });
+    const emptySite = await createAnalyticsSite({ owner_id: owner.id, name: "Empty Site", site_key: `623e4567-e89b-42d3-a456-${String(suffix + 4).slice(-12).padStart(12, "0")}`, host: "empty.example" });
     expect(await getAnalyticsSiteByKey(site.site_key)).toMatchObject({ id: site.id });
     const event = { site_id: site.id, path: "/", referrer_host: "", os: "Other", browser: "Other", country: "Unknown", device_type: "Desktop", visitor: false, visit: false };
     await insertAnalyticsEvent({ ...event, visitor: true, visit: true });
@@ -206,6 +209,13 @@ describe("analytics event queries", () => {
     expect(summary.timeline.reduce((total, point) => total + point.visits, 0)).toBe(summary.overview.visits);
     expect(summary.topPages).toEqual([{ path: "/", views: 3 }]);
     expect(Object.keys(summary.topPages[0]).sort()).toEqual(["path", "views"]);
+    expect(summary.dimensions).toEqual({
+      referrers: [{ referrer: "", views: 3 }],
+      countries: [{ country: "Unknown", views: 3 }],
+      browsers: [{ browser: "Other", views: 3 }],
+      operatingSystems: [{ os: "Other", views: 3 }],
+      devices: [{ device: "Desktop", views: 3 }],
+    });
 
     const insertAtTokyoDay = async (siteId: number, path: string, daysAgo: number, visitor = false, visit = false) => {
       await getTestPool().query(`
@@ -223,8 +233,31 @@ describe("analytics event queries", () => {
     }
     await insertAtTokyoDay(reportSite.id, "/two-days-ago", 2);
     await insertAtTokyoDay(reportSite.id, "/eight-days-ago", 8, true, true);
-    const otherEvents = { site_id: otherSite.id, path: "/path-b", referrer_host: "", os: "Other", browser: "Other", country: "Unknown", device_type: "Desktop", visitor: false, visit: false };
+    const otherEvents = { site_id: otherSite.id, path: "/path-b", referrer_host: "bing.com", os: "Windows", browser: "Chrome", country: "US", device_type: "Desktop", visitor: false, visit: false };
     for (let index = 0; index < 20; index += 1) await insertAnalyticsEvent(otherEvents);
+
+    const dimensionEvent = { site_id: dimensionSite.id, path: "/dimensions", referrer_host: "", os: "macOS", browser: "Safari", country: "JP", device_type: "Desktop", visitor: false, visit: false };
+    const insertDimensionGroup = async (count: number, fields: Partial<typeof dimensionEvent>) => {
+      for (let index = 0; index < count; index += 1) await insertAnalyticsEvent({ ...dimensionEvent, ...fields });
+    };
+    await insertDimensionGroup(10, {});
+    await insertDimensionGroup(5, { referrer_host: "google.com", country: "US", browser: "Chrome", os: "iOS", device_type: "Mobile" });
+    await insertDimensionGroup(2, { referrer_host: "github.com", country: "Unknown", browser: "Firefox", os: "Windows", device_type: "Tablet" });
+    await insertDimensionGroup(1, { referrer_host: "github.com", country: "DE", browser: "Other", os: "Other", device_type: "Other" });
+    await getTestPool().query(`
+      INSERT INTO analytics_events(site_id, path, referrer_host, os, browser, country, device_type, visitor, visit, recorded_at)
+      SELECT $1, '/old', 'old.example', 'Legacy OS', 'Legacy browser', 'CN', 'Legacy device', FALSE, FALSE,
+        ((((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')::date - 8)::timestamp) AT TIME ZONE 'Asia/Tokyo') + INTERVAL '12 hours'
+    `, [dimensionSite.id]);
+
+    const insertCountForLimit = async (referrer: string, count: number) => {
+      for (let index = 0; index < count; index += 1) {
+        await insertAnalyticsEvent({ site_id: limitSite.id, path: "/limit", referrer_host: referrer, os: "Other", browser: "Other", country: "Unknown", device_type: "Other", visitor: false, visit: false });
+      }
+    };
+    await insertCountForLimit("a.example", 5);
+    await insertCountForLimit("b.example", 5);
+    for (const letter of "cdefghijkl") await insertCountForLimit(`${letter}.example`, 1);
 
     const { rows: [clock] } = await getTestPool().query(`
       SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')::date::text AS tokyo_today,
@@ -257,6 +290,46 @@ describe("analytics event queries", () => {
     expect(otherReport.overview.views).toBe(20);
     expect(otherReport.timeline.reduce((total, point) => total + point.views, 0)).toBe(20);
     expect(otherReport.topPages).toEqual([{ path: "/path-b", views: 20 }]);
+    expect(otherReport.dimensions.referrers).toEqual([{ referrer: "bing.com", views: 20 }]);
+    expect(otherReport.dimensions.countries).toEqual([{ country: "US", views: 20 }]);
+    expect(otherReport.dimensions.browsers).toEqual([{ browser: "Chrome", views: 20 }]);
+
+    const dimensionReport = await getAnalyticsTrafficReport(dimensionSite.id, "Asia/Tokyo");
+    expect(dimensionReport.overview.views).toBe(18);
+    expect(dimensionReport.dimensions.referrers).toEqual([
+      { referrer: "", views: 10 }, { referrer: "google.com", views: 5 }, { referrer: "github.com", views: 3 },
+    ]);
+    expect(dimensionReport.dimensions.countries).toEqual([
+      { country: "JP", views: 10 }, { country: "US", views: 5 }, { country: "Unknown", views: 2 }, { country: "DE", views: 1 },
+    ]);
+    expect(dimensionReport.dimensions.browsers).toEqual([
+      { browser: "Safari", views: 10 }, { browser: "Chrome", views: 5 }, { browser: "Firefox", views: 2 }, { browser: "Other", views: 1 },
+    ]);
+    expect(dimensionReport.dimensions.operatingSystems).toEqual([
+      { os: "macOS", views: 10 }, { os: "iOS", views: 5 }, { os: "Windows", views: 2 }, { os: "Other", views: 1 },
+    ]);
+    expect(dimensionReport.dimensions.devices).toEqual([
+      { device: "Desktop", views: 10 }, { device: "Mobile", views: 5 }, { device: "Tablet", views: 2 }, { device: "Other", views: 1 },
+    ]);
+    expect(dimensionReport.dimensions.referrers.every((item) => Object.keys(item).sort().join(",") === "referrer,views")).toBe(true);
+    expect(dimensionReport.dimensions.countries.every((item) => Object.keys(item).sort().join(",") === "country,views")).toBe(true);
+    expect(dimensionReport.dimensions.browsers.every((item) => Object.keys(item).sort().join(",") === "browser,views")).toBe(true);
+    expect(dimensionReport.dimensions.operatingSystems.every((item) => Object.keys(item).sort().join(",") === "os,views")).toBe(true);
+    expect(dimensionReport.dimensions.devices.every((item) => Object.keys(item).sort().join(",") === "device,views")).toBe(true);
+    expect(dimensionReport.dimensions.referrers.map((item) => item.referrer)).not.toContain("old.example");
+    expect(dimensionReport.dimensions.countries.map((item) => item.country)).not.toContain("CN");
+    expect(dimensionReport.dimensions.browsers.map((item) => item.browser)).not.toContain("Legacy browser");
+    expect(dimensionReport.dimensions.operatingSystems.map((item) => item.os)).not.toContain("Legacy OS");
+    expect(dimensionReport.dimensions.devices.map((item) => item.device)).not.toContain("Legacy device");
+
+    const limitedReport = await getAnalyticsTrafficReport(limitSite.id, "UTC");
+    expect(limitedReport.dimensions.referrers).toHaveLength(10);
+    expect(limitedReport.dimensions.referrers.map((item) => item.referrer)).toEqual([
+      "a.example", "b.example", "c.example", "d.example", "e.example", "f.example", "g.example", "h.example", "i.example", "j.example",
+    ]);
+    const emptyReport = await getAnalyticsTrafficReport(emptySite.id, "UTC");
+    expect(emptyReport.overview.views).toBe(0);
+    expect(emptyReport.dimensions).toEqual({ referrers: [], countries: [], browsers: [], operatingSystems: [], devices: [] });
 
     const indexes = await getTestPool().query("SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'analytics_events'");
     expect(indexes.rows.filter((row: { indexname: string }) => row.indexname !== "analytics_events_pkey")).toEqual([expect.objectContaining({

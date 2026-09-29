@@ -29,11 +29,45 @@ export interface AnalyticsTopPage {
   views: number;
 }
 
+export interface AnalyticsReferrerDimension {
+  referrer: string;
+  views: number;
+}
+
+export interface AnalyticsCountryDimension {
+  country: string;
+  views: number;
+}
+
+export interface AnalyticsBrowserDimension {
+  browser: string;
+  views: number;
+}
+
+export interface AnalyticsOperatingSystemDimension {
+  os: string;
+  views: number;
+}
+
+export interface AnalyticsDeviceDimension {
+  device: string;
+  views: number;
+}
+
+export interface AnalyticsTrafficDimensions {
+  referrers: AnalyticsReferrerDimension[];
+  countries: AnalyticsCountryDimension[];
+  browsers: AnalyticsBrowserDimension[];
+  operatingSystems: AnalyticsOperatingSystemDimension[];
+  devices: AnalyticsDeviceDimension[];
+}
+
 export interface AnalyticsTraffic {
   period: { days: 7; timezone: string };
   overview: { views: number; visitors: number; visits: number };
   timeline: AnalyticsTrafficPoint[];
   topPages: AnalyticsTopPage[];
+  dimensions: AnalyticsTrafficDimensions;
 }
 
 export interface AnalyticsSite {

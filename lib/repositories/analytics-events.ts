@@ -31,11 +31,45 @@ export interface AnalyticsTopPage {
   views: number;
 }
 
+export interface AnalyticsReferrerDimension {
+  referrer: string;
+  views: number;
+}
+
+export interface AnalyticsCountryDimension {
+  country: string;
+  views: number;
+}
+
+export interface AnalyticsBrowserDimension {
+  browser: string;
+  views: number;
+}
+
+export interface AnalyticsOperatingSystemDimension {
+  os: string;
+  views: number;
+}
+
+export interface AnalyticsDeviceDimension {
+  device: string;
+  views: number;
+}
+
+export interface AnalyticsTrafficDimensions {
+  referrers: AnalyticsReferrerDimension[];
+  countries: AnalyticsCountryDimension[];
+  browsers: AnalyticsBrowserDimension[];
+  operatingSystems: AnalyticsOperatingSystemDimension[];
+  devices: AnalyticsDeviceDimension[];
+}
+
 export interface AnalyticsTrafficReport {
   period: { days: 7; timezone: string };
   overview: AnalyticsTrafficSummary;
   timeline: AnalyticsTrafficPoint[];
   topPages: AnalyticsTopPage[];
+  dimensions: AnalyticsTrafficDimensions;
 }
 
 const mockEvents: Array<NewAnalyticsEvent & { recorded_at: Date }> = [];
@@ -81,6 +115,33 @@ function mockTrafficReport(timezone: string): AnalyticsTrafficReport {
       { path: "/pricing", views: 21 },
       { path: "/docs", views: 12 },
     ],
+    dimensions: {
+      referrers: [
+        { referrer: "", views: 7_420 },
+        { referrer: "google.com", views: 2_930 },
+        { referrer: "github.com", views: 1_180 },
+      ],
+      countries: [
+        { country: "JP", views: 4_280 },
+        { country: "US", views: 3_160 },
+        { country: "DE", views: 1_040 },
+      ],
+      browsers: [
+        { browser: "Safari", views: 5_220 },
+        { browser: "Chrome", views: 4_310 },
+        { browser: "Firefox", views: 1_430 },
+      ],
+      operatingSystems: [
+        { os: "macOS", views: 4_820 },
+        { os: "iOS", views: 3_410 },
+        { os: "Windows", views: 2_180 },
+      ],
+      devices: [
+        { device: "Desktop", views: 6_240 },
+        { device: "Mobile", views: 5_860 },
+        { device: "Tablet", views: 530 },
+      ],
+    },
   };
 }
 
@@ -93,6 +154,7 @@ export async function getAnalyticsTrafficReport(siteId: number, timezone: string
     overview: AnalyticsTrafficSummary;
     timeline: AnalyticsTrafficPoint[];
     top_pages: AnalyticsTopPage[];
+    dimensions: AnalyticsTrafficDimensions;
   }>(sql`
     WITH clock AS MATERIALIZED (
       SELECT ${timezone}::text AS timezone,
@@ -106,6 +168,7 @@ export async function getAnalyticsTrafficReport(siteId: number, timezone: string
     ),
     scoped_events AS MATERIALIZED (
       SELECT event.path, event.visitor, event.visit,
+        event.referrer_host, event.country, event.browser, event.os, event.device_type,
         (event.recorded_at AT TIME ZONE bounds.timezone)::date AS local_date
       FROM analytics_events AS event
       CROSS JOIN bounds
@@ -138,6 +201,41 @@ export async function getAnalyticsTrafficReport(siteId: number, timezone: string
       GROUP BY path
       ORDER BY COUNT(*) DESC, path ASC
       LIMIT 10
+    ),
+    top_referrers AS (
+      SELECT referrer_host AS referrer, COUNT(*)::int AS views
+      FROM scoped_events
+      GROUP BY referrer_host
+      ORDER BY COUNT(*) DESC, referrer_host ASC
+      LIMIT 10
+    ),
+    top_countries AS (
+      SELECT country, COUNT(*)::int AS views
+      FROM scoped_events
+      GROUP BY country
+      ORDER BY COUNT(*) DESC, country ASC
+      LIMIT 10
+    ),
+    top_browsers AS (
+      SELECT browser, COUNT(*)::int AS views
+      FROM scoped_events
+      GROUP BY browser
+      ORDER BY COUNT(*) DESC, browser ASC
+      LIMIT 10
+    ),
+    top_operating_systems AS (
+      SELECT os, COUNT(*)::int AS views
+      FROM scoped_events
+      GROUP BY os
+      ORDER BY COUNT(*) DESC, os ASC
+      LIMIT 10
+    ),
+    top_devices AS (
+      SELECT device_type AS device, COUNT(*)::int AS views
+      FROM scoped_events
+      GROUP BY device_type
+      ORDER BY COUNT(*) DESC, device_type ASC
+      LIMIT 10
     )
     SELECT bounds.timezone,
       json_build_object('views', summary.views, 'visitors', summary.visitors, 'visits', summary.visits) AS overview,
@@ -155,7 +253,34 @@ export async function getAnalyticsTrafficReport(siteId: number, timezone: string
         SELECT json_agg(json_build_object('path', top_pages.path, 'views', top_pages.views)
           ORDER BY top_pages.views DESC, top_pages.path ASC)
         FROM top_pages
-      ), '[]'::json) AS top_pages
+      ), '[]'::json) AS top_pages,
+      json_build_object(
+        'referrers', COALESCE((
+          SELECT json_agg(json_build_object('referrer', referrer, 'views', views)
+            ORDER BY views DESC, referrer ASC)
+          FROM top_referrers
+        ), '[]'::json),
+        'countries', COALESCE((
+          SELECT json_agg(json_build_object('country', country, 'views', views)
+            ORDER BY views DESC, country ASC)
+          FROM top_countries
+        ), '[]'::json),
+        'browsers', COALESCE((
+          SELECT json_agg(json_build_object('browser', browser, 'views', views)
+            ORDER BY views DESC, browser ASC)
+          FROM top_browsers
+        ), '[]'::json),
+        'operatingSystems', COALESCE((
+          SELECT json_agg(json_build_object('os', os, 'views', views)
+            ORDER BY views DESC, os ASC)
+          FROM top_operating_systems
+        ), '[]'::json),
+        'devices', COALESCE((
+          SELECT json_agg(json_build_object('device', device, 'views', views)
+            ORDER BY views DESC, device ASC)
+          FROM top_devices
+        ), '[]'::json)
+      ) AS dimensions
     FROM bounds
     CROSS JOIN summary
   `);
@@ -166,5 +291,6 @@ export async function getAnalyticsTrafficReport(siteId: number, timezone: string
     overview: report.overview,
     timeline: report.timeline,
     topPages: report.top_pages,
+    dimensions: report.dimensions,
   };
 }

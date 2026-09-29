@@ -32,6 +32,8 @@ describe("Web Analytics boundaries", () => {
     expect(client).toContain('"/analytics/sites"');
     expect(client).toContain("/analytics/sites/${siteId}/traffic?timezone=${encodeURIComponent(timezone)}");
     expect(client).toContain("/analytics/sites/${siteId}/installation");
+    expect(client).toContain("AnalyticsTrafficDimensions");
+    expect(client).toContain("operatingSystems: AnalyticsOperatingSystemDimension[]");
   });
 
   it("keeps the public collector as an HTTP adapter and the exact tracker file allow-listed", () => {
