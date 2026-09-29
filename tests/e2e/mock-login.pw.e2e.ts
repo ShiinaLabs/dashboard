@@ -62,6 +62,14 @@ test("Web Analytics adds and selects sites before showing 7-day metrics", async 
   await expect(page.getByText("4,102")).toBeVisible();
   await expect(page.getByText("Traffic over time", { exact: true })).toBeVisible();
   await expect(page.getByRole("img", { name: "Traffic over time" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Visitor geography" })).toBeVisible();
+  const japanShape = page.locator('[data-country-code="JP"]');
+  await expect(japanShape).toHaveAttribute("data-active", "true");
+  await expect(page.locator('[data-country-code="US"]')).toHaveAttribute("data-active", "true");
+  await expect(page.locator('[data-country-code="DE"]')).toHaveAttribute("data-active", "true");
+  await japanShape.focus();
+  await expect(page.getByRole("tooltip")).toContainText("Japan");
+  await expect(page.getByRole("tooltip")).toContainText(/views/i);
   for (const title of ["Top Pages", "Referrers", "Countries", "Browsers", "Operating Systems", "Devices"]) {
     await expect(page.getByRole("heading", { name: title, level: 2 })).toBeVisible();
   }

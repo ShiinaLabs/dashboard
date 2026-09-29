@@ -194,6 +194,7 @@ describe("analytics event queries", () => {
     const dimensionSite = await createAnalyticsSite({ owner_id: owner.id, name: "Dimension Site", site_key: `423e4567-e89b-42d3-a456-${String(suffix + 2).slice(-12).padStart(12, "0")}`, host: "dimensions.example" });
     const limitSite = await createAnalyticsSite({ owner_id: owner.id, name: "Limit Site", site_key: `523e4567-e89b-42d3-a456-${String(suffix + 3).slice(-12).padStart(12, "0")}`, host: "limit.example" });
     const emptySite = await createAnalyticsSite({ owner_id: owner.id, name: "Empty Site", site_key: `623e4567-e89b-42d3-a456-${String(suffix + 4).slice(-12).padStart(12, "0")}`, host: "empty.example" });
+    const countrySite = await createAnalyticsSite({ owner_id: owner.id, name: "Country Site", site_key: `723e4567-e89b-42d3-a456-${String(suffix + 5).slice(-12).padStart(12, "0")}`, host: "countries.example" });
     expect(await getAnalyticsSiteByKey(site.site_key)).toMatchObject({ id: site.id });
     const event = { site_id: site.id, path: "/", referrer_host: "", os: "Other", browser: "Other", country: "Unknown", device_type: "Desktop", visitor: false, visit: false };
     await insertAnalyticsEvent({ ...event, visitor: true, visit: true });
@@ -258,6 +259,13 @@ describe("analytics event queries", () => {
     await insertCountForLimit("a.example", 5);
     await insertCountForLimit("b.example", 5);
     for (const letter of "cdefghijkl") await insertCountForLimit(`${letter}.example`, 1);
+
+    const countryCounts = [["JP", 20], ["US", 10], ["DE", 5], ...["AU", "BR", "CA", "CN", "ES", "FR", "GB", "IN", "IT"].map((country) => [country, 1] as const)] as const;
+    for (const [country, count] of countryCounts) {
+      for (let index = 0; index < count; index += 1) {
+        await insertAnalyticsEvent({ site_id: countrySite.id, path: `/country/${country}`, referrer_host: "geo.example", os: `OS ${country}`, browser: `Browser ${country}`, country, device_type: `Device ${country}`, visitor: false, visit: false });
+      }
+    }
 
     const { rows: [clock] } = await getTestPool().query(`
       SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')::date::text AS tokyo_today,
@@ -327,6 +335,20 @@ describe("analytics event queries", () => {
     expect(limitedReport.dimensions.referrers.map((item) => item.referrer)).toEqual([
       "a.example", "b.example", "c.example", "d.example", "e.example", "f.example", "g.example", "h.example", "i.example", "j.example",
     ]);
+    expect(limitedReport.dimensions.browsers).toHaveLength(1);
+    expect(limitedReport.dimensions.operatingSystems).toHaveLength(1);
+    expect(limitedReport.dimensions.devices).toHaveLength(1);
+    const countryReport = await getAnalyticsTrafficReport(countrySite.id, "UTC");
+    expect(countryReport.dimensions.countries).toHaveLength(12);
+    expect(countryReport.dimensions.countries).toEqual([
+      { country: "JP", views: 20 }, { country: "US", views: 10 }, { country: "DE", views: 5 },
+      ...["AU", "BR", "CA", "CN", "ES", "FR", "GB", "IN", "IT"].map((country) => ({ country, views: 1 })),
+    ]);
+    expect(countryReport.topPages).toHaveLength(10);
+    expect(countryReport.dimensions.referrers).toHaveLength(1);
+    expect(countryReport.dimensions.browsers).toHaveLength(10);
+    expect(countryReport.dimensions.operatingSystems).toHaveLength(10);
+    expect(countryReport.dimensions.devices).toHaveLength(10);
     const emptyReport = await getAnalyticsTrafficReport(emptySite.id, "UTC");
     expect(emptyReport.overview.views).toBe(0);
     expect(emptyReport.dimensions).toEqual({ referrers: [], countries: [], browsers: [], operatingSystems: [], devices: [] });
