@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 describe("analytics portfolio repository boundary", () => {
   it("keeps scope, one clock, event bounds, and aggregation in one SQL statement", async () => {
     const source = await readFile("lib/repositories/analytics-events.ts", "utf8");
-    const portfolioSource = source.slice(source.indexOf("export async function getAnalyticsPortfolioReport"));
+    const portfolioSource = source.slice(source.indexOf("export async function getAnalyticsPortfolioReport"), source.indexOf("export async function getAnalyticsGlobalDashboardReport"));
 
     expect(portfolioSource.match(/getDb\(\)\.execute/g)).toHaveLength(1);
     expect(portfolioSource.match(/CURRENT_TIMESTAMP/g)).toHaveLength(1);

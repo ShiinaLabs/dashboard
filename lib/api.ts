@@ -213,6 +213,8 @@ export const api = {
   getAnalyticsSites: () => apiJson<{ sites: AnalyticsSite[] }>("/analytics/sites"),
   createAnalyticsSite: (data: { name: string; host: string }) =>
     apiJson<AnalyticsSite>("/analytics/sites", { method: "POST", body: JSON.stringify(data) }),
+  renameAnalyticsSite: (siteId: number, data: { name: string }) =>
+    apiJson<AnalyticsSite>(`/analytics/sites/${siteId}`, { method: "PUT", body: JSON.stringify(data) }),
   getAnalyticsTraffic: (siteId: number, timezone: string) =>
     apiJson<AnalyticsTraffic>(`/analytics/sites/${siteId}/traffic?timezone=${encodeURIComponent(timezone)}`),
   getAnalyticsInstallation: (siteId: number) => apiJson<AnalyticsInstallation>(`/analytics/sites/${siteId}/installation`),

@@ -4,15 +4,18 @@ import {
   createAnalyticsSite as createSite,
   getAnalyticsSiteById as findSite,
   getAnalyticsSites as listSites,
+  renameAnalyticsSite as renameSite,
   type AnalyticsSiteRow,
 } from "../repositories/analytics-sites";
 import {
   getAnalyticsAcquisitionReport,
   getAnalyticsDashboardReport,
+  getAnalyticsGlobalDashboardReport,
   getAnalyticsPortfolioReport,
   getAnalyticsTrafficReport,
   type AnalyticsAcquisitionReport,
   type AnalyticsDashboardReport,
+  type AnalyticsGlobalDashboardReport,
   type AnalyticsPortfolioReport,
   type AnalyticsTrafficReport,
 } from "../repositories/analytics-events";
@@ -67,6 +70,17 @@ export async function createAnalyticsSite(ownerId: number, input: AnalyticsSiteI
   }));
 }
 
+export async function renameAnalyticsSite(id: number, viewer: AnalyticsViewer, input: { name: string }): Promise<AnalyticsSite> {
+  const name = typeof input.name === "string" ? input.name.trim() : "";
+  if (!name || name.length > 200) throw new AnalyticsSiteError("invalid_input");
+  const site = await getAnalyticsSiteById(id);
+  if (!site) throw new AnalyticsSiteError("not_found");
+  if (viewer.role !== "admin" && site.owner_id !== viewer.id) throw new AnalyticsSiteError("forbidden");
+  const updated = await renameSite(site.id, name);
+  if (!updated) throw new AnalyticsSiteError("not_found");
+  return publicSite(updated);
+}
+
 export async function getAnalyticsSiteById(id: number): Promise<AnalyticsSiteRow | undefined> {
   return findSite(id);
 }
@@ -118,6 +132,16 @@ export async function getAnalyticsPortfolio(
   if (!isValidTimezone(timezone) || ![7, 30, 90].includes(days)) throw new AnalyticsSiteError("invalid_input");
   const ownerId = viewer.role === "admin" ? undefined : viewer.id;
   return getAnalyticsPortfolioReport(ownerId, timezone, days);
+}
+
+export async function getAnalyticsGlobalDashboard(
+  viewer: AnalyticsViewer,
+  timezone: string,
+  days: number,
+): Promise<AnalyticsGlobalDashboardReport> {
+  if (!isValidTimezone(timezone) || ![7, 30, 90].includes(days)) throw new AnalyticsSiteError("invalid_input");
+  const ownerId = viewer.role === "admin" ? undefined : viewer.id;
+  return getAnalyticsGlobalDashboardReport(ownerId, timezone, days);
 }
 
 export interface AnalyticsInstallation {

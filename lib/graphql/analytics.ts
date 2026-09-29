@@ -4,6 +4,7 @@ import {
   AnalyticsSiteError,
   getAnalyticsAcquisitionForSite,
   getAnalyticsDashboardForSite,
+  getAnalyticsGlobalDashboard,
   getAnalyticsPortfolio,
   getAnalyticsSites,
   getAnalyticsTrafficForSite,
@@ -21,6 +22,7 @@ export const analyticsTypeDefs = /* GraphQL */ `
     traffic(siteId: Int!, timezone: String = "UTC"): AnalyticsTraffic!
     acquisition(siteId: Int!, timezone: String = "UTC"): AnalyticsAcquisition!
     dashboard(siteId: Int!, range: AnalyticsRange = DAYS_7, timezone: String = "UTC"): AnalyticsDashboard!
+    globalDashboard(range: AnalyticsRange = DAYS_7, timezone: String = "UTC"): AnalyticsGlobalDashboard!
     portfolio(range: AnalyticsRange = DAYS_7, timezone: String = "UTC"): AnalyticsPortfolio!
   }
 
@@ -188,6 +190,59 @@ export const analyticsTypeDefs = /* GraphQL */ `
     previousSummary: AnalyticsPortfolioPreviousSummary!
     sites: [AnalyticsPortfolioSite!]!
   }
+
+  type AnalyticsGlobalOverview {
+    trackedSites: Int!
+    activeSites: Int!
+    views: Int!
+    visits: Int!
+  }
+
+  type AnalyticsGlobalPreviousOverview {
+    views: Int!
+    visits: Int!
+  }
+
+  type AnalyticsGlobalTrafficPoint {
+    date: String!
+    views: Int!
+    visits: Int!
+  }
+
+  type AnalyticsGlobalSite {
+    id: Int!
+    name: String!
+    host: String!
+    views: Int!
+    visits: Int!
+  }
+
+  type AnalyticsGlobalCampaign {
+    siteId: Int!
+    siteName: String!
+    siteHost: String!
+    source: String!
+    medium: String!
+    campaign: String!
+    visits: Int!
+  }
+
+  type AnalyticsGlobalAcquisition {
+    totalVisits: Int!
+    referrers: [AnalyticsAcquisitionReferrer!]!
+    campaigns: [AnalyticsGlobalCampaign!]!
+  }
+
+  type AnalyticsGlobalDashboard {
+    period: AnalyticsDashboardPeriod!
+    previousPeriod: AnalyticsDashboardPeriod!
+    overview: AnalyticsGlobalOverview!
+    previousOverview: AnalyticsGlobalPreviousOverview!
+    timeline: [AnalyticsGlobalTrafficPoint!]!
+    sites: [AnalyticsGlobalSite!]!
+    dimensions: AnalyticsDashboardDimensions!
+    acquisition: AnalyticsGlobalAcquisition!
+  }
 `;
 
 interface AnalyticsSiteGraphQL {
@@ -203,6 +258,7 @@ type AnalyticsTrafficReport = Awaited<ReturnType<typeof getAnalyticsTrafficForSi
 type AnalyticsAcquisitionReport = Awaited<ReturnType<typeof getAnalyticsAcquisitionForSite>>;
 type AnalyticsDashboardReport = Awaited<ReturnType<typeof getAnalyticsDashboardForSite>>;
 type AnalyticsPortfolioReport = Awaited<ReturnType<typeof getAnalyticsPortfolio>>;
+type AnalyticsGlobalDashboardReport = Awaited<ReturnType<typeof getAnalyticsGlobalDashboard>>;
 
 function rangeDays(range: "DAYS_7" | "DAYS_30" | "DAYS_90"): number {
   switch (range) {
@@ -293,6 +349,15 @@ export const analyticsResolvers = {
       args: { range: "DAYS_7" | "DAYS_30" | "DAYS_90"; timezone: string },
       context: GraphQLContext,
     ): Promise<AnalyticsPortfolioReport> => mapServiceError(() => getAnalyticsPortfolio(
+      { id: context.user.id, role: context.user.role },
+      args.timezone,
+      rangeDays(args.range),
+    )),
+    globalDashboard: async (
+      _parent: unknown,
+      args: { range: "DAYS_7" | "DAYS_30" | "DAYS_90"; timezone: string },
+      context: GraphQLContext,
+    ): Promise<AnalyticsGlobalDashboardReport> => mapServiceError(() => getAnalyticsGlobalDashboard(
       { id: context.user.id, role: context.user.role },
       args.timezone,
       rangeDays(args.range),

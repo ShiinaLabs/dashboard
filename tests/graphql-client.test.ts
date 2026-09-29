@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getAnalyticsAcquisition, getAnalyticsDashboard, getAnalyticsPortfolio } from "@/lib/client/analytics-graphql";
+import { getAnalyticsAcquisition, getAnalyticsDashboard, getAnalyticsGlobalDashboard, getAnalyticsPortfolio } from "@/lib/client/analytics-graphql";
 import { GraphQLRequestError, graphqlRequest } from "@/lib/client/graphql";
 
 describe("GraphQL client helper", () => {
@@ -109,5 +109,28 @@ describe("GraphQL client helper", () => {
     expect(body.query).toContain("summary { trackedSites activeSites views visits }");
     expect(body.query).toContain("sites { id name host views visits }");
     expect(body.query).not.toContain("dashboard(");
+  });
+
+  it("loads the global dashboard as a separate GraphQL operation with range and timezone variables", async () => {
+    const globalDashboard = {
+      period: { days: 7, timezone: "Asia/Tokyo", startDate: "2026-09-24", endDate: "2026-09-30" },
+      previousPeriod: { days: 7, timezone: "Asia/Tokyo", startDate: "2026-09-17", endDate: "2026-09-23" },
+      overview: { trackedSites: 2, activeSites: 1, views: 10, visits: 4 }, previousOverview: { views: 8, visits: 3 },
+      timeline: [], sites: [], dimensions: { countries: [], browsers: [], operatingSystems: [], devices: [] },
+      acquisition: { totalVisits: 4, referrers: [], campaigns: [] },
+    };
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: { analytics: { globalDashboard } } })));
+    await expect(getAnalyticsGlobalDashboard("DAYS_7", "Asia/Tokyo")).resolves.toEqual(globalDashboard);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [, init] = vi.mocked(fetch).mock.calls[0];
+    const body = JSON.parse(String(init?.body));
+    expect(body.variables).toEqual({ range: "DAYS_7", timezone: "Asia/Tokyo" });
+    expect(body.query).toContain("query AnalyticsGlobalDashboard(");
+    expect(body.query).toContain("globalDashboard(range: $range, timezone: $timezone)");
+    expect(body.query).toContain("campaigns { siteId siteName siteHost source medium campaign visits }");
+    expect(body.query).not.toContain("dashboard(siteId");
+    expect(body.query).not.toContain("topPages");
+    expect(body.query).not.toContain("entryPages");
+    expect(body.query).not.toContain("visitorDays");
   });
 });

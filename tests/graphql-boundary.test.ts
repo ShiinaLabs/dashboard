@@ -49,6 +49,7 @@ describe("GraphQL dependency boundary", () => {
     expect(analytics).toContain("getAnalyticsAcquisitionForSite(");
     expect(analytics).toContain("getAnalyticsDashboardForSite(");
     expect(analytics).toContain("getAnalyticsPortfolio(");
+    expect(analytics).toContain("getAnalyticsGlobalDashboard(");
     expect(analytics).toContain('case "DAYS_7": return 7');
     expect(analytics).toContain('case "DAYS_30": return 30');
     expect(analytics).toContain('case "DAYS_90": return 90');
@@ -73,5 +74,7 @@ describe("GraphQL dependency boundary", () => {
     expect(portfolioClient).toContain('import { graphqlRequest } from "./graphql"');
     expect(portfolioClient).toContain("export async function getAnalyticsPortfolio(");
     expect(portfolioClient).toContain("portfolio(range: $range, timezone: $timezone)");
+    expect(acquisitionClient).toContain("export async function getAnalyticsGlobalDashboard(");
+    expect(acquisitionClient).toContain("globalDashboard(range: $range, timezone: $timezone)");
   });
 });

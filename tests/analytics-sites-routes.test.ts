@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AnalyticsSiteError, createAnalyticsSite, getAnalyticsInstallationForSite, getAnalyticsSites } from "../lib/services/analytics";
+import { AnalyticsSiteError, createAnalyticsSite, getAnalyticsInstallationForSite, getAnalyticsSites, renameAnalyticsSite } from "../lib/services/analytics";
 import { loader as sitesLoader, action as sitesAction } from "../app/api/analytics/sites/route";
 import { loader as installationLoader } from "../app/api/analytics/sites/[id]/installation/route";
+import { action as renameSiteAction } from "../app/api/analytics/sites/[id]/route";
 import { requireSession } from "../lib/auth-helpers";
 
 vi.mock("../lib/auth-helpers", () => ({
@@ -10,7 +11,7 @@ vi.mock("../lib/auth-helpers", () => ({
 }));
 vi.mock("../lib/services/analytics", async (importOriginal) => {
   const original = await importOriginal<typeof import("../lib/services/analytics")>();
-  return { ...original, getAnalyticsSites: vi.fn(), createAnalyticsSite: vi.fn(), getAnalyticsInstallationForSite: vi.fn() };
+  return { ...original, getAnalyticsSites: vi.fn(), createAnalyticsSite: vi.fn(), getAnalyticsInstallationForSite: vi.fn(), renameAnalyticsSite: vi.fn() };
 });
 
 const request = (method = "GET", body?: unknown) => new Request("http://localhost/api/analytics/sites", {
@@ -53,6 +54,28 @@ describe("analytics site routes", () => {
     expect(allowed.status).toBe(200);
     expect(getAnalyticsInstallationForSite).toHaveBeenLastCalledWith(20, { id: 99, role: "admin" });
     await expect(allowed.json()).resolves.toMatchObject({ trackerUrl: "https://dashboard.example/a/t.js" });
+  });
+
+  it("routes authenticated site rename through the owner-aware service and accepts only a name", async () => {
+    authAs(10);
+    vi.mocked(renameAnalyticsSite).mockResolvedValue({ id: 20, owner_id: 10, name: "Renamed", site_key: "fixed", host: "fixed.example", created_at: "then", updated_at: "now", deleted_at: null } as never);
+    const response = await renameSiteAction({
+      request: new Request("http://localhost/api/analytics/sites/20", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "Renamed", host: "attacker.example", site_key: "attacker" }) }),
+      params: { id: "20" }, context: {},
+    } as never);
+    expect(response.status).toBe(200);
+    expect(renameAnalyticsSite).toHaveBeenCalledWith(20, { id: 10, role: "user" }, { name: "Renamed" });
+    await expect(response.json()).resolves.toMatchObject({ name: "Renamed", host: "fixed.example", site_key: "fixed", updated_at: "now" });
+  });
+
+  it("maps rename ownership, missing-site, and validation errors to HTTP status codes", async () => {
+    authAs(10);
+    vi.mocked(renameAnalyticsSite).mockRejectedValueOnce(new AnalyticsSiteError("forbidden"));
+    expect((await renameSiteAction({ request: new Request("http://localhost/api/analytics/sites/20", { method: "PUT", body: JSON.stringify({ name: "X" }) }), params: { id: "20" }, context: {} } as never)).status).toBe(403);
+    vi.mocked(renameAnalyticsSite).mockRejectedValueOnce(new AnalyticsSiteError("not_found"));
+    expect((await renameSiteAction({ request: new Request("http://localhost/api/analytics/sites/20", { method: "PUT", body: JSON.stringify({ name: "X" }) }), params: { id: "20" }, context: {} } as never)).status).toBe(404);
+    vi.mocked(renameAnalyticsSite).mockRejectedValueOnce(new AnalyticsSiteError("invalid_input"));
+    expect((await renameSiteAction({ request: new Request("http://localhost/api/analytics/sites/20", { method: "PUT", body: JSON.stringify({ name: " " }) }), params: { id: "20" }, context: {} } as never)).status).toBe(400);
   });
 
   it("returns an explicit collector configuration error", async () => {

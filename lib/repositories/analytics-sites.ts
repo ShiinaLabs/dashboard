@@ -16,9 +16,11 @@ export interface AnalyticsSiteRow {
 }
 
 const mockSites: AnalyticsSiteRow[] = [
-  { id: 1, owner_id: 1, name: "Example Site", site_key: "123e4567-e89b-42d3-a456-426614174000", host: "example.com", created_at: new Date(0).toISOString(), updated_at: new Date(0).toISOString(), deleted_at: null },
+  { id: 1, owner_id: 1, name: "WiFi Lens", site_key: "123e4567-e89b-42d3-a456-426614174000", host: "wifi-lens.app", created_at: new Date(0).toISOString(), updated_at: new Date(0).toISOString(), deleted_at: null },
+  { id: 2, owner_id: 1, name: "Tazuki", site_key: "123e4567-e89b-42d3-a456-426614174001", host: "tazuki.dev", created_at: new Date(0).toISOString(), updated_at: new Date(0).toISOString(), deleted_at: null },
+  { id: 3, owner_id: 1, name: "ShiinaPlay", site_key: "123e4567-e89b-42d3-a456-426614174002", host: "shiina.play", created_at: new Date(0).toISOString(), updated_at: new Date(0).toISOString(), deleted_at: null },
 ];
-let nextMockId = 2;
+let nextMockId = 4;
 
 export async function getAnalyticsSites(ownerId?: number): Promise<AnalyticsSiteRow[]> {
   if (isMockMode()) return mockSites.filter((site) => site.deleted_at === null && (ownerId === undefined || site.owner_id === ownerId));
@@ -49,5 +51,20 @@ export async function createAnalyticsSite(data: Pick<AnalyticsSiteRow, "owner_id
     return row;
   }
   const rows = await getDb().insert(analytics_sites).values(data).returning();
+  return rows[0];
+}
+
+export async function renameAnalyticsSite(id: number, name: string): Promise<AnalyticsSiteRow | undefined> {
+  if (isMockMode()) {
+    const site = mockSites.find((candidate) => candidate.id === id && candidate.deleted_at === null);
+    if (!site) return undefined;
+    site.name = name;
+    site.updated_at = new Date().toISOString();
+    return site;
+  }
+  const rows = await getDb().update(analytics_sites)
+    .set({ name, updated_at: new Date().toISOString() })
+    .where(and(eq(analytics_sites.id, id), isNull(analytics_sites.deleted_at)))
+    .returning();
   return rows[0];
 }

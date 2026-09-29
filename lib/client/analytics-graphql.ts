@@ -50,6 +50,32 @@ export interface AnalyticsPortfolio {
   sites: Array<{ id: number; name: string; host: string; views: number; visits: number }>;
 }
 
+export interface AnalyticsGlobalCampaign extends AnalyticsCampaign {
+  siteId: number;
+  siteName: string;
+  siteHost: string;
+}
+
+export interface AnalyticsGlobalDashboard {
+  period: { days: number; timezone: string; startDate: string; endDate: string };
+  previousPeriod: { days: number; timezone: string; startDate: string; endDate: string };
+  overview: { trackedSites: number; activeSites: number; views: number; visits: number };
+  previousOverview: { views: number; visits: number };
+  timeline: Array<{ date: string; views: number; visits: number }>;
+  sites: Array<{ id: number; name: string; host: string; views: number; visits: number }>;
+  dimensions: {
+    countries: Array<{ country: string; views: number }>;
+    browsers: Array<{ browser: string; views: number }>;
+    operatingSystems: Array<{ os: string; views: number }>;
+    devices: Array<{ device: string; views: number }>;
+  };
+  acquisition: {
+    totalVisits: number;
+    referrers: AnalyticsAcquisitionReferrer[];
+    campaigns: AnalyticsGlobalCampaign[];
+  };
+}
+
 interface AnalyticsAcquisitionSummary {
   totalVisits: number;
   referrers: AnalyticsAcquisitionReferrer[];
@@ -119,6 +145,32 @@ const portfolioQuery = /* GraphQL */ `
   }
 `;
 
+const globalDashboardQuery = /* GraphQL */ `
+  query AnalyticsGlobalDashboard($range: AnalyticsRange!, $timezone: String!) {
+    analytics {
+      globalDashboard(range: $range, timezone: $timezone) {
+        period { days timezone startDate endDate }
+        previousPeriod { days timezone startDate endDate }
+        overview { trackedSites activeSites views visits }
+        previousOverview { views visits }
+        timeline { date views visits }
+        sites { id name host views visits }
+        dimensions {
+          countries { country views }
+          browsers { browser views }
+          operatingSystems { os views }
+          devices { device views }
+        }
+        acquisition {
+          totalVisits
+          referrers { referrer visits }
+          campaigns { siteId siteName siteHost source medium campaign visits }
+        }
+      }
+    }
+  }
+`;
+
 export async function getAnalyticsDashboard(siteId: number, range: AnalyticsRange, timezone: string): Promise<AnalyticsDashboard> {
   const result = await graphqlRequest<
     { analytics: { dashboard: AnalyticsDashboard } },
@@ -133,4 +185,12 @@ export async function getAnalyticsPortfolio(range: AnalyticsRange, timezone: str
     { range: AnalyticsRange; timezone: string }
   >(portfolioQuery, { range, timezone });
   return result.analytics.portfolio;
+}
+
+export async function getAnalyticsGlobalDashboard(range: AnalyticsRange, timezone: string): Promise<AnalyticsGlobalDashboard> {
+  const result = await graphqlRequest<
+    { analytics: { globalDashboard: AnalyticsGlobalDashboard } },
+    { range: AnalyticsRange; timezone: string }
+  >(globalDashboardQuery, { range, timezone });
+  return result.analytics.globalDashboard;
 }

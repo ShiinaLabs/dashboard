@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getAnalyticsTrafficForSite: vi.fn(),
   getAnalyticsAcquisitionForSite: vi.fn(),
   getAnalyticsDashboardForSite: vi.fn(),
+  getAnalyticsGlobalDashboard: vi.fn(),
   getAnalyticsPortfolio: vi.fn(),
 }));
 
@@ -289,5 +290,31 @@ describe("authenticated GraphQL route", () => {
     const response = await routeCall(graphqlAction, request("{ analytics { portfolio { summary { trackedSites } } } }"));
     expect(response.status).toBe(401);
     expect(mocks.getAnalyticsPortfolio).not.toHaveBeenCalled();
+  });
+
+  it.each([["DAYS_7", 7], ["DAYS_30", 30], ["DAYS_90", 90]] as const)("resolves globalDashboard %s through the service only", async (range, days) => {
+    authAs(7, "user");
+    const globalDashboard = {
+      period: { days, timezone: "Asia/Tokyo", startDate: "2026-09-24", endDate: "2026-09-30" },
+      previousPeriod: { days, timezone: "Asia/Tokyo", startDate: "2026-09-17", endDate: "2026-09-23" },
+      overview: { trackedSites: 2, activeSites: 1, views: 10, visits: 4 }, previousOverview: { views: 8, visits: 3 },
+      timeline: [], sites: [], dimensions: { countries: [], browsers: [], operatingSystems: [], devices: [] },
+      acquisition: { totalVisits: 4, referrers: [], campaigns: [] },
+    };
+    mocks.getAnalyticsGlobalDashboard.mockResolvedValueOnce(globalDashboard);
+    const query = `query Global($range: AnalyticsRange!, $timezone: String!) { analytics { globalDashboard(range: $range, timezone: $timezone) { period { days timezone startDate endDate } previousPeriod { days timezone startDate endDate } overview { trackedSites activeSites views visits } previousOverview { views visits } timeline { date views visits } sites { id name host views visits } dimensions { countries { country views } browsers { browser views } operatingSystems { os views } devices { device views } } acquisition { totalVisits referrers { referrer visits } campaigns { siteId siteName siteHost source medium campaign visits } } } } }`;
+    const response = await routeCall(graphqlAction, request(query, { range, timezone: "Asia/Tokyo" }));
+    await expect(response.json()).resolves.toEqual({ data: { analytics: { globalDashboard } } });
+    expect(mocks.getAnalyticsGlobalDashboard).toHaveBeenCalledWith({ id: 7, role: "user" }, "Asia/Tokyo", days);
+    expect(mocks.getAnalyticsDashboardForSite).not.toHaveBeenCalled();
+  });
+
+  it("gives admins their identity and default UTC seven-day range for globalDashboard", async () => {
+    authAs(99, "admin");
+    const report = { overview: { trackedSites: 0, activeSites: 0, views: 0, visits: 0 }, previousOverview: { views: 0, visits: 0 }, timeline: [], sites: [], dimensions: { countries: [], browsers: [], operatingSystems: [], devices: [] }, acquisition: { totalVisits: 0, referrers: [], campaigns: [] } };
+    mocks.getAnalyticsGlobalDashboard.mockResolvedValueOnce(report);
+    const response = await routeCall(graphqlAction, request("{ analytics { globalDashboard { overview { trackedSites } } } }"));
+    await expect(response.json()).resolves.toEqual({ data: { analytics: { globalDashboard: { overview: { trackedSites: 0 } } } } });
+    expect(mocks.getAnalyticsGlobalDashboard).toHaveBeenCalledWith({ id: 99, role: "admin" }, "UTC", 7);
   });
 });

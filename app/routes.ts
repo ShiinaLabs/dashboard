@@ -32,6 +32,7 @@ export default [
   route("api/auth/me", "api/auth/me/route.ts"),
   route("api/graphql", "api/graphql/route.ts"),
   route("api/analytics/sites", "api/analytics/sites/route.ts"),
+  route("api/analytics/sites/:id", "api/analytics/sites/[id]/route.ts"),
   route("api/analytics/sites/:id/installation", "api/analytics/sites/[id]/installation/route.ts"),
   route("api/analytics/sites/:id/traffic", "api/analytics/sites/[id]/traffic/route.ts"),
   route("api/bing-wallpaper", "api/bing-wallpaper/route.ts"),

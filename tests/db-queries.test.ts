@@ -30,8 +30,8 @@ import {
 import { getTopContent } from "../lib/services/top-content";
 import { SyncTelemetry } from "../lib/application/usecases/SyncTelemetry";
 import { createUser } from "../lib/services/users";
-import { createAnalyticsSite, getAnalyticsSiteById, getAnalyticsSiteByKey, getAnalyticsSites } from "../lib/repositories/analytics-sites";
-import { getAnalyticsAcquisitionReport, getAnalyticsDashboardReport, getAnalyticsPortfolioReport, getAnalyticsTrafficReport, insertAnalyticsEvent } from "../lib/repositories/analytics-events";
+import { createAnalyticsSite, getAnalyticsSiteById, getAnalyticsSiteByKey, getAnalyticsSites, renameAnalyticsSite as renameAnalyticsSiteRecord } from "../lib/repositories/analytics-sites";
+import { getAnalyticsAcquisitionReport, getAnalyticsDashboardReport, getAnalyticsGlobalDashboardReport, getAnalyticsPortfolioReport, getAnalyticsTrafficReport, insertAnalyticsEvent } from "../lib/repositories/analytics-events";
 import { ensureAnalyticsSiteConstraints, ensureSchemaColumns } from "../lib/setup";
 import { collectAnalyticsEvent } from "../lib/services/analytics-collector";
 
@@ -128,6 +128,15 @@ describe("users queries", () => {
 });
 
 describe("analytics site queries", () => {
+  it("updates only site name and updated_at when renaming", async () => {
+    const suffix = Date.now();
+    const owner = await usersQ.insertUser({ username: `analytics_rename_${suffix}`, password_hash: "hash", role: "user" });
+    const site = await createAnalyticsSite({ owner_id: owner.id, name: "Before", site_key: `rename-${suffix}`, host: "fixed.example" });
+    const renamed = await renameAnalyticsSiteRecord(site.id, "After");
+    expect(renamed).toMatchObject({ id: site.id, name: "After", site_key: site.site_key, host: site.host });
+    expect(renamed?.updated_at).not.toBe(site.updated_at);
+  });
+
   it("scopes by owner, enforces global keys, and excludes soft-deleted sites", async () => {
     const suffix = Date.now();
     const ownerA = await usersQ.insertUser({ username: `analytics_a_${suffix}`, password_hash: "hash", role: "user" });
@@ -283,6 +292,99 @@ describe("analytics portfolio queries", () => {
     expect(shiftDate(report.previousPeriod.endDate, 1)).toBe(report.period.startDate);
     expect(report.summary).toEqual({ trackedSites: 1, activeSites: 1, views: 2, visits: 1 });
     expect(report.previousSummary).toEqual({ views: 2, visits: 1 });
+  });
+});
+
+describe("analytics global dashboard queries", () => {
+  const insertVisit = (siteId: number, options: { referrer?: string; source?: string; medium?: string; campaign?: string } = {}) => getTestPool().query(`
+    INSERT INTO analytics_events(site_id, path, referrer_host, os, browser, country, device_type, visitor, visit, utm_source, utm_medium, utm_campaign)
+    VALUES ($1, '/', $2, 'macOS', 'Safari', 'JP', 'Desktop', FALSE, TRUE, $3, $4, $5)
+  `, [siteId, options.referrer ?? "google.com", options.source ?? "newsletter", options.medium ?? "email", options.campaign ?? "launch"]);
+
+  const makeSite = (ownerId: number, name: string, suffix: string) => createAnalyticsSite({
+    owner_id: ownerId, name, site_key: `global-${suffix}-${Math.random()}`, host: `${suffix}.global.example`,
+  });
+
+  it("enforces owner/admin scope and preserves cross-site referrers, site-aware campaigns, and zero-traffic sites", async () => {
+    const suffix = Date.now();
+    const owner = await usersQ.insertUser({ username: `analytics_global_owner_${suffix}`, password_hash: "hash", role: "user" });
+    const otherOwner = await usersQ.insertUser({ username: `analytics_global_other_${suffix}`, password_hash: "hash", role: "user" });
+    const alpha = await makeSite(owner.id, "Alpha", `alpha-${suffix}`);
+    const beta = await makeSite(owner.id, "Beta", `beta-${suffix}`);
+    const viewOnly = await makeSite(owner.id, "View Only", `view-only-${suffix}`);
+    const zero = await makeSite(owner.id, "Zero", `zero-${suffix}`);
+    const deleted = await makeSite(owner.id, "Deleted", `deleted-${suffix}`);
+    const foreign = await makeSite(otherOwner.id, "Foreign", `foreign-${suffix}`);
+    for (let index = 0; index < 3; index += 1) await insertVisit(alpha.id);
+    for (let index = 0; index < 2; index += 1) await insertVisit(beta.id);
+    await getTestPool().query(`
+      INSERT INTO analytics_events(site_id, path, referrer_host, os, browser, country, device_type, visitor, visit, utm_source, utm_medium, utm_campaign)
+      VALUES ($1, '/', 'excluded.example', 'Linux', 'Firefox', 'DE', 'Mobile', FALSE, FALSE, 'not', 'a-visit', 'ignored')
+    `, [viewOnly.id]);
+    for (let index = 0; index < 4; index += 1) await insertVisit(deleted.id, { source: "deleted", medium: "email", campaign: "deleted" });
+    for (let index = 0; index < 5; index += 1) await insertVisit(foreign.id, { source: "foreign", medium: "email", campaign: "foreign" });
+    await getTestPool().query("UPDATE analytics_sites SET deleted_at = NOW() WHERE id = $1", [deleted.id]);
+
+    const report = await getAnalyticsGlobalDashboardReport(owner.id, "UTC", 7);
+    expect(report.overview).toEqual({ trackedSites: 4, activeSites: 3, views: 6, visits: 5 });
+    expect(report.sites.map(({ id }) => id)).toEqual([alpha.id, beta.id, viewOnly.id, zero.id]);
+    expect(report.sites.at(-1)).toMatchObject({ id: zero.id, views: 0, visits: 0 });
+    expect(report.sites.reduce((sum, site) => sum + site.views, 0)).toBe(report.overview.views);
+    expect(report.sites.reduce((sum, site) => sum + site.visits, 0)).toBe(report.overview.visits);
+    expect(report.overview.activeSites).toBe(report.sites.filter((site) => site.views > 0).length);
+    expect(report.acquisition.totalVisits).toBe(report.overview.visits);
+    expect(report.acquisition.referrers).toContainEqual({ referrer: "google.com", visits: 5 });
+    expect(report.acquisition.campaigns).toEqual([
+      expect.objectContaining({ siteId: alpha.id, siteName: "Alpha", source: "newsletter", medium: "email", campaign: "launch", visits: 3 }),
+      expect.objectContaining({ siteId: beta.id, siteName: "Beta", source: "newsletter", medium: "email", campaign: "launch", visits: 2 }),
+    ]);
+    expect(report.dimensions.countries).toEqual([{ country: "JP", views: 5 }, { country: "DE", views: 1 }]);
+    expect(report.timeline).toHaveLength(7);
+    expect(report).not.toHaveProperty("topPages");
+    expect(report.acquisition).not.toHaveProperty("entryPages");
+
+    const adminReport = await getAnalyticsGlobalDashboardReport(undefined, "UTC", 7);
+    expect(adminReport.sites.map(({ id }) => id)).toContain(foreign.id);
+    expect(adminReport.sites.map(({ id }) => id)).not.toContain(deleted.id);
+    expect(adminReport.acquisition.campaigns).toEqual(expect.arrayContaining([
+      expect.objectContaining({ siteId: alpha.id, visits: 3 }),
+      expect.objectContaining({ siteId: beta.id, visits: 2 }),
+      expect.objectContaining({ siteId: foreign.id, visits: 5 }),
+    ]));
+  });
+
+  it.each([7, 30, 90])("uses the viewer-local %i-day current and previous bounds and zero-fills its timeline", async (days) => {
+    const suffix = `${Date.now()}_${days}`;
+    const owner = await usersQ.insertUser({ username: `analytics_global_bounds_${suffix}`, password_hash: "hash", role: "user" });
+    const site = await makeSite(owner.id, "Bounds", `bounds-${suffix}`);
+    const insertAtOffset = (offset: number, visit: boolean) => getTestPool().query(`
+      INSERT INTO analytics_events(site_id, path, referrer_host, os, browser, country, device_type, visitor, visit, recorded_at)
+      SELECT $1, '/', '', 'Other', 'Other', 'Unknown', 'Desktop', FALSE, $3,
+        (((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tokyo')::date + $2::int)::timestamp AT TIME ZONE 'Asia/Tokyo')
+    `, [site.id, offset, visit]);
+    const currentStartOffset = 1 - days;
+    const previousStartOffset = 1 - days * 2;
+    await insertAtOffset(currentStartOffset, true);
+    await insertAtOffset(0, false);
+    await insertAtOffset(previousStartOffset, true);
+    await insertAtOffset(previousStartOffset - 1, true);
+    await insertAtOffset(1, true);
+
+    const report = await getAnalyticsGlobalDashboardReport(owner.id, "Asia/Tokyo", days);
+    const shiftDate = (dateText: string, offset: number) => {
+      const date = new Date(`${dateText}T00:00:00.000Z`);
+      date.setUTCDate(date.getUTCDate() + offset);
+      return date.toISOString().slice(0, 10);
+    };
+    expect(report.period.days).toBe(days);
+    expect(shiftDate(report.period.startDate, days - 1)).toBe(report.period.endDate);
+    expect(shiftDate(report.previousPeriod.startDate, days - 1)).toBe(report.previousPeriod.endDate);
+    expect(shiftDate(report.previousPeriod.endDate, 1)).toBe(report.period.startDate);
+    expect(report.overview.views).toBe(2);
+    expect(report.previousOverview.views).toBe(1);
+    expect(report.timeline).toHaveLength(days);
+    expect(report.timeline[0]).toMatchObject({ date: report.period.startDate, views: 1, visits: 1 });
+    expect(report.timeline.at(-1)).toMatchObject({ date: report.period.endDate, views: 1, visits: 0 });
   });
 });
 

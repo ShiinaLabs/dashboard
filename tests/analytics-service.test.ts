@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { analyticsPublicOrigin } from "../lib/config";
-import { createAnalyticsSite, getAnalyticsAcquisitionForSite, getAnalyticsDashboardForSite, getAnalyticsInstallationForSite, getAnalyticsPortfolio, getAnalyticsTrafficForSite, getAnalyticsSites } from "../lib/services/analytics";
+import { createAnalyticsSite, getAnalyticsAcquisitionForSite, getAnalyticsDashboardForSite, getAnalyticsGlobalDashboard, getAnalyticsInstallationForSite, getAnalyticsPortfolio, getAnalyticsTrafficForSite, getAnalyticsSites, renameAnalyticsSite } from "../lib/services/analytics";
 import * as sitesRepo from "../lib/repositories/analytics-sites";
 import * as eventsRepo from "../lib/repositories/analytics-events";
 
 vi.mock("../lib/config", () => ({ analyticsPublicOrigin: vi.fn() }));
 vi.mock("../lib/repositories/analytics-sites", () => ({
-  getAnalyticsSites: vi.fn(), getAnalyticsSiteById: vi.fn(), getAnalyticsSiteByKey: vi.fn(), createAnalyticsSite: vi.fn(),
+  getAnalyticsSites: vi.fn(), getAnalyticsSiteById: vi.fn(), getAnalyticsSiteByKey: vi.fn(), createAnalyticsSite: vi.fn(), renameAnalyticsSite: vi.fn(),
 }));
-vi.mock("../lib/repositories/analytics-events", () => ({ insertAnalyticsEvent: vi.fn(), getAnalyticsTrafficReport: vi.fn(), getAnalyticsAcquisitionReport: vi.fn(), getAnalyticsDashboardReport: vi.fn(), getAnalyticsPortfolioReport: vi.fn() }));
+vi.mock("../lib/repositories/analytics-events", () => ({ insertAnalyticsEvent: vi.fn(), getAnalyticsTrafficReport: vi.fn(), getAnalyticsAcquisitionReport: vi.fn(), getAnalyticsDashboardReport: vi.fn(), getAnalyticsPortfolioReport: vi.fn(), getAnalyticsGlobalDashboardReport: vi.fn() }));
 
 const siteA = { id: 10, owner_id: 1, name: "A", site_key: "site-a", host: "a.example", created_at: "now", updated_at: "now", deleted_at: null };
 const trafficReport = {
@@ -50,6 +50,21 @@ describe("analytics service", () => {
     expect(sitesRepo.createAnalyticsSite).toHaveBeenNthCalledWith(2, {
       owner_id: 7, name: "Another Site", site_key: second.site_key, host: "another.example",
     });
+  });
+
+  it("renames only an authorized site's name and leaves ownership checks in the service", async () => {
+    vi.mocked(sitesRepo.renameAnalyticsSite).mockResolvedValue({ ...siteA, name: "Renamed" });
+    await expect(renameAnalyticsSite(10, { id: 1, role: "user" }, { name: " Renamed " })).resolves.toMatchObject({ id: 10, name: "Renamed", host: "a.example", site_key: "site-a" });
+    expect(sitesRepo.renameAnalyticsSite).toHaveBeenCalledWith(10, "Renamed");
+    await expect(renameAnalyticsSite(10, { id: 99, role: "user" }, { name: "Blocked" })).rejects.toMatchObject({ code: "forbidden" });
+    expect(sitesRepo.renameAnalyticsSite).toHaveBeenCalledTimes(1);
+    await expect(renameAnalyticsSite(10, { id: 99, role: "admin" }, { name: "Admin rename" })).resolves.toMatchObject({ name: "Renamed" });
+  });
+
+  it("rejects empty or overlong rename values", async () => {
+    await expect(renameAnalyticsSite(10, { id: 1, role: "user" }, { name: "  " })).rejects.toMatchObject({ code: "invalid_input" });
+    await expect(renameAnalyticsSite(10, { id: 1, role: "user" }, { name: "n".repeat(201) })).rejects.toMatchObject({ code: "invalid_input" });
+    expect(sitesRepo.renameAnalyticsSite).not.toHaveBeenCalled();
   });
 
   it("rejects incomplete or path-bearing site input", async () => {
@@ -130,6 +145,17 @@ describe("analytics service", () => {
     await expect(getAnalyticsPortfolio({ id: 1, role: "user" }, "Not/AZone", 7)).rejects.toMatchObject({ code: "invalid_input" });
     await expect(getAnalyticsPortfolio({ id: 1, role: "user" }, "UTC", 14)).rejects.toMatchObject({ code: "invalid_input" });
     expect(eventsRepo.getAnalyticsPortfolioReport).not.toHaveBeenCalled();
+  });
+
+  it("uses owner scope for global dashboards and gives admins global scope", async () => {
+    const report = { overview: { trackedSites: 1, activeSites: 1, views: 2, visits: 1 } } as never;
+    vi.mocked(eventsRepo.getAnalyticsGlobalDashboardReport).mockResolvedValue(report);
+    await expect(getAnalyticsGlobalDashboard({ id: 1, role: "user" }, "Asia/Tokyo", 30)).resolves.toBe(report);
+    await expect(getAnalyticsGlobalDashboard({ id: 99, role: "admin" }, "UTC", 7)).resolves.toBe(report);
+    expect(eventsRepo.getAnalyticsGlobalDashboardReport).toHaveBeenNthCalledWith(1, 1, "Asia/Tokyo", 30);
+    expect(eventsRepo.getAnalyticsGlobalDashboardReport).toHaveBeenNthCalledWith(2, undefined, "UTC", 7);
+    await expect(getAnalyticsGlobalDashboard({ id: 1, role: "user" }, "Not/AZone", 14)).rejects.toMatchObject({ code: "invalid_input" });
+    expect(eventsRepo.getAnalyticsGlobalDashboardReport).toHaveBeenCalledTimes(2);
   });
 
   it("rejects missing sites and invalid acquisition timezones before querying the repository", async () => {

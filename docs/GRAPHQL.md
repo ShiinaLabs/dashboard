@@ -2,7 +2,7 @@
 
 The authenticated GraphQL endpoint is `GET`/`POST /api/graphql`. It is a query layer over existing application services; it does not replace or change the REST API. The endpoint requires the existing `dash_session` cookie and returns HTTP `401` before GraphQL execution when no valid session is present.
 
-The current schema is query-only. It exposes `Query.analytics.sites`, the compatibility fields `traffic(siteId, timezone = "UTC")` and `acquisition(siteId, timezone = "UTC")`, the ranged `dashboard(siteId, range = DAYS_7, timezone = "UTC")` read model, and `portfolio(range = DAYS_7, timezone = "UTC")`. `AnalyticsRange` accepts only `DAYS_7`, `DAYS_30`, or `DAYS_90`. Site results use camelCase fields and omit owner and soft-delete fields. Traffic and portfolio timezone/range behavior is delegated to the analytics service.
+The current schema exposes `Query.analytics.sites`, the compatibility fields `traffic(siteId, timezone = "UTC")` and `acquisition(siteId, timezone = "UTC")`, the ranged site `dashboard(siteId, range = DAYS_7, timezone = "UTC")`, the portfolio `portfolio(range = DAYS_7, timezone = "UTC")`, and `globalDashboard(range = DAYS_7, timezone = "UTC")`. `AnalyticsRange` accepts only `DAYS_7`, `DAYS_30`, or `DAYS_90`. Site results use camelCase fields and omit owner and soft-delete fields. Analytics timezone/range behavior is delegated to the analytics service.
 
 Example:
 
@@ -64,3 +64,11 @@ The tracker reads only those three allow-listed query parameters. It never sends
 `analytics.portfolio` provides the site-level summary used by `/overview`. One authenticated GraphQL request returns the tracked-site count, active sites, aggregate Views and Visits, previous-period Views and Visits, and every visible site's summary. It does not issue one dashboard query per site. The typed `getAnalyticsPortfolio` client calls the shared `graphqlRequest` transport.
 
 The service applies the same visibility rule as `analytics.sites`: regular users see their own sites and admins see all users' sites. The repository excludes soft-deleted sites and scopes events to the visible sites before aggregating. A single PostgreSQL statement uses one database clock and viewer-local calendar bounds for the current period and the immediately preceding equal-length period. Sites without events remain in the result. Portfolio Views and Visits equal the sum of the per-site values; Active Sites counts sites with at least one current-period event. Portfolio does not report cross-site visitors because site-local visitor markers cannot identify unique people across sites.
+
+## Global Analytics dashboard
+
+`analytics.globalDashboard` is the `/analytics` All Sites read model. One repository statement returns current and previous viewer-local periods, Views and Visits, a zero-filled Views/Visits timeline, every visible site's metrics (including zero-traffic sites), dimensions, and visit-based acquisition. The overview also reports `trackedSites` (non-deleted visible sites, independent of range) and `activeSites` (visible sites with at least one view in the selected period). Site sums equal overview totals.
+
+Global dimensions count views. Countries are complete for the map; browsers, operating systems, and devices are limited to ten. Referrers count visit-entry events and aggregate by raw referrer host across sites; an empty host remains `""` and the UI renders it as Direct. Campaigns count visit-entry events with a non-empty UTM value and are grouped by site plus source/medium/campaign so identical campaign tuples on different sites stay distinct. The global result intentionally has no visitors, Top Pages, or Entry Pages: visitor markers are site-local and page paths are site-relative. The portfolio contract for `/overview` and the site dashboard contract remain separate and unchanged.
+
+Regular users are scoped to their own non-deleted sites; admins use the portfolio's existing global visibility rule. The UI issues only the global dashboard query in All Sites mode or only the site dashboard query in specific-site mode. Site selection/creation/rename and installation setup remain REST-backed.
