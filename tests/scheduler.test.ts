@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getAccountFetchState } from "../lib/repositories/account-fetch-state";
+import { getAccountFetchState, upsertAccountFetchState } from "../lib/repositories/account-fetch-state";
 
 const getActiveAccounts = vi.fn();
 const getAccountByIdWithCredential = vi.fn();
@@ -120,6 +120,98 @@ describe("scheduler", () => {
 
     expect(getAccountByIdWithCredential).toHaveBeenCalledWith(8);
     expect(dispatchFetch).toHaveBeenCalledWith(dueAccount, "scheduler", "l1");
+    expect(upsertAccountFetchState).toHaveBeenCalledWith(8, "l1", expect.any(String));
+    expect(updateAccount).not.toHaveBeenCalledWith(8, expect.objectContaining({ last_fetched_at: expect.any(String) }));
+  });
+
+  it("advances level state after a partial dispatch", async () => {
+    const account = {
+      id: 31,
+      owner_id: 1,
+      screen_name: "partial-user",
+      platform: "twitter",
+      user_id: null,
+      auth_token: "token",
+      fetch_interval: 30,
+      is_active: 1,
+      last_fetched_at: null,
+      error_message: null,
+      instance_url: null,
+      auth_type: null,
+      created_at: "2026-07-05T00:00:00.000Z",
+      updated_at: "2026-07-05T00:00:00.000Z",
+    };
+    getActiveAccounts.mockResolvedValue([account]);
+    getAccountByIdWithCredential.mockResolvedValue(account);
+    dispatchFetch.mockResolvedValue({ status: "partial", errorMessage: "one data source failed" });
+
+    const { runCycleOnceForTests } = await import("../lib/scheduler");
+    await runCycleOnceForTests();
+
+    expect(upsertAccountFetchState).toHaveBeenCalledWith(31, "l0", expect.any(String));
+    expect(updateAccount).not.toHaveBeenCalledWith(31, expect.objectContaining({ last_fetched_at: expect.any(String) }));
+  });
+
+  it("does not advance level state after a failed dispatch and continues the cycle", async () => {
+    const failedAccount = {
+      id: 32,
+      owner_id: 1,
+      screen_name: "failed-user",
+      platform: "twitter",
+      user_id: null,
+      auth_token: "token",
+      fetch_interval: 30,
+      is_active: 1,
+      last_fetched_at: null,
+      error_message: null,
+      instance_url: null,
+      auth_type: null,
+      created_at: "2026-07-05T00:00:00.000Z",
+      updated_at: "2026-07-05T00:00:00.000Z",
+    };
+    const healthyAccount = { ...failedAccount, id: 33, screen_name: "healthy-user", platform: "github" };
+    getActiveAccounts.mockResolvedValue([failedAccount, healthyAccount]);
+    getAccountByIdWithCredential.mockImplementation(async (id: number) => id === 32 ? failedAccount : healthyAccount);
+    dispatchFetch
+      .mockResolvedValueOnce({ status: "failed", errorMessage: "upstream unavailable" })
+      .mockResolvedValueOnce({ status: "success" });
+
+    const { runCycleOnceForTests } = await import("../lib/scheduler");
+    await expect(runCycleOnceForTests()).resolves.toBeUndefined();
+
+    expect(dispatchFetch).toHaveBeenCalledTimes(2);
+    expect(upsertAccountFetchState).toHaveBeenCalledTimes(1);
+    expect(upsertAccountFetchState).toHaveBeenCalledWith(33, "l0", expect.any(String));
+    expect(upsertAccountFetchState).not.toHaveBeenCalledWith(32, expect.anything(), expect.anything());
+    expect(updateAccount).not.toHaveBeenCalledWith(32, expect.objectContaining({ last_fetched_at: expect.any(String) }));
+  });
+
+  it("does not advance level state after a skipped dispatch", async () => {
+    const account = {
+      id: 34,
+      owner_id: 1,
+      screen_name: "already-running-user",
+      platform: "twitter",
+      user_id: null,
+      auth_token: "token",
+      fetch_interval: 30,
+      is_active: 1,
+      last_fetched_at: null,
+      error_message: null,
+      instance_url: null,
+      auth_type: null,
+      created_at: "2026-07-05T00:00:00.000Z",
+      updated_at: "2026-07-05T00:00:00.000Z",
+    };
+    getActiveAccounts.mockResolvedValue([account]);
+    getAccountByIdWithCredential.mockResolvedValue(account);
+    dispatchFetch.mockResolvedValue({ status: "skipped", reason: "already-running" });
+
+    const { runCycleOnceForTests } = await import("../lib/scheduler");
+    await runCycleOnceForTests();
+
+    expect(upsertAccountFetchState).not.toHaveBeenCalled();
+    expect(updateAccount).not.toHaveBeenCalledWith(34, expect.objectContaining({ last_fetched_at: expect.any(String) }));
   });
 
   it("isolates a credential decryption failure to the affected account", async () => {

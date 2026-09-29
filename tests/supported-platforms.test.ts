@@ -65,7 +65,10 @@ describe("supported platform guardrails", () => {
       updated_at: "2026-06-27T00:00:00.000Z",
     };
 
-    await expect(dispatchFetch(account as never)).resolves.toEqual({ skipped: true });
+    await expect(dispatchFetch(account as never)).resolves.toEqual({
+      status: "skipped",
+      reason: "unsupported-platform",
+    });
     expect(startFetchRun).not.toHaveBeenCalled();
   });
 });

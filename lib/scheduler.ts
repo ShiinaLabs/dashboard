@@ -100,15 +100,13 @@ async function runCycle() {
         continue;
       }
 
-      await dispatchFetch(freshAccount, "scheduler", dueLevel);
-      // Record per-level fetch time
-      try {
-        await upsertAccountFetchState(account.id, dueLevel, new Date().toISOString());
-      } catch { /* per-level state table may not exist yet */ }
-      // Also update legacy last_fetched_at for backward compat / health display
-      try {
-        await updateAccount(account.id, { last_fetched_at: new Date().toISOString() });
-      } catch { /* legacy update best-effort */ }
+      const result = await dispatchFetch(freshAccount, "scheduler", dueLevel);
+      if (result.status === "success" || result.status === "partial") {
+        // The dispatcher owns account.last_fetched_at; Scheduler owns per-level state.
+        try {
+          await upsertAccountFetchState(account.id, dueLevel, new Date().toISOString());
+        } catch { /* per-level state table may not exist yet */ }
+      }
 
       lastPlatformFetch.set(freshAccount.platform, Date.now());
       // Refresh now after each fetch so the interval check reflects real elapsed time

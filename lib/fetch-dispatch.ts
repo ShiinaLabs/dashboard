@@ -18,6 +18,12 @@ import { getPlatformFetchLevels } from "./application/scheduler/fetchPolicy";
 
 type CompletedRunStatus = Exclude<FetchRunStatus, "running">;
 
+export type DispatchFetchResult =
+  | { status: "success"; capabilityGaps?: CapabilityGap[] }
+  | { status: "partial"; capabilityGaps?: CapabilityGap[]; errorMessage?: string | null }
+  | { status: "failed"; errorMessage?: string | null }
+  | { status: "skipped"; reason: "already-running" | "unsupported-platform" };
+
 type FetcherResult = boolean | number | {
   status?: CompletedRunStatus;
   errorMessage?: string | null;
@@ -48,15 +54,15 @@ function normalizeResult(result: FetcherResult): {
   return { status: "success", errorMessage: null, capabilityGaps: [] };
 }
 
-export async function dispatchFetch(account: AccountRow, trigger: FetchTrigger = "manual", level?: string) {
+export async function dispatchFetch(account: AccountRow, trigger: FetchTrigger = "manual", level?: string): Promise<DispatchFetchResult> {
   if (!isSupportedPlatform(account.platform)) {
     getLogger().warn("FetchRun", "Account %s has unsupported platform %s; fetch skipped", account.id, account.platform);
-    return { skipped: true };
+    return { status: "skipped", reason: "unsupported-platform" };
   }
 
   if (activeDispatches.has(account.id)) {
     getLogger().info("FetchRun", "Account %s is already fetching; request skipped", account.id);
-    return { skipped: true };
+    return { status: "skipped", reason: "already-running" };
   }
 
   activeDispatches.add(account.id);
@@ -79,7 +85,7 @@ export async function dispatchFetch(account: AccountRow, trigger: FetchTrigger =
     // the run actually succeeds (or is partial) so a failed run does not make
     // the account look freshly fetched.
 
-    return executeAndRecord(account, runId, trigger, level);
+    return await executeAndRecord(account, runId, trigger, level);
   } finally {
     activeDispatches.delete(account.id);
   }
@@ -90,7 +96,7 @@ async function executeAndRecord(
   runId: number | undefined,
   trigger: FetchTrigger,
   level?: string,
-) {
+): Promise<DispatchFetchResult> {
   const startedAt = Date.now();
   try {
     // Level-aware new architecture with compatible fallback (Phase 2)
@@ -139,26 +145,17 @@ async function executeAndRecord(
       result = await selectFetcher(account)(account) as FetcherResult;
     }
     const outcome = normalizeResult(result);
-    // Only advance last_fetched_at on success/partial so a failed run does not
-    // make the account look freshly fetched (which would break retry/health).
-    if (outcome.status === "success" || outcome.status === "partial") {
-      try {
-        await updateAccount(account.id, { last_fetched_at: new Date().toISOString() });
-      } catch (e) {
-        getLogger().error(
-          "FetchRun",
-          "Unable to record last_fetched_at for account %s: %s",
-          account.id,
-          e instanceof Error ? e.message : String(e),
-        );
-      }
-    }
     await finishFetchRun({
       id: runId,
       status: outcome.status,
       errorMessage: outcome.errorMessage,
       capabilityGaps: outcome.capabilityGaps,
     });
+    // Only advance last_fetched_at after a success/partial outcome is recorded,
+    // so a failed run does not look freshly fetched and delay its retry.
+    if (outcome.status === "success" || outcome.status === "partial") {
+      await advanceLastFetchedAt(account.id);
+    }
     getLogger().info(
       "FetchRun",
       "Account %s %s in %dms (%s)",
@@ -167,17 +164,40 @@ async function executeAndRecord(
       Date.now() - startedAt,
       trigger,
     );
-    return result;
+    if (outcome.status === "partial") {
+      return {
+        status: "partial",
+        capabilityGaps: outcome.capabilityGaps,
+        errorMessage: outcome.errorMessage,
+      };
+    }
+    if (outcome.status === "failed") {
+      return { status: "failed", errorMessage: outcome.errorMessage };
+    }
+    return { status: "success", capabilityGaps: outcome.capabilityGaps };
   } catch (caught: unknown) {
     const error = caught instanceof Error ? caught : new Error(String(caught));
     const metadata = caught as FetcherError;
-    await finishFetchRun({
-      id: runId,
-      status: metadata.fetchRunStatus === "partial" ? "partial" : "failed",
-      errorMessage: error.message,
-    });
+    const status = metadata.fetchRunStatus === "partial" ? "partial" : "failed";
+    await finishFetchRun({ id: runId, status, errorMessage: error.message });
+    if (status === "partial") await advanceLastFetchedAt(account.id);
     getLogger().warn("FetchRun", "Account %s failed in %dms: %s", account.id, Date.now() - startedAt, error.message);
-    return false;
+    return status === "partial"
+      ? { status: "partial", errorMessage: error.message }
+      : { status: "failed", errorMessage: error.message };
+  }
+}
+
+async function advanceLastFetchedAt(accountId: number): Promise<void> {
+  try {
+    await updateAccount(accountId, { last_fetched_at: new Date().toISOString() });
+  } catch (error) {
+    getLogger().error(
+      "FetchRun",
+      "Unable to record last_fetched_at for account %s: %s",
+      accountId,
+      error instanceof Error ? error.message : String(error),
+    );
   }
 }
 
