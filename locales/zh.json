@@ -205,6 +205,13 @@
   },
   "analytics": {
     "heading": "网站分析",
+    "atAGlance": "一览",
+    "topPage": "热门页面",
+    "topSource": "主要来源",
+    "topCountry": "主要国家/地区",
+    "topCampaign": "主要 Campaign",
+    "noAnalyticsDataInPeriod": "该周期暂无分析数据",
+    "noCampaignDataSummary": "暂无 Campaign 数据",
     "period": "最近 {{days}} 天",
     "range": "分析时间范围",
     "trafficOverTime": "流量趋势",

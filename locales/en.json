@@ -205,6 +205,13 @@
   },
   "analytics": {
     "heading": "Web Analytics",
+    "atAGlance": "At a glance",
+    "topPage": "Top Page",
+    "topSource": "Top Source",
+    "topCountry": "Top Country",
+    "topCampaign": "Top Campaign",
+    "noAnalyticsDataInPeriod": "No analytics data in this period",
+    "noCampaignDataSummary": "No campaign data",
     "period": "Last {{days}} days",
     "range": "Analytics date range",
     "trafficOverTime": "Traffic over time",

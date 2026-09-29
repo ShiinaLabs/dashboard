@@ -64,6 +64,28 @@ test("Web Analytics adds and selects sites, then switches the complete dashboard
   await expect(page.getByText("+4.5% vs previous period")).toBeVisible();
   await expect(page.getByText("+6.0% vs previous period")).toBeVisible();
   await expect(page.getByText(/Infinity/)).toHaveCount(0);
+  const glanceHeading = page.getByRole("heading", { name: "At a glance", level: 2 });
+  await expect(glanceHeading).toBeVisible();
+  const glanceCard = glanceHeading.locator("xpath=../..");
+  await expect(glanceCard.getByText("Top Page", { exact: true })).toBeVisible();
+  await expect(glanceCard.getByText("/", { exact: true })).toBeVisible();
+  await expect(glanceCard.getByText("42 Views", { exact: true })).toBeVisible();
+  await expect(glanceCard.getByText("Top Source", { exact: true })).toBeVisible();
+  await expect(glanceCard.getByText("Direct", { exact: true })).toBeVisible();
+  await expect(glanceCard.getByText("2,100 Visits", { exact: true })).toBeVisible();
+  await expect(glanceCard.getByText("Japan (JP)", { exact: true })).toBeVisible();
+  await expect(glanceCard.getByText("4,280 Views", { exact: true })).toBeVisible();
+  await expect(glanceCard.getByText("launch", { exact: true })).toBeVisible();
+  await expect(glanceCard.getByText("newsletter / email · 420 Visits", { exact: true })).toBeVisible();
+  const pageOrder = await page.evaluate(() => {
+    const metricGrid = document.querySelector('[data-slot="metric-grid"]');
+    const glance = document.querySelector('section[aria-labelledby="analytics-at-a-glance-heading"]');
+    const trafficCard = document.querySelector('[data-slot="chart-card-title"]')?.closest('[data-slot="card"]');
+    const follows = (before: Element | null | undefined, after: Element | null | undefined) =>
+      Boolean(before && after && (before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING));
+    return { metricsBeforeGlance: follows(metricGrid, glance), glanceBeforeTraffic: follows(glance, trafficCard) };
+  });
+  expect(pageOrder).toEqual({ metricsBeforeGlance: true, glanceBeforeTraffic: true });
   await expect(page.getByText("Traffic over time", { exact: true })).toBeVisible();
   await expect(page.getByRole("img", { name: "Traffic over time" })).toBeVisible();
   await expect(page.getByRole("group", { name: "Visitor geography" })).toBeVisible();
@@ -124,9 +146,10 @@ test("Web Analytics adds and selects sites, then switches the complete dashboard
   await expect(campaignCard.getByTitle("launch · newsletter / email", { exact: true })).toBeVisible();
   await expect(campaignCard.getByTitle("wifi-tool · google / cpc", { exact: true })).toBeVisible();
   await expect(campaignCard.getByText("10.2%", { exact: true })).toBeVisible();
-  await expect(page.getByText("Direct", { exact: true })).toBeVisible();
-  await expect(page.getByText("google.com", { exact: true })).toBeVisible();
-  await expect(page.getByText("Japan (JP)", { exact: true })).toBeVisible();
+  await expect(referrerCard.getByText("Direct", { exact: true })).toBeVisible();
+  await expect(referrerCard.getByText("google.com", { exact: true })).toBeVisible();
+  const countryCard = page.getByRole("heading", { name: "Countries", level: 2 }).locator("xpath=../..");
+  await expect(countryCard.getByText("Japan (JP)", { exact: true })).toBeVisible();
   await expect(page.getByText("Safari", { exact: true })).toBeVisible();
   await expect(page.getByText("macOS", { exact: true })).toBeVisible();
   await expect(page.getByText("Desktop", { exact: true })).toBeVisible();
@@ -142,6 +165,7 @@ test("Web Analytics adds and selects sites, then switches the complete dashboard
   expect(thirtyDayDashboard.timeline).toHaveLength(30);
   expect(thirtyDayDashboard.acquisition.campaigns).toHaveLength(2);
   await expect(page.getByText("Last 30 days")).toBeVisible();
+  await expect(glanceHeading).toBeVisible();
   await expect(page.getByRole("button", { name: "30D" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText("Average Daily Visitors").first()).toBeVisible();
 
@@ -155,6 +179,7 @@ test("Web Analytics adds and selects sites, then switches the complete dashboard
   expect(ninetyDayDashboard.timeline).toHaveLength(90);
   expect(ninetyDayDashboard.acquisition.campaigns).toHaveLength(2);
   await expect(page.getByText("Last 90 days")).toBeVisible();
+  await expect(glanceHeading).toBeVisible();
   await expect(page.getByRole("button", { name: "90D" })).toHaveAttribute("aria-pressed", "true");
 });
 
@@ -205,7 +230,49 @@ test("dashboard shows separate acquisition empty states when the selected site h
   await expect(page.getByText("No acquisition referrer data in this period")).toBeVisible();
   await expect(page.getByText("No entry page data in this period")).toBeVisible();
   await expect(page.getByText("No campaign data in this period")).toBeVisible();
+  await expect(page.getByText("No analytics data in this period")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "At a glance", level: 2 })).toBeVisible();
   await expect(page.getByRole("img", { name: "Traffic over time" })).toBeVisible();
+});
+
+test("At a glance keeps its campaign cell when campaign data is empty", async ({ page }) => {
+  await logIn(page);
+  await page.route("**/api/graphql", async (route) => {
+    const response = await route.fetch();
+    const payload = await response.json();
+    if (payload.data?.analytics?.dashboard) payload.data.analytics.dashboard.acquisition.campaigns = [];
+    await route.fulfill({ response, body: JSON.stringify(payload) });
+  });
+  await page.goto("/analytics");
+  const glance = page.getByRole("heading", { name: "At a glance", level: 2 }).locator("xpath=../..");
+  await expect(glance.getByText("Top Campaign", { exact: true })).toBeVisible();
+  await expect(glance.getByText("—", { exact: true })).toBeVisible();
+  await expect(glance.getByText("No campaign data", { exact: true })).toBeVisible();
+  await expect(glance.getByText("Top Page", { exact: true })).toBeVisible();
+});
+
+test("At a glance truncates long summary values without mobile overflow", async ({ page }) => {
+  await logIn(page);
+  await page.route("**/api/graphql", async (route) => {
+    const response = await route.fetch();
+    const payload = await response.json();
+    const dashboard = payload.data?.analytics?.dashboard;
+    if (dashboard) {
+      dashboard.topPages[0] = { path: "/this/is/a/very/long/page/path/that/should/truncate", views: 42 };
+      dashboard.acquisition.referrers[0] = { referrer: "a-very-long-source-hostname.example", visits: 7 };
+    }
+    await route.fulfill({ response, body: JSON.stringify(payload) });
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/analytics");
+  const glance = page.getByRole("heading", { name: "At a glance", level: 2 }).locator("xpath=../..");
+  await expect(glance.getByTitle("/this/is/a/very/long/page/path/that/should/truncate")).toBeVisible();
+  await expect(glance.getByTitle("a-very-long-source-hostname.example")).toBeVisible();
+  const dimensions = await page.evaluate(() => ({
+    viewport: document.documentElement.clientWidth,
+    content: document.documentElement.scrollWidth,
+  }));
+  expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport);
 });
 
 test("dashboard routes render without horizontal overflow at desktop and tablet widths", async ({ page }) => {

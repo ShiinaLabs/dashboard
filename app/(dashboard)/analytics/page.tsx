@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AnalyticsDimensionCard } from "@/components/domain/analytics/AnalyticsDimensionCard";
+import { AnalyticsAtAGlance } from "@/components/domain/analytics/AnalyticsAtAGlance";
 import { AnalyticsWorldMap } from "@/components/domain/analytics/AnalyticsWorldMap";
 import { ChartCard } from "@/components/domain/shared/ChartCard";
 import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
@@ -87,6 +88,46 @@ export default function WebAnalyticsPage() {
   };
   const dimensionData = dashboard?.dimensions;
   const countryLocale = i18n.resolvedLanguage ?? i18n.language;
+  const summaryNumber = new Intl.NumberFormat(countryLocale);
+  const topPage = dashboard?.topPages[0];
+  const topSource = dashboard?.acquisition.referrers[0];
+  const topCountry = dashboard?.dimensions.countries[0];
+  const topCampaign = dashboard?.acquisition.campaigns[0];
+  const campaignSource = topCampaign?.source || "—";
+  const campaignMedium = topCampaign?.medium || "—";
+  const campaignSourceMedium = `${campaignSource} / ${campaignMedium}`;
+  const glanceItems = [
+    {
+      key: "page",
+      label: t("analytics.topPage"),
+      value: topPage?.path ?? "—",
+      detail: topPage ? `${summaryNumber.format(topPage.views)} ${t("analytics.views")}` : undefined,
+      title: topPage?.path,
+    },
+    {
+      key: "source",
+      label: t("analytics.topSource"),
+      value: topSource ? (topSource.referrer === "" ? t("analytics.direct") : topSource.referrer) : "—",
+      detail: topSource ? `${summaryNumber.format(topSource.visits)} ${t("analytics.visits")}` : undefined,
+      title: topSource?.referrer || (topSource ? t("analytics.direct") : undefined),
+    },
+    {
+      key: "country",
+      label: t("analytics.topCountry"),
+      value: topCountry ? countryLabel(topCountry.country, countryLocale, t("analytics.unknown")) : "—",
+      detail: topCountry ? `${summaryNumber.format(topCountry.views)} ${t("analytics.views")}` : undefined,
+      title: topCountry ? countryLabel(topCountry.country, countryLocale, t("analytics.unknown")) : undefined,
+    },
+    {
+      key: "campaign",
+      label: t("analytics.topCampaign"),
+      value: topCampaign ? (topCampaign.campaign || campaignSourceMedium) : "—",
+      detail: topCampaign
+        ? `${topCampaign.campaign ? `${campaignSourceMedium} · ` : ""}${summaryNumber.format(topCampaign.visits)} ${t("analytics.visits")}`
+        : t("analytics.noCampaignDataSummary"),
+      title: topCampaign ? `${topCampaign.campaign ? `${topCampaign.campaign} · ` : ""}${campaignSourceMedium}` : undefined,
+    },
+  ];
 
   function comparisonLabel(current: number, previous: number): string {
     const comparison = compareAnalyticsPeriod(current, previous);
@@ -159,6 +200,15 @@ export default function WebAnalyticsPage() {
         </MetricGrid> : <MetricGrid columns="three">
           {Array.from({ length: 3 }, (_, index) => <MetricCardSkeleton key={index} />)}
         </MetricGrid>}
+
+        <AnalyticsAtAGlance
+          title={t("analytics.atAGlance")}
+          items={glanceItems}
+          emptyMessage={t("analytics.noAnalyticsDataInPeriod")}
+          loadingLabel={t("common.loading")}
+          empty={Boolean(dashboard && dashboard.overview.views === 0)}
+          loading={!dashboard}
+        />
 
         <ChartCard title={t("analytics.trafficOverTime")}>
           {dashboard ? (
