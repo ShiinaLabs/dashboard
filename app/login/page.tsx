@@ -19,6 +19,12 @@ export default function Login() {
   const queryClient = useQueryClient();
   const { url } = useBingWallpaper();
   const [searchParams] = useSearchParams();
+  // Mock /api/auth/me reports the mock admin user even before a session cookie
+  // exists. Keep the login form available in mock mode so the login endpoint
+  // can issue the cookie required by protected mock API routes.
+  const isMock =
+    process.env.NEXT_PUBLIC_MOCK_DATA === "1" ||
+    process.env.NEXT_PUBLIC_MOCK_DATA === "true";
   const fromParam = searchParams.get("from");
   // Only allow internal paths, strip protocol/host to avoid open-redirect.
   const safeFrom = fromParam && fromParam.startsWith("/") && !fromParam.startsWith("//") ? fromParam : null;
@@ -32,16 +38,13 @@ export default function Login() {
   // If already authenticated, bounce to the original destination instead of
   // showing the form — prevents an authenticated user stuck on /login.
   useEffect(() => {
-    if (auth?.authenticated) {
+    if (auth?.authenticated && !isMock) {
       const dest = safeFrom || "/overview";
       navigate(dest, { replace: true });
     }
-  }, [auth, safeFrom, navigate]);
+  }, [auth, isMock, safeFrom, navigate]);
   // Mock/debug mode (build-time mirror of MOCK_DATA): the server accepts any
   // credentials, so don't require a password client-side either.
-  const isMock =
-    process.env.NEXT_PUBLIC_MOCK_DATA === "1" ||
-    process.env.NEXT_PUBLIC_MOCK_DATA === "true";
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");

@@ -8,14 +8,15 @@
   "packageManager": "pnpm@10.34.5",
   "scripts": {
     "dev": "react-router dev",
-    "mock": "MOCK_DATA=1 NEXT_PUBLIC_MOCK_DATA=1 react-router dev",
+    "mock": "HTTPS=false MOCK_DATA=1 NEXT_PUBLIC_MOCK_DATA=1 react-router dev",
     "build": "pnpm run build:client && pnpm run build:server",
     "start": "node server/index.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build:client": "RR_SKIP_SSR=1 NODE_OPTIONS=\"--max-old-space-size=512 --max-semi-space-size=8\" react-router build",
-    "build:server": "RR_SKIP_CLIENT=1 NODE_OPTIONS=\"--max-old-space-size=160 --max-semi-space-size=8\" react-router build"
+    "build:server": "RR_SKIP_CLIENT=1 NODE_OPTIONS=\"--max-old-space-size=160 --max-semi-space-size=8\" react-router build",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.46",
@@ -66,6 +67,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.63.0",
     "@react-router/dev": "^7.18.2",
     "@tailwindcss/postcss": "^4.3.2",
     "@tailwindcss/vite": "^4.3.2",

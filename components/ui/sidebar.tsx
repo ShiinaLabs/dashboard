@@ -524,7 +524,9 @@ function SidebarMenuButton({
     />
   )
 
-  if (!tooltip) {
+  // Tooltips add no value on touch layouts and can consume Escape while the
+  // mobile sidebar sheet is open. Keep them for the collapsed desktop rail.
+  if (!tooltip || isMobile || state !== 'collapsed') {
     return button
   }
 
@@ -540,7 +542,6 @@ function SidebarMenuButton({
       <TooltipContent
         side='right'
         align='center'
-        hidden={state !== 'collapsed' || isMobile}
         {...tooltip}
       />
     </Tooltip>

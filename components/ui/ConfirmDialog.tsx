@@ -45,6 +45,8 @@ export function ConfirmDialog({ open, onOpenChange, title, description, confirmL
     try { await onConfirm(token); onOpenChange(false); } catch { setLoading(false); }
   };
 
+  if (!open) return null;
+
   return (
     <AlertDialog open={open} onOpenChange={(nextOpen) => {
       if (nextOpen) { setInput(""); setLoading(false); }
