@@ -88,9 +88,6 @@ importers:
       cmdk:
         specifier: ^1.1.1
         version: 1.1.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      drizzle-kit:
-        specifier: ^0.31.10
-        version: 0.31.10
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@types/pg@8.20.0)(pg@8.21.0)
@@ -142,9 +139,6 @@ importers:
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
-      tsx:
-        specifier: ^4.23.0
-        version: 4.23.0
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0
@@ -194,6 +188,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.17)
+      drizzle-kit:
+        specifier: ^0.31.10
+        version: 0.31.10
       eslint:
         specifier: ^9.39.5
         version: 9.39.5(jiti@2.7.0)
@@ -203,6 +200,9 @@ importers:
       tailwindcss:
         specifier: ^4.3.2
         version: 4.3.2
+      tsx:
+        specifier: ^4.23.0
+        version: 4.23.0
       typescript-eslint:
         specifier: ^8.59.2
         version: 8.62.1(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)

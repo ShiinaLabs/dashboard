@@ -3,6 +3,7 @@ allowBuilds:
   esbuild: true
   sharp: true
   unrs-resolver: true
+  workerd: true
 overrides:
   # browserslist data package that publishes daily; pin an older, widely
   # distributed version so pnpm's minimumReleaseAge policy stays satisfied.
