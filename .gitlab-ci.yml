@@ -68,6 +68,7 @@ test:
     PG_DB: dashboard_test
     PG_USER: dashboard
     PG_PASSWORD: dashboard
+    pnpm_config_registry: "https://registry.npmmirror.com"
   <<: *build_template
   rules:
     - changes: *build_paths
@@ -78,6 +79,7 @@ test:
   before_script:
     - corepack enable
     - pnpm --version
+    - pnpm config get registry
     - pnpm install --store-dir .pnpm-store --frozen-lockfile
   script:
     - pnpm run lint
