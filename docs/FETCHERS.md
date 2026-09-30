@@ -97,7 +97,7 @@ Supports two auth modes:
 | Mode | Function | Auth |
 |------|----------|------|
 | OAuth | `fetchRedditAccount` | Reddit API with refresh-token flow |
-| Public | `fetchRedditPublicAccount` | `.reddit` session cookie, no API access needed |
+| Public | `fetchRedditPublicAccount` | Browser cookies through the standard application HTTP client; no API access token |
 
 ### Fetch flow (both modes)
 1. User profile karma stats
@@ -116,7 +116,7 @@ All four platform fetchers were audited and hardened against the same class of i
 
 ### Request timeouts
 
-Every HTTP request now has a 30-second timeout (curl: `--max-time`; fetch: `AbortController`), preventing fetchers from hanging indefinitely on unresponsive API endpoints.
+Every HTTP request now has a 30-second timeout (`AbortController`), preventing fetchers from hanging indefinitely on unresponsive API endpoints.
 
 | Fetcher | Mechanism |
 |---------|-----------|
@@ -124,7 +124,7 @@ Every HTTP request now has a 30-second timeout (curl: `--max-time`; fetch: `Abor
 | GitHub | `AbortController` / 30s per `ghFetch` call |
 | GitLab | `AbortController` / 30s per `glFetch` call |
 | Reddit OAuth | `AbortController` / 30s per `redditFetch`, 15s for token exchange |
-| Reddit Public | `curl --max-time 30` |
+| Reddit Public | `fetchWithConfig` / `AbortController` (30s) |
 
 ### Concurrency guards
 

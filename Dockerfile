@@ -32,11 +32,7 @@ ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable
 WORKDIR /app
 
-# curl is needed by the Reddit public fetcher and compose healthcheck.
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends curl ca-certificates \
-  && rm -rf /var/lib/apt/lists/* \
-  && groupadd --system --gid 1001 nodejs \
+RUN groupadd --system --gid 1001 nodejs \
   && useradd --system --uid 1001 --gid nodejs dashboard \
   && mkdir -p /app/data/db /app/data/logs
 

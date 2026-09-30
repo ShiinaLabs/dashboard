@@ -1,6 +1,5 @@
 // Reddit REST client — pure fetch for OAuth and cookie-based (public) modes.
 import { fetchWithConfig, withNetworkRetry } from "../../http";
-import { execFileSync } from "child_process";
 import { getLogger } from "../../logger";
 
 type Json = Record<string, unknown>;
@@ -52,26 +51,38 @@ export class RedditClient {
     return res.json() as Promise<Json>;
   }
 
-  private publicFetch(path: string, cookies: Record<string, string>): Promise<Json> {
+  private async publicFetch(path: string, cookies: Record<string, string>): Promise<Json> {
     const cookieStr = Object.entries(cookies).map(([k, v]) => `${k}=${v}`).join("; ");
-    const url = `https://www.reddit.com${path}`;
-    let stdout: string;
+    const res = await withNetworkRetry(async () => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 30_000);
+      try {
+        return await fetchWithConfig(`https://www.reddit.com${path}`, {
+          headers: {
+            "User-Agent": "Safari/537.36",
+            Accept: "application/json",
+            Cookie: cookieStr,
+          },
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+    }, { label: "Reddit" });
+    const body = await res.text();
+
+    if (!res.ok) {
+      if (res.status === 403) {
+        throw new Error(`Reddit rejected request (HTTP 403) — cookies expired or IP blocked. Use OAuth instead. Body: ${body.slice(0, 200)}`);
+      }
+      throw new Error(`Reddit public API ${res.status} for ${path}: ${body.slice(0, 200)}`);
+    }
+
     try {
-      stdout = execFileSync("curl", ["-sS", "--http1.1", "--max-time", "30", "-w", "\n%{http_code}", url,
-        "-H", "User-Agent: Safari/537.36", "-H", "Accept: application/json", "-H", `Cookie: ${cookieStr}`],
-        { encoding: "utf-8", timeout: 35000 });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      throw new Error(`Reddit public API curl failed for ${path}: ${msg.slice(0, 200)}`, { cause: err });
+      return JSON.parse(body) as Json;
+    } catch (error) {
+      throw new Error(`Reddit public API returned invalid JSON for ${path}: ${body.slice(0, 200)}`, { cause: error });
     }
-    const lastNewline = stdout.lastIndexOf("\n");
-    const status = lastNewline >= 0 ? parseInt(stdout.slice(lastNewline + 1).trim(), 10) || 0 : 200;
-    const body = lastNewline >= 0 ? stdout.slice(0, lastNewline) : stdout;
-    if (status >= 400 || status === 0) {
-      if (status === 403) throw new Error(`Reddit rejected request (HTTP 403) — cookies expired or IP blocked. Use OAuth instead. Body: ${body.slice(0, 200)}`);
-      throw new Error(`Reddit public API ${status} for ${path}: ${body.slice(0, 200)}`);
-    }
-    return Promise.resolve(JSON.parse(body) as Json);
   }
 
   private parseCookies(raw: string | null): Record<string, string> {

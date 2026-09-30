@@ -4,7 +4,6 @@ import { insertRedditStats, upsertRedditPost, upsertRedditComment, updateAccount
 import { getLogger } from "../logger";
 import { fetchWithConfig, withNetworkRetry } from "../http";
 import { contentWindowDays } from "../config";
-import { execFileSync } from "child_process";
 
 async function getRedditAccessToken(refreshToken: string): Promise<string> {
   const clientId = process.env.REDDIT_CLIENT_ID;
@@ -229,50 +228,46 @@ export async function fetchRedditAccount(account: AccountRow) {
   }
 }
 
-// ── Public (cookie-based) fetcher (curl) ──────────────────────────
-// Uses curl subprocess to avoid TLS fingerprint detection by Reddit.
-// The old fetch()-based implementation is kept below as redditPublicFetchOld.
-
-async function redditPublicFetchCurl(path: string, cookies: Record<string, string>): Promise<Record<string, unknown>> {
+// ── Public (cookie-based) fetcher ─────────────────────────────────
+async function redditPublicFetch(path: string, cookies: Record<string, string>): Promise<Record<string, unknown>> {
   const cookieStr = Object.entries(cookies)
     .map(([k, v]) => `${k}=${v}`)
     .join("; ");
 
-  const url = `https://www.reddit.com${path}`;
-  let stdout: string;
+  const res = await withNetworkRetry(
+    async () => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 30_000);
+      try {
+        return await fetchWithConfig(`https://www.reddit.com${path}`, {
+          headers: {
+            "User-Agent": "Safari/537.36",
+            Accept: "application/json",
+            Cookie: cookieStr,
+          },
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+    { label: "Reddit" },
+  );
+  const body = await res.text();
+
+  if (!res.ok) {
+    getLogger().error("Reddit", "Public API HTTP %d for %s", res.status, path);
+    if (res.status === 403) {
+      throw new Error(`Reddit rejected the request (HTTP 403). This may be because: (1) your cookies have expired, or (2) the server IP is blocked by Reddit. Use OAuth instead. Body: ${body.slice(0, 200)}`);
+    }
+    throw new Error(`Reddit public API ${res.status} for ${path}: ${body.slice(0, 200)}`);
+  }
+
   try {
-    stdout = execFileSync("curl", [
-      "-sS",
-      "--http1.1",
-      "--max-time", "30",
-      "-w", "\n%{http_code}",
-      url,
-      "-H", "User-Agent: Safari/537.36",
-      "-H", "Accept: application/json",
-      "-H", `Cookie: ${cookieStr}`,
-    ], { encoding: "utf-8", timeout: 35000 });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    getLogger().error("Reddit", "Public API (curl) failed for %s: %s", path, msg.slice(0, 200));
-    throw new Error(`Reddit public API curl failed for ${path}: ${msg.slice(0, 200)}`, { cause: err });
+    return JSON.parse(body) as Record<string, unknown>;
+  } catch (error) {
+    throw new Error(`Reddit public API returned invalid JSON for ${path}: ${body.slice(0, 200)}`, { cause: error });
   }
-
-  const lastNewline = stdout.lastIndexOf("\n");
-  const status = lastNewline >= 0 ? parseInt(stdout.slice(lastNewline + 1).trim(), 10) || 0 : 200;
-  const body = lastNewline >= 0 ? stdout.slice(0, lastNewline) : stdout;
-
-  if (status >= 400 || status === 0) {
-    getLogger().error("Reddit", "Public API (curl) HTTP %d for %s", status, path);
-    if (status === 403) {
-      throw new Error(`Reddit rejected the request (HTTP 403). This may be because: (1) your cookies have expired, or (2) the server IP is blocked by Reddit (common for datacenter/VPS IPs). Try from a residential IP or use OAuth instead. Body: ${body.slice(0, 200)}`);
-    }
-    if (status === 0) {
-      throw new Error(`Reddit public API curl returned no status for ${path}`);
-    }
-    throw new Error(`Reddit public API ${status} for ${path}: ${body.slice(0, 200)}`);
-  }
-
-  return JSON.parse(body) as Record<string, unknown>;
 }
 
 export async function fetchRedditPublicAccount(account: AccountRow) {
@@ -300,7 +295,7 @@ export async function fetchRedditPublicAccount(account: AccountRow) {
 
     // 1. Fetch public profile
     getLogger().info("Reddit", "@%s (public): fetching profile...", username);
-    const profile = await redditPublicFetchCurl(`/user/${username}/about.json`, cookies);
+    const profile = await redditPublicFetch(`/user/${username}/about.json`, cookies);
     if (!profile?.data?.name) {
       throw new Error("Invalid Reddit user profile — user may not exist");
     }
@@ -320,7 +315,7 @@ export async function fetchRedditPublicAccount(account: AccountRow) {
     let after: string | undefined;
     while (postCount < 50) {
       const path = `/user/${username}/submitted.json?limit=25&sort=new${after ? `&after=${after}` : ""}`;
-      const posts = await redditPublicFetchCurl(path, cookies);
+      const posts = await redditPublicFetch(path, cookies);
       const children = posts?.data?.children ?? [];
       if (children.length === 0) break;
 
@@ -356,7 +351,7 @@ export async function fetchRedditPublicAccount(account: AccountRow) {
     after = undefined;
     while (commentCount < 50) {
       const path = `/user/${username}/comments.json?limit=25&sort=new${after ? `&after=${after}` : ""}`;
-      const comments = await redditPublicFetchCurl(path, cookies);
+      const comments = await redditPublicFetch(path, cookies);
       const children = comments?.data?.children ?? [];
       if (children.length === 0) break;
 
