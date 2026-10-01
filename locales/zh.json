@@ -37,6 +37,9 @@
   "nav": {
     "overview": "概览",
     "accounts": "账户管理",
+    "social": "社交",
+    "developer": "开发者",
+    "connections": "连接",
     "x": "X",
     "github": "GitHub",
     "gitlab": "GitLab",
@@ -44,7 +47,7 @@
     "analytics": "网站分析",
     "admin": "管理",
     "settings": "设置",
-    "ai": "AI",
+    "ai": "AI 分析",
     "logout": "退出登录"
   },
   "badge": {

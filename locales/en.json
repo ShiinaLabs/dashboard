@@ -37,6 +37,9 @@
   "nav": {
     "overview": "Overview",
     "accounts": "Accounts",
+    "social": "Social",
+    "developer": "Developer",
+    "connections": "Connections",
     "x": "X",
     "github": "GitHub",
     "gitlab": "GitLab",
@@ -44,7 +47,7 @@
     "analytics": "Web Analytics",
     "admin": "Admin",
     "settings": "Settings",
-    "ai": "AI",
+    "ai": "AI Analysis",
     "logout": "Log out"
   },
   "badge": {

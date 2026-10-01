@@ -1,5 +1,6 @@
-import { Bot, ChartNoAxesColumnIncreasing, LayoutDashboard, LogOut, Settings, Shield, Users, UserRound } from "lucide-react";
+import { Bot, ChartNoAxesColumnIncreasing, Code2, Ellipsis, LayoutDashboard, LogOut, MessagesSquare, Settings, Shield, UserRound, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router";
 import {
   Sidebar,
   SidebarContent,
@@ -7,27 +8,49 @@ import {
   SidebarHeader,
   SidebarSeparator,
   SidebarMenuButton,
+  useSidebar,
 } from "@/components/ui/sidebar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { AppTitle } from "./app-title";
 import { NavGroup, type NavEntry } from "./nav-group";
 import { GithubIcon, XIcon, GitlabIcon, RedditIcon } from "@/components/BrandIcons";
 
 export function AppSidebar({ isAdmin, username, role, loggingOut, onLogout }: { isAdmin: boolean; username: string; role: string; loggingOut: boolean; onLogout: () => void }) {
   const { t } = useTranslation();
+  const { isMobile, setOpenMobile } = useSidebar();
   const mainItems: NavEntry[] = [
-    { to: "/overview", label: t("nav.overview"), icon: LayoutDashboard },
-    { to: "/x", label: t("nav.x"), icon: XIcon },
-    { to: "/github", label: t("nav.github"), icon: GithubIcon },
-    { to: "/gitlab", label: t("nav.gitlab"), icon: GitlabIcon },
-    { to: "/reddit", label: t("nav.reddit"), icon: RedditIcon },
-    { to: "/analytics", label: t("nav.analytics"), icon: ChartNoAxesColumnIncreasing },
-    { to: "/ai", label: t("nav.ai"), icon: Bot },
+    { type: "link", to: "/overview", label: t("nav.overview"), icon: LayoutDashboard },
+    {
+      type: "group",
+      label: t("nav.social"),
+      icon: MessagesSquare,
+      children: [
+        { type: "link", to: "/x", label: t("nav.x"), icon: XIcon },
+        { type: "link", to: "/reddit", label: t("nav.reddit"), icon: RedditIcon },
+      ],
+    },
+    {
+      type: "group",
+      label: t("nav.developer"),
+      icon: Code2,
+      children: [
+        { type: "link", to: "/github", label: t("nav.github"), icon: GithubIcon },
+        { type: "link", to: "/gitlab", label: t("nav.gitlab"), icon: GitlabIcon },
+      ],
+    },
+    { type: "link", to: "/analytics", label: t("nav.analytics"), icon: ChartNoAxesColumnIncreasing },
+    { type: "link", to: "/ai", label: t("nav.ai"), icon: Bot },
   ];
-  const managementItems: NavEntry[] = [
-    { to: "/accounts", label: t("nav.accounts"), icon: Users },
-    ...(isAdmin ? [{ to: "/admin", label: t("nav.admin"), icon: Shield } satisfies NavEntry] : []),
-    { to: "/settings", label: t("nav.settings"), icon: Settings },
+  const connectionItems: NavEntry[] = [
+    { type: "link", to: "/accounts", label: t("nav.connections"), icon: Users },
   ];
+  const userTooltip = [username || "—", role].filter(Boolean).join(" · ");
 
   return (
     <Sidebar collapsible="icon" variant="inset" className="border-sidebar-border">
@@ -36,21 +59,46 @@ export function AppSidebar({ isAdmin, username, role, loggingOut, onLogout }: { 
       </SidebarHeader>
       <SidebarSeparator />
       <SidebarContent className="gap-2 px-2 py-3">
-        <NavGroup label={t("nav.main", { defaultValue: "Main" })} items={mainItems} />
-        <NavGroup label={t("nav.management", { defaultValue: "Management" })} items={managementItems} />
+        <NavGroup items={mainItems} />
+        <SidebarSeparator />
+        <NavGroup items={connectionItems} />
       </SidebarContent>
-      <SidebarFooter className="gap-3 border-t p-3">
-        <div className="flex min-w-0 items-center gap-2.5 px-1">
-          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground"><UserRound size={15} aria-hidden="true" /></span>
-          <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-            <p className="truncate text-sm font-medium">{username || "—"}</p>
-            <p className="truncate text-xs capitalize text-muted-foreground">{role}</p>
-          </div>
-        </div>
-        <SidebarMenuButton className="min-h-10" onClick={onLogout} disabled={loggingOut} tooltip={t("nav.logout")}>
-          <LogOut aria-hidden="true" />
-          <span>{loggingOut ? "…" : t("nav.logout")}</span>
-        </SidebarMenuButton>
+      <SidebarFooter className="border-t p-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton className="h-auto min-h-11 justify-start" tooltip={userTooltip}>
+              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
+                <UserRound size={15} aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+                <span className="block truncate text-sm font-medium">{username || "—"}</span>
+                <span className="block truncate text-xs capitalize text-muted-foreground">{role}</span>
+              </span>
+              <Ellipsis className="ms-auto group-data-[collapsible=icon]:hidden" aria-hidden="true" />
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="start" className="w-56">
+            <DropdownMenuItem asChild>
+              <Link to="/settings" onClick={() => isMobile && setOpenMobile(false)}>
+                <Settings aria-hidden="true" />
+                {t("nav.settings")}
+              </Link>
+            </DropdownMenuItem>
+            {isAdmin && (
+              <DropdownMenuItem asChild>
+                <Link to="/admin" onClick={() => isMobile && setOpenMobile(false)}>
+                  <Shield aria-hidden="true" />
+                  {t("nav.admin")}
+                </Link>
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" disabled={loggingOut} onSelect={onLogout}>
+              <LogOut aria-hidden="true" />
+              {loggingOut ? "…" : t("nav.logout")}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarFooter>
     </Sidebar>
   );
