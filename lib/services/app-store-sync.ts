@@ -112,7 +112,7 @@ export function syncAppStoreRevenue(id: number, viewer: Viewer, input: unknown) 
                 const checksum = bytes ? createHash("sha256").update(bytes).digest("hex") : "no-sales";
                 const rows = bytes ? mapSalesReport(parseAnalyticsTsv(await gunzipAnalyticsSegment(bytes)), id, date, checksum) : [];
                 result[await facts.commitSalesReport(id, connection.updated_at, date, checksum, rows)]++;
-              } catch (error) { result.errors.push(reportDiagnostic(error)); }
+              } catch (error) { result.errors.push(`Sales; date ${date}; ${reportDiagnostic(error)}`); }
             }
           } else {
             const bytes = await client.downloadFinanceReport(connection.vendor_number, fiscalMonth, regionCode);
@@ -122,7 +122,7 @@ export function syncAppStoreRevenue(id: number, viewer: Viewer, input: unknown) 
             result[await facts.commitFinanceReport(id, connection.updated_at, fiscalMonth, regionCode, checksum, rows)]++;
           }
         }
-      } catch (error) { result.errors.push(reportDiagnostic(error)); }
+      } catch (error) { result.errors.push(`${kind === "finance" ? `Finance; fiscal month ${fiscalMonth}; region ${regionCode}` : "Sales"}; ${reportDiagnostic(error)}`); }
       result.status = analyticsRunStatus(result.imported + result.skipped + result.waiting, result.errors.length);
       await finishRun(run, result.status, result.errors.length ? result.errors.join("; ").slice(0, 2000) : null);
     }

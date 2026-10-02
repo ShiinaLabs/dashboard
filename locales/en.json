@@ -909,9 +909,16 @@
     "configured": "Configured",
     "notConfigured": "Not configured",
     "apps": "Apps",
-    "appsHelp": "Select the apps you want to track. Newly discovered apps start disabled. App reports are not available yet.",
+    "appsHelp": "Select the apps you want to track. Newly discovered apps start disabled.",
     "noApps": "Apple returned no accessible apps for this key.",
     "lastSync": "Last Sync",
+    "syncSource": {
+      "metadata": "App metadata",
+      "analytics": "Acquisition Analytics",
+      "revenueAnalytics": "Revenue Analytics",
+      "sales": "Sales",
+      "finance": "Finance"
+    },
     "syncStatus": {
       "running": "Running",
       "success": "Success",

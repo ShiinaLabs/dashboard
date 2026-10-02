@@ -36,6 +36,8 @@ test("ASC connection management, app selection, vendor setup, refresh and soft d
   await page.getByRole("button", { name: "Enable", exact: true }).click();
   await page.getByRole("button", { name: "Refresh Apps" }).click();
   await expect(page.getByText("Success", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("App metadata", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Revenue Analytics", { exact: true }).first()).toBeVisible();
   await expect(app).toBeChecked();
   await page.screenshot({ path: "/tmp/dashboard-asc-desktop.png", fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });

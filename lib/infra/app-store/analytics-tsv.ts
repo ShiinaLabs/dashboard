@@ -41,7 +41,10 @@ export function parseAnalyticsTsv(input: string, requiredHeaders: readonly strin
   const rows: AnalyticsTsv["rows"] = [];
   for (const [index, values] of records.entries()) {
     if (values.length === 1 && values[0] === "") continue;
-    if (values.length !== headers.length) throw new AppStoreReportError("malformed_row", `Report row ${index + 2} has an unexpected number of fields`);
+    if (values.length !== headers.length) {
+      const final = records.slice(index + 1).every((row) => row.length === 1 && row[0] === "");
+      throw new AppStoreReportError("malformed_row", `Report row ${index + 2} has an unexpected number of fields (expected ${headers.length}, received ${values.length}, non-empty ${values.filter((value) => value !== "").length}, ${final ? "final row" : "more rows follow"})`);
+    }
     rows.push(Object.fromEntries(headers.map((name, i) => [name, values[i] === "" ? null : values[i]])));
   }
   return { headers, rows };

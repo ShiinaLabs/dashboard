@@ -909,9 +909,16 @@
     "configured": "已配置",
     "notConfigured": "未配置",
     "apps": "App",
-    "appsHelp": "选择需要跟踪的 App。新发现的 App 默认关闭；App 报表暂未开放。",
+    "appsHelp": "选择需要跟踪的 App。新发现的 App 默认关闭。",
     "noApps": "Apple 未返回此密钥可访问的 App。",
     "lastSync": "最近同步",
+    "syncSource": {
+      "metadata": "App 信息",
+      "analytics": "获客 Analytics",
+      "revenueAnalytics": "收入 Analytics",
+      "sales": "Sales",
+      "finance": "Finance"
+    },
     "syncStatus": {
       "running": "同步中",
       "success": "成功",

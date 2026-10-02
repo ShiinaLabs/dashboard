@@ -27,6 +27,7 @@ export interface AppStoreSyncRun {
   id: number;
   connection_id: number;
   kind: "metadata" | "analytics" | "sales" | "finance";
+  scope?: string | null;
   trigger: "manual" | "scheduler";
   status: "running" | "success" | "partial" | "error";
   started_at: string;

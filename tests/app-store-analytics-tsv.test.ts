@@ -25,4 +25,9 @@ describe("report TSV format", () => {
     expect(() => parseAnalyticsTsv("A\nvalue", ["Date"])).toThrow("Missing required report headers: Date");
   });
 
+  it("identifies a malformed third row using structure only", () => {
+    expect(() => parseAnalyticsTsv("A\tB\tC\n1\t2\t3\nSECRET\t"))
+      .toThrow("Report row 3 has an unexpected number of fields (expected 3, received 2, non-empty 1, final row)");
+  });
+
 });

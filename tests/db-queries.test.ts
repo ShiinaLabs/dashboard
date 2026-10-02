@@ -1917,13 +1917,15 @@ describe("independent App Store Connect foundation", () => {
       const app = (await appStoreRepo.getApps(connection.id))[0];
       await appStoreService.setAppEnabled(connection.id, app.id, viewer, { isEnabled: true });
       const filters = { from: "2026-09-29", to: "2026-09-29", fiscalMonth: "2026-09", regionCode: "ZZ" };
-      expect(await syncAppStoreRevenue(connection.id, viewer, filters)).toMatchObject({ status: "partial", sources: { sales: { status: "success", imported: 1 }, finance: { status: "error" } } });
+      expect(await syncAppStoreRevenue(connection.id, viewer, filters)).toMatchObject({ status: "partial", sources: { sales: { status: "success", imported: 1 }, finance: { status: "error", errors: ["Finance; fiscal month 2026-09; region ZZ; apple_report_error (403)"] } } });
       expect(await syncAppStoreRevenue(connection.id, viewer, filters)).toMatchObject({ status: "success", sources: { sales: { skipped: 1 }, finance: { imported: 1 } } });
       const dashboard = await getAppStoreRevenueDashboard(viewer, { ...filters, appId: app.id });
       expect(dashboard.sales).toMatchObject({ units: "2", amounts: [{ currency: "JPY", proceeds: null, sales: "200" }, { currency: "USD", proceeds: "1.4", sales: null }] });
       expect(dashboard.settlements).toEqual(expect.arrayContaining([expect.objectContaining({ fiscalMonth: "2026-09", region: "ZZ", currency: "USD", earned: "1.4" }), expect.objectContaining({ currency: "JPY", earned: "100" })]));
       expect(dashboard.overview.payingUsers).toBeNull();
       expect(dashboard.subscriptions.active).toBeNull();
+      salesDownload.mockRejectedValueOnce(new AppStoreApiError(404, "NOT_FOUND", "SECRET"));
+      expect(await syncAppStoreRevenue(connection.id, viewer, filters)).toMatchObject({ status: "partial", sources: { sales: { status: "error", errors: ["Sales; date 2026-09-29; apple_report_error (404)"] }, finance: { status: "success", skipped: 1 } } });
       await expect(syncAppStoreRevenue(connection.id, otherViewer, filters)).rejects.toMatchObject({ code: "forbidden" });
       await expect(getAppStoreRevenueDashboard(otherViewer, { ...filters, appId: app.id })).rejects.toMatchObject({ code: "forbidden" });
       const noVendor = await appStoreService.createConnection(viewer, input());
