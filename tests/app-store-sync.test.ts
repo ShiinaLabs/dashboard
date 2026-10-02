@@ -238,7 +238,8 @@ describe("production Analytics sync selection", () => {
   });
 
   it("logs map and commit failures with stages while hiding row and SQL values", async () => {
-    const badRow = { Date: "2026-09-29", "App Apple Identifier": "999", "Download Type": "First-time Download", "Source Type": "Search", Territory: "USA", Counts: "0" };
+    const sensitiveAppIdentifier = "app-id-should-not-be-logged-7f39";
+    const badRow = { Date: "2026-09-29", "App Apple Identifier": sensitiveAppIdentifier, "Download Type": "First-time Download", "Source Type": "Search", Territory: "USA", Counts: "0" };
     const badBytes = gzipSync(Object.keys(badRow).join("\t") + "\n" + Object.values(badRow).join("\t"));
     const { client } = clientWithCatalog([analyticsReportDefinitions.downloads.standardName]);
     vi.spyOn(client, "downloadAnalyticsSegment").mockResolvedValueOnce(badBytes);
@@ -246,7 +247,7 @@ describe("production Analytics sync selection", () => {
     await syncAppStoreAnalytics(1, viewer);
     const mapFailures = mocks.error.mock.calls.map(([, message]) => JSON.parse(message));
     expect(mapFailures).toContainEqual(expect.objectContaining({ event: "report_failed", stage: "map", code: "app_identity_mismatch" }));
-    expect(JSON.stringify(mocks.error.mock.calls)).not.toContain("999");
+    expect(JSON.stringify(mocks.error.mock.calls)).not.toContain(sensitiveAppIdentifier);
 
     clientWithCatalog([analyticsReportDefinitions.downloads.standardName]);
     mocks.commit.mockRejectedValueOnce(new Error("SECRET SQL VALUE"));
