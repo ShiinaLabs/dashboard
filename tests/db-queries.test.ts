@@ -1687,6 +1687,20 @@ describe("independent App Store Connect foundation", () => {
     expect(await appStoreRepo.getLatestRunForSource(connection.id, "sales", "revenue")).toMatchObject({ id: first.id, status: "error" });
   });
 
+  it("checks Finance import facts by connection, fiscal month, and region", async () => {
+    const connection = await appStoreRepo.createWithApps({ owner_id: viewer.id, name: "Finance import lookup", issuer_id: input().issuerId, key_id: input().keyId, private_key_encrypted: "synthetic-encrypted" }, [], new Date().toISOString());
+    const otherConnection = await appStoreRepo.createWithApps({ owner_id: viewer.id, name: "Other Finance import lookup", issuer_id: "00000000-0000-4000-8000-000000000002", key_id: "XYZ1234567", private_key_encrypted: "synthetic-encrypted" }, [], new Date().toISOString());
+    await getTestPool().query(
+      "INSERT INTO app_store_finance_imports (connection_id, fiscal_month, region_code, checksum) VALUES ($1, '2026-09', 'US', 'us-checksum'), ($1, '2026-08', 'ZZ', 'older-checksum')",
+      [connection.id],
+    );
+
+    expect(await ascFacts.hasFinanceImport(connection.id, "2026-09", "ZZ")).toBe(false);
+    expect(await ascFacts.hasFinanceImport(connection.id, "2026-09", "US")).toBe(true);
+    expect(await ascFacts.hasFinanceImport(connection.id, "2026-08", "ZZ")).toBe(true);
+    expect(await ascFacts.hasFinanceImport(otherConnection.id, "2026-09", "US")).toBe(false);
+  });
+
   it("validates before creation, encrypts the private key and returns only metadata", async () => {
     const spy = vi.spyOn(AppStoreConnectClient.prototype, "listApps").mockResolvedValue(apps);
     try {

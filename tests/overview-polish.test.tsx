@@ -158,6 +158,19 @@ describe("dashboard presentation and behavior", () => {
     expect(repoChip).toContain("min-w-0");
   });
 
+  it("labels App Store Analytics purchases and Sales & Trends activity as separate sources", () => {
+    const page = source("app/(dashboard)/revenue/page.tsx");
+    const en = JSON.parse(source("locales/en.json")) as { revenue: Record<string, string> };
+    const zh = JSON.parse(source("locales/zh.json")) as { revenue: Record<string, string> };
+    expect(page).toContain('t("revenue.analyticsSource")');
+    expect(page).toContain('t("revenue.salesSource")');
+    expect(page).toContain('t("revenue.salesUnitsAllTypes")');
+    expect(en.revenue.analyticsSource).toContain("App Store Analytics");
+    expect(en.revenue.salesSource).toContain("Sales & Trends");
+    expect(zh.revenue.analyticsSource).toContain("App Store Analytics");
+    expect(zh.revenue.salesSource).toContain("Sales & Trends");
+  });
+
   it("uses compact metric cards without preserving the old fixed minimum height", () => {
     const html = render(<MetricCard icon={<span>icon</span>} label="Followers" value={12345} hint="Today +12" />);
     expect(html).toContain("line-clamp-2");

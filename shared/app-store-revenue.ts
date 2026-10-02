@@ -17,3 +17,14 @@ export function latestSalesReportDate(now = new Date(Date.now())): string {
   const day = Date.parse(`${parts.year}-${parts.month}-${parts.day}T00:00:00Z`);
   return new Date(day - (Number(parts.hour) >= 8 ? 1 : 2) * 86400000).toISOString().slice(0, 10);
 }
+
+/** Finance availability follows Apple's fiscal periods, not natural months; these are conservative candidates only. */
+export function financeCandidateMonths(now: number): string[] {
+  const currentMonth = new Date(now);
+  currentMonth.setUTCDate(1);
+  return [1, 2].map((monthsAgo) => {
+    const candidate = new Date(currentMonth);
+    candidate.setUTCMonth(candidate.getUTCMonth() - monthsAgo);
+    return candidate.toISOString().slice(0, 7);
+  });
+}

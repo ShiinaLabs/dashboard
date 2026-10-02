@@ -35,9 +35,9 @@ describe("ASC Analytics API", () => {
     if (method === "listAnalyticsReportInstances") expect(new URL(String(request.mock.calls[0][0])).searchParams.get("filter[granularity]")).toBe("DAILY");
   });
 
-  it.each([403, 429])("preserves Apple status %i and safe detail", async (status) => {
-    const request = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ errors: [{ code: "APPLE_ERROR", title: "Request rejected", detail: "https://signed.example/secret" }] }, { status }));
-    await expect(new AppStoreConnectClient(tokens, request).listAnalyticsReports("id")).rejects.toMatchObject({ status, code: "APPLE_ERROR", message: expect.not.stringContaining("signed.example") });
+  it("preserves Apple 403 and safe detail", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ errors: [{ code: "APPLE_ERROR", title: "Request rejected", detail: "https://signed.example/secret" }] }, { status: 403 }));
+    await expect(new AppStoreConnectClient(tokens, request).listAnalyticsReports("id")).rejects.toMatchObject({ status: 403, code: "APPLE_ERROR", message: expect.not.stringContaining("signed.example") });
   });
 
   it("rejects invalid resource responses and does not leak network error URLs", async () => {
@@ -46,6 +46,47 @@ describe("ASC Analytics API", () => {
     const client = new AppStoreConnectClient(tokens, request);
     await expect(client.getAnalyticsReportSegment("segment")).rejects.toMatchObject({ code: "invalid_response" });
     await expect(client.listAnalyticsReportInstances("report")).rejects.toMatchObject({ code: "request_failed", message: expect.not.stringContaining("signed.example") });
+  });
+
+  it("retries 429 and 503 JSON responses, then succeeds", async () => {
+    vi.useFakeTimers();
+    try {
+      const request = vi.fn<typeof fetch>()
+        .mockResolvedValueOnce(Response.json({}, { status: 429 }))
+        .mockResolvedValueOnce(Response.json({}, { status: 503 }))
+        .mockResolvedValueOnce(Response.json({ data: [] }));
+      const operation = new AppStoreConnectClient(tokens, request).listAnalyticsReports("id");
+      await vi.runAllTimersAsync();
+      await expect(operation).resolves.toEqual([]);
+      expect(request).toHaveBeenCalledTimes(3);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("retries an explicit network timeout and succeeds", async () => {
+    vi.useFakeTimers();
+    try {
+      const request = vi.fn<typeof fetch>()
+        .mockRejectedValueOnce(new DOMException("timeout", "TimeoutError"))
+        .mockResolvedValueOnce(Response.json({ data: [] }));
+      const operation = new AppStoreConnectClient(tokens, request).listAnalyticsReports("id");
+      await vi.runAllTimersAsync();
+      await expect(operation).resolves.toEqual([]);
+      expect(request).toHaveBeenCalledTimes(2);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("bounds persistent transient HTTP failures to two retries", async () => {
+    vi.useFakeTimers();
+    try {
+      const request = vi.fn<typeof fetch>().mockImplementation(async () => Response.json({ errors: [{ code: "SERVICE_UNAVAILABLE", title: "Temporary outage" }] }, { status: 503 }));
+      const operation = new AppStoreConnectClient(tokens, request).listAnalyticsReports("id");
+      const result = operation.then(() => null, (error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(500);
+      await vi.advanceTimersByTimeAsync(1500);
+      const error = await result;
+      expect(error).toMatchObject({ status: 503, code: "SERVICE_UNAVAILABLE" });
+      expect(request).toHaveBeenCalledTimes(3);
+    } finally { vi.useRealTimers(); }
   });
 
   it("rejects pagination that switches to a different analytics endpoint", async () => {

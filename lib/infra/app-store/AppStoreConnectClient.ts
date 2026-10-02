@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { AppStoreTokenProvider } from "./AppStoreTokenProvider";
 import { downloadAnalyticsSegment, AppStoreReportError, MAX_SEGMENT_BYTES } from "./analytics-segment";
+import { getLogger } from "../../logger";
 
 const ORIGIN = "https://api.appstoreconnect.apple.com";
 const resourceId = z.string().min(1).max(200);
@@ -71,18 +72,50 @@ function appleApiError(status: number, body: unknown, values: readonly string[],
   });
 }
 
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+const RETRY_DELAYS_MS = [500, 1500];
+const MAX_RETRY_AFTER_MS = 8000;
+function retryAfterMs(value: string | null, fallback: number): number {
+  if (!value) return fallback;
+  const seconds = Number(value);
+  const parsed = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(value) - Date.now();
+  return Math.min(MAX_RETRY_AFTER_MS, Math.max(0, Number.isFinite(parsed) ? parsed : fallback));
+}
+function transientNetworkFailure(error: unknown): boolean {
+  return error instanceof TypeError || (error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name));
+}
+function wait(ms: number) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
 export class AppStoreConnectClient {
   constructor(private readonly tokens: AppStoreTokenProvider, private readonly request: typeof fetch = fetch) {}
+
+  private async fetchWithRetry(url: string, init: RequestInit, source: "json_api" | "sales" | "finance", operation: string, timeoutMs: number, maxRetries = RETRY_DELAYS_MS.length): Promise<Response> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const response = await this.request(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+        if (!RETRYABLE_STATUSES.has(response.status) || attempt > maxRetries) return response;
+        const delay = retryAfterMs(response.headers.get("retry-after"), RETRY_DELAYS_MS[attempt - 1]);
+        getLogger().warn("ASC", JSON.stringify({ event: "asc_api_retry", source, operation, status: response.status, attempt, retryAfterMs: delay }));
+        await response.body?.cancel().catch(() => undefined);
+        await wait(delay);
+      } catch (error) {
+        if (!transientNetworkFailure(error) || attempt > maxRetries) throw error;
+        const delay = RETRY_DELAYS_MS[attempt - 1];
+        getLogger().warn("ASC", JSON.stringify({ event: "asc_api_retry", source, operation, status: "network_error", attempt, retryAfterMs: delay }));
+        await wait(delay);
+      }
+    }
+  }
 
   private async jsonRequest(url: URL, method = "GET", body?: unknown): Promise<unknown> {
     const token = await this.tokens.getToken();
     let response: Response;
     try {
-      response = await this.request(url.href, {
+      response = await this.fetchWithRetry(url.href, {
         method, headers: { Authorization: `Bearer ${token}`, Accept: "application/json", ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
         body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(20_000), redirect: "error",
-      });
+        redirect: "error",
+      }, "json_api", "request", 20_000, method === "GET" ? RETRY_DELAYS_MS.length : 0);
       const result: unknown = await response.json().catch(() => null);
       if (!response.ok) {
         throw appleApiError(response.status, result, [token], `Apple API request failed (${response.status})`);
@@ -125,7 +158,8 @@ export class AppStoreConnectClient {
     for (const [key, value] of Object.entries(filters)) url.searchParams.set(`filter[${key}]`, value);
     try {
       const token = await this.tokens.getToken();
-      const response = await this.request(url.href, { headers: { Authorization: `Bearer ${token}`, Accept: "application/a-gzip" }, redirect: "error", signal: AbortSignal.timeout(30_000) });
+      const source = path === "/v1/salesReports" ? "sales" : "finance";
+      const response = await this.fetchWithRetry(url.href, { headers: { Authorization: `Bearer ${token}`, Accept: "application/a-gzip" }, redirect: "error" }, source, "download_report", 30_000);
       const limit = response.ok ? MAX_SEGMENT_BYTES : 64 * 1024;
       const advertised = response.headers.get("content-length");
       if (advertised && (!/^\d+$/.test(advertised) || Number(advertised) > limit)) {

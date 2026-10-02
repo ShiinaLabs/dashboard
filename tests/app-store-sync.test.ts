@@ -275,6 +275,40 @@ describe("production Analytics sync selection", () => {
     expect(result.status).toBe("error");
   });
 
+  it("skips old imported instances before segment API while still checking recent and unimported instances", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-02T00:00:00Z"));
+    try {
+      const { client } = clientWithCatalog([analyticsReportDefinitions.downloads.standardName]);
+      vi.spyOn(client, "listAnalyticsReportInstances").mockResolvedValue([
+        { id: "old-imported", type: "analyticsReportInstances", attributes: { granularity: "DAILY", processingDate: "2026-09-01" } },
+        { id: "recent-imported", type: "analyticsReportInstances", attributes: { granularity: "DAILY", processingDate: "2026-10-01" } },
+        { id: "old-unimported", type: "analyticsReportInstances", attributes: { granularity: "DAILY", processingDate: "2026-08-31" } },
+      ]);
+      mocks.imports.mockResolvedValue([
+        { apple_instance_id: "old-imported", apple_report_id: "report-0", apple_segment_id: "old-segment", checksum: "old-checksum", status: "imported", processing_date: "2026-09-01" },
+        { apple_instance_id: "recent-imported", apple_report_id: "report-0", apple_segment_id: "recent-segment", checksum: "recent-checksum", status: "imported", processing_date: "2026-10-01" },
+      ]);
+      const listSegments = vi.spyOn(client, "listAnalyticsReportSegments").mockResolvedValue([]);
+      const result = await syncAppStoreAnalytics(1, viewer);
+      expect(result.skipped).toBe(1);
+      expect(listSegments.mock.calls).toEqual([["old-unimported"], ["recent-imported"]]);
+      const events = mocks.info.mock.calls.map(([, message]) => JSON.parse(message));
+      expect(events).toContainEqual(expect.objectContaining({ event: "analytics_instance_skipped", instanceId: "old-imported", reason: "old_instance_imported" }));
+      expect(mocks.imports).toHaveBeenCalledWith([2]);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("does not fast-skip imported instances during a ONE_TIME_SNAPSHOT backfill", async () => {
+    const { client } = clientWithCatalog([analyticsReportDefinitions.downloads.standardName]);
+    vi.spyOn(client, "listAnalyticsReportRequests").mockResolvedValue([{ id: "snapshot", type: "analyticsReportRequests", attributes: { accessType: "ONE_TIME_SNAPSHOT", stoppedDueToInactivity: false } }]);
+    mocks.imports.mockResolvedValue([{ apple_instance_id: "instance", apple_report_id: "report-0", apple_segment_id: "segment", checksum: "old", status: "imported", processing_date: "2020-01-01" }]);
+    const listSegments = vi.spyOn(client, "listAnalyticsReportSegments");
+    await backfillAppStoreAnalytics(1, viewer);
+    expect(listSegments).toHaveBeenCalledWith("instance");
+    expect(mocks.imports).toHaveBeenCalled();
+  });
+
   it("skips unchanged instances after the single segment listing without downloading or parsing", async () => {
     const { client, segment } = clientWithCatalog([analyticsReportDefinitions.downloads.standardName]);
     mocks.imports.mockResolvedValue([{ apple_instance_id: "instance", apple_report_id: "report-0", apple_segment_id: "segment", checksum: segment.attributes.checksum, status: "imported" }]);
@@ -287,6 +321,27 @@ describe("production Analytics sync selection", () => {
     const events = mocks.info.mock.calls.map(([, message]) => JSON.parse(message));
     expect(events).toContainEqual(expect.objectContaining({ event: "analytics_instance_skipped", reason: "segments_unchanged", segmentCount: 1 }));
     expect(events.some((event) => ["analytics_instance_parsed", "analytics_instance_mapped", "analytics_instance_commit_started"].includes(event.event))).toBe(false);
+  });
+
+  it("uses decompressed report text as the Sales and Finance checksum", async () => {
+    const { client } = clientWithCatalog([]);
+    mocks.authorized.mockResolvedValue({ id: 1, is_active: true, updated_at: "version", vendor_number: "12345678" });
+    const reportDate = latestSalesReportDate();
+    const usDate = `${reportDate.slice(5, 7)}/${reportDate.slice(8, 10)}/${reportDate.slice(0, 4)}`;
+    const salesRow = { "Begin Date": usDate, "End Date": usDate, SKU: "synthetic-sku", "Apple Identifier": "123", "Parent Identifier": "", "Product Type Identifier": "1", "Country Code": "JP", Units: "2", "Developer Proceeds": "0.70", "Currency of Proceeds": "USD", "Customer Price": "100", "Customer Currency": "JPY" };
+    const salesText = Object.keys(salesRow).join("\t") + "\n" + Object.values(salesRow).join("\t");
+    const financeText = "Start Date\tEnd Date\tVendor Identifier\tApple Identifier\tProduct Type Identifier\tCountry Of Sale\tQuantity\tExtended Partner Share\tPartner Share Currency\n08/30/2026\t09/26/2026\tprivate-sku\t456\t1\tJP\t2\t1.4\tUSD\nTotal_Rows\t1\nTotal_Amount\t2.80\nTotal_Units\t2\n";
+    vi.spyOn(client, "downloadSalesReport").mockResolvedValueOnce(gzipSync(salesText, { level: 1 })).mockResolvedValueOnce(gzipSync(salesText, { level: 9 }));
+    vi.spyOn(client, "downloadFinanceReport").mockResolvedValueOnce(gzipSync(financeText, { level: 1 })).mockResolvedValueOnce(gzipSync(financeText, { level: 9 }));
+    mocks.commitSales.mockResolvedValueOnce("imported").mockResolvedValueOnce("skipped");
+    mocks.commitFinance.mockResolvedValueOnce("imported").mockResolvedValueOnce("skipped");
+    await syncAppStoreRevenue(1, viewer, { from: reportDate, to: reportDate, fiscalMonth: "2026-09", regionCode: "ZZ" });
+    await syncAppStoreRevenue(1, viewer, { from: reportDate, to: reportDate, fiscalMonth: "2026-09", regionCode: "ZZ" });
+    expect(gzipSync(salesText, { level: 1 })).not.toEqual(gzipSync(salesText, { level: 9 }));
+    expect(mocks.commitSales.mock.calls[0][3]).toBe(mocks.commitSales.mock.calls[1][3]);
+    expect(mocks.commitFinance.mock.calls[0][4]).toBe(mocks.commitFinance.mock.calls[1][4]);
+    expect(mocks.commitSales.mock.calls[1][2]).toBe(reportDate);
+    expect(mocks.commitFinance.mock.calls[1][2]).toBe("2026-09");
   });
 
   it("logs the complete Sales and Finance report stages using safe metadata only", async () => {

@@ -106,12 +106,29 @@ export async function readFinanceAppMappings(connectionIds: number[]) {
   return getDb().selectDistinct({ connection_id: s.app_store_sales_daily.connection_id, apple_identifier: s.app_store_sales_daily.apple_identifier, sku: s.app_store_sales_daily.sku, parent_identifier: s.app_store_sales_daily.parent_identifier }).from(s.app_store_sales_daily).where(inArray(s.app_store_sales_daily.connection_id, connectionIds));
 }
 
-export async function readCommerceImportDates(connectionId: number) {
+export async function readCommerceImportDates(connectionId: number, salesRange?: { from: string; to: string }) {
   if (isMockMode()) return { sales: [] as string[], finance: [] as string[] };
   const db = getDb();
   const [sales, finance] = await Promise.all([
-    db.select({ date: s.app_store_sales_imports.report_date }).from(s.app_store_sales_imports).where(eq(s.app_store_sales_imports.connection_id, connectionId)),
-    db.select({ month: s.app_store_finance_imports.fiscal_month }).from(s.app_store_finance_imports).where(eq(s.app_store_finance_imports.connection_id, connectionId)),
+    db.select({ date: s.app_store_sales_imports.report_date }).from(s.app_store_sales_imports).where(and(
+      eq(s.app_store_sales_imports.connection_id, connectionId),
+      salesRange ? gte(s.app_store_sales_imports.report_date, salesRange.from) : undefined,
+      salesRange ? lte(s.app_store_sales_imports.report_date, salesRange.to) : undefined,
+    )),
+    salesRange ? Promise.resolve([] as { month: string }[]) : db.select({ month: s.app_store_finance_imports.fiscal_month }).from(s.app_store_finance_imports).where(eq(s.app_store_finance_imports.connection_id, connectionId)),
   ]);
   return { sales: sales.map((row) => row.date), finance: finance.map((row) => row.month) };
+}
+
+export async function hasFinanceImport(connectionId: number, fiscalMonth: string, regionCode: string) {
+  if (isMockMode()) return false;
+  const [importRecord] = await getDb().select({ fiscalMonth: s.app_store_finance_imports.fiscal_month })
+    .from(s.app_store_finance_imports)
+    .where(and(
+      eq(s.app_store_finance_imports.connection_id, connectionId),
+      eq(s.app_store_finance_imports.fiscal_month, fiscalMonth),
+      eq(s.app_store_finance_imports.region_code, regionCode),
+    ))
+    .limit(1);
+  return Boolean(importRecord);
 }

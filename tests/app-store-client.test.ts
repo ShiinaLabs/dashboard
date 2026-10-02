@@ -17,6 +17,24 @@ describe("App Store team credentials", () => {
     expect(payload.sub).toBeUndefined();
   });
 
+  it("reuses the signing key and JWT until fewer than 60 seconds remain", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-10-02T00:00:00Z"));
+    const { privateKey } = await generateKeyPair("ES256", { extractable: true });
+    const credential = { issuerId: "team-issuer", keyId: "ABC1234567", privateKey: await exportPKCS8(privateKey) };
+    const provider = new AppStoreTokenProvider(credential);
+    try {
+      const first = await provider.getToken();
+      expect(await provider.getToken()).toBe(first);
+      credential.privateKey = "invalid after the cached key has been imported";
+      await vi.advanceTimersByTimeAsync(241_000);
+      const refreshed = await provider.getToken();
+      expect(refreshed).not.toBe(first);
+      const payload = JSON.parse(Buffer.from(refreshed.split(".")[1], "base64url").toString("utf8"));
+      expect(payload.exp - payload.iat).toBe(300);
+    } finally { vi.useRealTimers(); }
+  });
+
   it("extracts only the expected .p8 filename pattern", () => {
     expect(keyIdFromFilename("AuthKey_ABC1234567.p8")).toBe("ABC1234567");
     expect(keyIdFromFilename("AuthKey_ABC.p8")).toBeUndefined();
