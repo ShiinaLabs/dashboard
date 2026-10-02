@@ -3,6 +3,7 @@ import type { ReportSyncResult } from "@/lib/services/app-store-sync";
 import { apiJson, apiRequest } from "@/lib/client/api-transport";
 import type { AppStoreConnection, AppStoreConnectionDetail, AppStoreConnectionInput, AppStoreConnectionUpdate, AppStoreApp } from "@/shared/app-store";
 import type { AppStoreAnalyticsStatus, AppStoreAnalyticsAppOption, AppStoreAnalyticsDashboard } from "@/shared/app-store-analytics";
+import type { AppStoreHealth } from "@/shared/app-store-health";
 export { ApiError } from "@/lib/client/api-transport";
 
 // Keep transport helpers available for callers that need a streaming response.
@@ -104,6 +105,9 @@ export type {
 // ─── API methods ────────────────────────────────────────────────
 
 export const api = {
+  getAppStoreHealth: (id: number) => apiJson<AppStoreHealth>(`/app-store/connections/${id}/health`),
+  backfillAppStoreAnalytics: (id: number) => apiJson<ReportSyncResult>(`/app-store/connections/${id}/backfill`, { method: "POST", body: JSON.stringify({ kind: "analytics" }) }),
+  backfillAppStoreRevenue: (id: number, input: { from: string; to: string; fiscalMonthFrom: string; fiscalMonthTo: string; regionCode: "ZZ" }) => apiJson<{ status: ReportSyncResult["status"]; sources: Record<"analytics" | "sales" | "finance", ReportSyncResult> }>(`/app-store/connections/${id}/backfill`, { method: "POST", body: JSON.stringify({ kind: "revenue", ...input }) }),
   syncAppStoreAnalytics: (id: number) => apiJson<ReportSyncResult>(`/app-store/connections/${id}/analytics/sync`, { method: "POST" }),
   syncAppStoreRevenue: (id: number, input: { from: string; to: string; fiscalMonth: string; regionCode: "ZZ" }) => apiJson<{ status: ReportSyncResult["status"]; sources: Record<"analytics" | "sales" | "finance", ReportSyncResult> }>(`/app-store/connections/${id}/revenue/sync`, { method: "POST", body: JSON.stringify(input) }),
   getAppStoreRevenueDashboard: (filter: { from: string; to: string; appId?: number; territory?: string; fiscalMonth?: string }) => {

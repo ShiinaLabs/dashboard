@@ -105,3 +105,13 @@ export async function readFinanceAppMappings(connectionIds: number[]) {
   if (!connectionIds.length || isMockMode()) return [];
   return getDb().selectDistinct({ connection_id: s.app_store_sales_daily.connection_id, apple_identifier: s.app_store_sales_daily.apple_identifier, sku: s.app_store_sales_daily.sku, parent_identifier: s.app_store_sales_daily.parent_identifier }).from(s.app_store_sales_daily).where(inArray(s.app_store_sales_daily.connection_id, connectionIds));
 }
+
+export async function readCommerceImportDates(connectionId: number) {
+  if (isMockMode()) return { sales: [] as string[], finance: [] as string[] };
+  const db = getDb();
+  const [sales, finance] = await Promise.all([
+    db.select({ date: s.app_store_sales_imports.report_date }).from(s.app_store_sales_imports).where(eq(s.app_store_sales_imports.connection_id, connectionId)),
+    db.select({ month: s.app_store_finance_imports.fiscal_month }).from(s.app_store_finance_imports).where(eq(s.app_store_finance_imports.connection_id, connectionId)),
+  ]);
+  return { sales: sales.map((row) => row.date), finance: finance.map((row) => row.month) };
+}

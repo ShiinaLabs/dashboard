@@ -22,7 +22,12 @@ export class AnalyticsInstanceError extends AppStoreReportError {
     public readonly original: unknown,
   ) {
     const reportError = original instanceof AppStoreReportError ? original : null;
-    super(reportError?.code ?? (original instanceof AppStoreApiError ? original.code : stage === "download" ? "download_timeout" : "report_import_failed"), reportError?.message ?? "report_import_failed");
+    const message = reportError?.message ?? ({
+      segment: "Failed to refresh report segment metadata",
+      download: "Report download failed or timed out",
+      parse: "Report segment could not be parsed",
+    } as const)[stage];
+    super(reportError?.code ?? (original instanceof AppStoreApiError ? original.code : stage === "download" ? "download_timeout" : "report_import_failed"), message);
     this.name = "AnalyticsInstanceError";
   }
 }

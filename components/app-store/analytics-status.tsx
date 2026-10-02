@@ -11,6 +11,7 @@ export function AppStoreAnalyticsStatusPanel({ connectionId, isActive }: { conne
   const queryClient = useQueryClient();
   const status = useQuery({ queryKey: ["app-store-analytics-status", connectionId], queryFn: () => api.getAppStoreAnalyticsStatus(connectionId) });
   const [busy, setBusy] = useState(false);
+  const [backfillBusy, setBackfillBusy] = useState(false);
   const [result, setResult] = useState<Awaited<ReturnType<typeof api.syncAppStoreAnalytics>> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const setup = async () => {
@@ -32,6 +33,16 @@ export function AppStoreAnalyticsStatusPanel({ connectionId, isActive }: { conne
     } catch (e) { setError(e instanceof Error ? e.message : t("appStoreAnalytics.operationError")); }
     finally { setBusy(false); }
   };
+  const backfill = async () => {
+    setBackfillBusy(true); setError(null); setResult(null);
+    try {
+      const next = await api.backfillAppStoreAnalytics(connectionId);
+      setResult(next);
+      if (next.errors.length) setError(next.errors.join("; "));
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ["app-store-analytics"] }), queryClient.invalidateQueries({ queryKey: ["app-store-analytics-status", connectionId] }), queryClient.invalidateQueries({ queryKey: ["app-store-connection", connectionId] }), queryClient.invalidateQueries({ queryKey: ["app-store-health", connectionId] })]);
+    } catch (e) { setError(e instanceof Error ? e.message : t("appStoreAnalytics.operationError")); }
+    finally { setBackfillBusy(false); }
+  };
   const data = status.data;
   return <Card><CardContent className="space-y-4 p-5">
     <h3 className="font-semibold">{t("appStoreAnalytics.analytics")}</h3>
@@ -51,8 +62,9 @@ export function AppStoreAnalyticsStatusPanel({ connectionId, isActive }: { conne
     {result && <div role="status" className="space-y-1 text-sm"><p>{t(`revenue.status.${result.status}`)}</p>{result.waitingReasons?.map((reason, index) => <p key={index} className="text-muted-foreground">{reason}</p>)}</div>}
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     <div className="flex flex-wrap gap-2">
-      <Button disabled={busy || !isActive || !data?.enabledApps} onClick={() => void sync()}>{t("appStoreAnalytics.sync")}</Button>
-      <Button variant="outline" disabled={busy || !isActive || !data?.enabledApps} onClick={() => void setup()}>{t(busy ? "appStoreAnalytics.settingUp" : "appStoreAnalytics.setup")}</Button>
+      <Button disabled={busy || backfillBusy || !isActive || !data?.enabledApps} onClick={() => void sync()}>{t("appStoreAnalytics.sync")}</Button>
+      <Button variant="outline" disabled={busy || backfillBusy || !isActive || !data?.enabledApps} onClick={() => void backfill()}>{t(backfillBusy ? "appStore.backfill.running" : "appStore.backfill.analytics")}</Button>
+      <Button variant="outline" disabled={busy || backfillBusy || !isActive || !data?.enabledApps} onClick={() => void setup()}>{t(busy ? "appStoreAnalytics.settingUp" : "appStoreAnalytics.setup")}</Button>
     </div>
   </CardContent></Card>;
 }

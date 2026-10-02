@@ -925,6 +925,33 @@
       "success": "成功",
       "error": "错误",
       "partial": "部分成功"
+    },
+    "health": {
+      "title": "App Store Connect 健康状态",
+      "source": {
+        "connection": "连接",
+        "analytics": "获客 Analytics",
+        "revenueAnalytics": "收入 Analytics",
+        "sales": "Sales",
+        "finance": "Finance"
+      },
+      "state": {
+        "healthy": "正常",
+        "waiting": "等待数据",
+        "stale": "已过期",
+        "action_required": "需要处理",
+        "error": "错误",
+        "never_run": "尚未运行"
+      },
+      "lastSync": "最近同步：{{value}}",
+      "latestData": "最新数据：{{value}}",
+      "completeThrough": "数据完整至：{{value}}"
+    },
+    "backfill": {
+      "analytics": "补抓 Analytics 快照",
+      "revenue": "补抓 Revenue",
+      "running": "正在补抓…",
+      "financeThrough": "Finance 截止月份"
     }
   },
   "appStoreAnalytics": {

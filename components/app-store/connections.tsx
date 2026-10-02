@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { RevenueSyncPanel } from "./revenue-sync";
 import { AppStoreAnalyticsStatusPanel } from "./analytics-status";
+import { AppStoreHealthPanel } from "./health";
 
 function errorMessage(error: unknown) { return error instanceof Error ? error.message : "App Store Connect operation failed"; }
 
@@ -29,6 +30,7 @@ export function AppStoreConnections({ adding, onClose, onAdd }: { adding: boolea
       queryClient.invalidateQueries({ queryKey: ["app-store-connection"] }),
       queryClient.invalidateQueries({ queryKey: ["app-store-analytics-status"] }),
       queryClient.invalidateQueries({ queryKey: ["app-store-analytics"] }),
+      queryClient.invalidateQueries({ queryKey: ["app-store-health"] }),
     ]);
   };
 
@@ -148,6 +150,7 @@ function ConnectionDetail({ id, onBack, onChanged }: { id: number; onBack: () =>
     ].map(([label, value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="break-all font-medium">{value}</dd></div>)}</dl></CardContent></Card>
     <Card><CardContent className="space-y-3 p-5"><h3 className="font-semibold">{t("appStore.apps")}</h3><p className="text-sm text-muted-foreground">{t("appStore.appsHelp")}</p>{apps.length ? apps.map((app) => <div key={app.id} className="flex items-center gap-3 rounded-lg border p-3"><Checkbox id={`asc-app-${app.id}`} checked={app.is_enabled} disabled={busy} onCheckedChange={(value) => run(() => api.setAppStoreAppEnabled(id, app.id, value === true))} /><Label htmlFor={`asc-app-${app.id}`} className="min-w-0 flex-1 cursor-pointer flex-col items-start gap-1"><span className="break-words">{app.name}</span><span className="break-all text-xs font-normal text-muted-foreground">{app.bundle_id} · {app.apple_id}</span></Label></div>) : <p className="text-sm text-muted-foreground">{t("appStore.noApps")}</p>}</CardContent></Card>
     <Card><CardContent className="space-y-3 p-5"><h3 className="font-semibold">{t("appStore.lastSync")}</h3><p className="text-sm">{t("appStore.apps")}: {lastSuccess?.finished_at ? formatDateTime(lastSuccess.finished_at) : "—"}</p>{recentSyncRuns.map((sync) => <div key={sync.id} className="space-y-1 border-t pt-3 text-sm"><div className="flex flex-wrap justify-between gap-2"><span><span className="font-medium">{t(`appStore.syncSource.${sync.kind === "analytics" && sync.scope === "revenue" ? "revenueAnalytics" : sync.kind}`)}</span> · {formatDateTime(sync.started_at)}</span><span>{t(`appStore.syncStatus.${reportRunDisplayStatus(sync)}`)}</span></div>{sync.error_message && <p className={`break-words ${sync.status === "error" || sync.status === "partial" ? "text-destructive" : "text-muted-foreground"}`}>{sync.error_message}</p>}</div>)}</CardContent></Card>
+    <AppStoreHealthPanel connectionId={id} />
     <AppStoreAnalyticsStatusPanel connectionId={id} isActive={connection.is_active} />
     <RevenueSyncPanel connectionId={id} isActive={connection.is_active} vendorNumber={connection.vendor_number} onEdit={() => setEditing(true)} />
     <ConfirmDialog open={deleting} onOpenChange={setDeleting} title={t("common.delete")} description={t("settings.deleteConfirm", { name: connection.name })} target={id} action="delete_app_store_connection" onConfirm={async (token) => { await perform(() => api.deleteAppStoreConnection(id, token)); onBack(); }} />

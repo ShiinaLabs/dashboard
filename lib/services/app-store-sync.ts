@@ -55,7 +55,11 @@ async function finishReportRun(run: RunRow, result: ReportSyncResult, progress: 
   logEvent(result.status === "error" ? "error" : result.status === "partial" ? "warn" : "info", "sync_finished", { ...runContext(run), status: result.status, imported: result.imported, skipped: result.skipped, waiting: result.waiting, failures: result.errors.length, ...progress, durationMs: Date.now() - Date.parse(run.started_at) });
 }
 export function reportDiagnostic(error: unknown): string {
-  if (error instanceof AnalyticsInstanceError) return reportDiagnostic(error.original);
+  if (error instanceof AnalyticsInstanceError) {
+    return error.original instanceof AppStoreApiError
+      ? reportDiagnostic(error.original)
+      : `${error.code}: ${error.message}`;
+  }
   if (error instanceof AppStoreReportError) return `${error.code}: ${error.message}`;
   if (error instanceof AppStoreApiError) return ["apple_report_error", `status=${error.status}`, `code=${error.code}`, error.title ? `title=${error.title}` : null, error.parameter ? `parameter=${error.parameter}` : null, `message=${error.message}`].filter(Boolean).join(" ");
   // Driver/fetch errors may contain report rows, SQL values, signed URLs or credentials.
@@ -72,10 +76,10 @@ function recordWaiting(result: ReportSyncResult, run: RunRow, stage: string, rea
   if (!result.waitingReasons.includes(diagnostic)) result.waitingReasons.push(diagnostic);
   logEvent("info", "report_waiting", { ...runContext(run), ...fields, stage, reason });
 }
-async function syncAnalyticsReports(connection: ConnectionRow, kinds: AnalyticsReportKind[], scope: string): Promise<ReportSyncResult> {
+async function syncAnalyticsReports(connection: ConnectionRow, kinds: AnalyticsReportKind[], scope: string, trigger: "manual" | "scheduler" = "manual", accessType?: "ONE_TIME_SNAPSHOT"): Promise<ReportSyncResult> {
   const result: ReportSyncResult = { status: "success", imported: 0, skipped: 0, waiting: 0, waitingReasons: [], errors: [] };
   const progress = runProgress();
-  const run = await startRun(connection.id, "analytics", scope);
+  const run = await startRun(connection.id, "analytics", scope, trigger);
   logEvent("info", "sync_started", runContext(run));
   const fail = (stage: string, diagnostic: string, fields: Record<string, unknown> = {}, code?: string) => {
     result.errors.push(diagnostic);
@@ -96,7 +100,7 @@ async function syncAnalyticsReports(connection: ConnectionRow, kinds: AnalyticsR
           existingImports = await analytics.importsForApps([app.id]);
           resources = await client.listAnalyticsReportRequests(app.apple_id);
           progress.requests += resources.length;
-          const active = resources.filter((request) => !request.attributes.stoppedDueToInactivity);
+          const active = resources.filter((request) => !request.attributes.stoppedDueToInactivity && (!accessType || request.attributes.accessType === accessType));
           logEvent("info", "analytics_requests_discovered", { ...runContext(run), appId: app.id, count: resources.length, active: active.length, stopped: resources.length - active.length, accessTypes: [...new Set(resources.map((request) => request.attributes.accessType))], requestIds: resources.map((request) => request.id) });
           if (!resources.length) wait("request", "no_requests", { appId: app.id });
           else if (!active.length) wait("request", "requests_inactive", { appId: app.id });
@@ -106,6 +110,7 @@ async function syncAnalyticsReports(connection: ConnectionRow, kinds: AnalyticsR
         }
         for (const resource of resources) {
           if (resource.attributes.stoppedDueToInactivity) continue;
+          if (accessType && resource.attributes.accessType !== accessType) continue;
           let request: Awaited<ReturnType<typeof analytics.adoptRequest>>;
           try { request = await analytics.adoptRequest(app.id, resource, connection.updated_at); }
           catch (error) { fail("request", reportDiagnostic(error), { appId: app.id, requestId: resource.id }); continue; }
@@ -141,6 +146,7 @@ async function syncAnalyticsReports(connection: ConnectionRow, kinds: AnalyticsR
             for (const instance of instances) {
               progress.instancesProcessed++;
               const instanceFields = { appId: app.id, reportId: report.id, reportKind: kind, instanceId: instance.id, processingDate: instance.attributes.processingDate };
+              if (accessType === "ONE_TIME_SNAPSHOT") logEvent("info", "backfill_progress", { ...runContext(run), ...instanceFields, accessType });
               logEvent("info", "analytics_instance_started", { ...runContext(run), ...instanceFields });
               let listed;
               try { listed = await client.listAnalyticsReportSegments(instance.id); }
@@ -219,107 +225,184 @@ export function syncAppStoreAnalytics(id: number, viewer: Viewer) {
     return syncAnalyticsReports(connection, ["discovery", "downloads"], "acquisition");
   });
 }
+export async function syncAppStoreAnalyticsForConnection(connection: ConnectionRow, options: { scope: "acquisition" | "revenue"; trigger: "scheduler"; snapshotOnly?: boolean }) {
+  if (inFlight.has(connection.id)) throw new AppStoreError("sync_busy", 409, "A report sync is already running for this connection");
+  inFlight.add(connection.id);
+  try {
+    if (!connection.is_active) throw new AppStoreError("connection_disabled", 409, "Enable this connection before syncing");
+    const kinds: AnalyticsReportKind[] = options.scope === "acquisition" ? ["discovery", "downloads"] : ["purchases", "subscriptionState", "subscriptionEvent"];
+    if (!(await analytics.enabledApps(connection.id)).length) throw new AppStoreError("no_enabled_apps", 400, "Enable at least one app before syncing Analytics");
+    return await syncAnalyticsReports(connection, kinds, options.scope, options.trigger, options.snapshotOnly ? "ONE_TIME_SNAPSHOT" : undefined);
+  } finally { inFlight.delete(connection.id); }
+}
 const revenueSyncInput = z.object({ from: z.iso.date(), to: z.iso.date(), fiscalMonth: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), regionCode: z.literal("ZZ") });
-export function syncAppStoreRevenue(id: number, viewer: Viewer, input: unknown) {
-  const parsed = revenueSyncInput.safeParse(input);
-  if (!parsed.success) throw new AppStoreError("invalid_filters", 400, "Select Sales dates and an Apple fiscal month; consolidated Finance uses region ZZ");
-  const { from, to, fiscalMonth, regionCode } = parsed.data;
-  const days = (Date.parse(to) - Date.parse(from)) / 86400000 + 1;
-  if (days < 1 || days > 90) throw new AppStoreError("invalid_range", 400, "Select a date range of 1–90 days");
-  return withConnection(id, viewer, async (connection) => {
-    const commerce = await syncAnalyticsReports(connection, ["purchases", "subscriptionState", "subscriptionEvent"], "revenue");
-    const sources = { analytics: commerce, sales: { status: "success", imported: 0, skipped: 0, waiting: 0, waitingReasons: [], errors: [] } as ReportSyncResult, finance: { status: "success", imported: 0, skipped: 0, waiting: 0, waitingReasons: [], errors: [] } as ReportSyncResult };
-    const appCount = (await analytics.enabledApps(id)).length;
-    for (const kind of ["sales", "finance"] as const) {
-      const result = sources[kind];
-      const progress = runProgress();
-      progress.apps = appCount;
-      const run = await startRun(id, kind, "revenue");
-      logEvent("info", "sync_started", { ...runContext(run), ...(kind === "sales" ? { from, to } : { fiscalMonth, regionCode }) });
-      const fail = (stage: string, diagnostic: string, fields: Record<string, unknown> = {}, code?: string) => {
-        const source = kind === "finance" ? `Finance; fiscal month ${fiscalMonth}; region ${regionCode}` : `Sales${typeof fields.date === "string" ? `; date ${fields.date}` : ""}`;
-        const contextualDiagnostic = `${source}; ${diagnostic}`;
-        result.errors.push(contextualDiagnostic);
-        logEvent("error", "report_failed", { ...runContext(run), ...fields, stage, ...(code ? { code } : {}), diagnostic: contextualDiagnostic });
-      };
-      try {
-        if (!connection.vendor_number) fail("connection", "vendor_required: Revenue setup required: add Vendor Number in Edit Connection");
-        else if (isMockMode()) recordWaiting(result, run, "report", "no_reports_generated");
-        else {
-          const client = clientForConnection(connection);
-          if (kind === "sales") {
-            const latestDate = latestSalesReportDate();
-            for (let time = Date.parse(from); time <= Date.parse(to); time += 86400000) {
-              const date = new Date(time).toISOString().slice(0, 10);
-              if (date > latestDate) { recordWaiting(result, run, "report", "before_daily_publication", { date, latestDate }); continue; }
-              logEvent("info", "sales_report_started", { ...runContext(run), date });
-              let bytes: Buffer | null;
-              try { bytes = await client.downloadSalesReport(connection.vendor_number, date); }
-              catch (error) { fail("download", reportDiagnostic(error), { date }, error instanceof AppStoreApiError ? error.code : undefined); continue; }
-              logEvent("info", "sales_report_downloaded", { ...runContext(run), date, compressedBytes: bytes?.byteLength ?? 0, noSales: bytes === null });
-              let table;
-              if (bytes) {
-                try { table = parseAnalyticsTsv(await gunzipAnalyticsSegment(bytes)); }
-                catch (error) { fail("parse", reportDiagnostic(error), { date }, error instanceof AppStoreReportError ? error.code : undefined); continue; }
-              } else table = { headers: [], rows: [] };
-              progress.parsedRows += table.rows.length;
-              logEvent("info", "sales_report_parsed", { ...runContext(run), date, rowCount: table.rows.length, headers: table.headers });
-              const checksum = bytes ? createHash("sha256").update(bytes).digest("hex") : "no-sales";
-              let rows;
-              try { rows = bytes ? mapSalesReport(table, id, date, checksum) : []; }
-              catch (error) { fail("map", reportDiagnostic(error), { date }, error instanceof AppStoreReportError ? error.code : undefined); continue; }
-              progress.mappedRows += rows.length;
-              logEvent("info", "sales_report_mapped", { ...runContext(run), date, inputRows: table.rows.length, mappedRows: rows.length });
-              const commitStartedAt = Date.now();
-              let outcome: "imported" | "skipped";
-              try { outcome = await facts.commitSalesReport(id, connection.updated_at, date, checksum, rows); }
-              catch { fail("commit", "report_import_failed", { date }, "report_import_failed"); continue; }
-              result[outcome]++;
-              logEvent("info", "sales_report_committed", { ...runContext(run), date, rows: rows.length, outcome, durationMs: Date.now() - commitStartedAt });
-            }
-          } else {
-            const dimensions = { fiscalMonth, regionCode };
-            logEvent("info", "finance_report_started", { ...runContext(run), ...dimensions });
+async function syncRevenueSources(connection: ConnectionRow, id: number, parsed: z.infer<typeof revenueSyncInput>, options: { trigger?: "manual" | "scheduler"; sources?: Array<"analytics" | "sales" | "finance">; snapshotOnly?: boolean; backfill?: boolean; backfillLifecycle?: boolean } = {}) {
+  const { from, to, fiscalMonth, regionCode } = parsed;
+  const selectedSources = options.sources ?? ["analytics", "sales", "finance"];
+  if (options.backfill && options.backfillLifecycle !== false) logEvent("info", "backfill_started", { connectionId: id, kind: selectedSources.join(","), from, to, fiscalMonth });
+  const sources = { analytics: { status: "success", imported: 0, skipped: 0, waiting: 0, waitingReasons: [], errors: [] } as ReportSyncResult, sales: { status: "success", imported: 0, skipped: 0, waiting: 0, waitingReasons: [], errors: [] } as ReportSyncResult, finance: { status: "success", imported: 0, skipped: 0, waiting: 0, waitingReasons: [], errors: [] } as ReportSyncResult };
+  if (selectedSources.includes("analytics")) sources.analytics = await syncAnalyticsReports(connection, ["purchases", "subscriptionState", "subscriptionEvent"], "revenue", options.trigger ?? "manual", options.snapshotOnly ? "ONE_TIME_SNAPSHOT" : undefined);
+  const appCount = (await analytics.enabledApps(id)).length;
+  for (const kind of ["sales", "finance"] as const) {
+    if (!selectedSources.includes(kind)) continue;
+    const result = sources[kind];
+    const progress = runProgress();
+    progress.apps = appCount;
+    const run = await startRun(id, kind, "revenue", options.trigger ?? "manual");
+    logEvent("info", "sync_started", { ...runContext(run), ...(kind === "sales" ? { from, to } : { fiscalMonth, regionCode }) });
+    const fail = (stage: string, diagnostic: string, fields: Record<string, unknown> = {}, code?: string) => {
+      const source = kind === "finance" ? `Finance; fiscal month ${fiscalMonth}; region ${regionCode}` : `Sales${typeof fields.date === "string" ? `; date ${fields.date}` : ""}`;
+      const contextualDiagnostic = `${source}; ${diagnostic}`;
+      result.errors.push(contextualDiagnostic);
+      logEvent("error", "report_failed", { ...runContext(run), ...fields, stage, ...(code ? { code } : {}), diagnostic: contextualDiagnostic });
+    };
+    try {
+      if (!connection.vendor_number) fail("connection", "vendor_required: Revenue setup required: add Vendor Number in Edit Connection");
+      else if (isMockMode()) recordWaiting(result, run, "report", "no_reports_generated");
+      else {
+        const client = clientForConnection(connection);
+        if (kind === "sales") {
+          const latestDate = latestSalesReportDate();
+          for (let time = Date.parse(from); time <= Date.parse(to); time += 86400000) {
+            const date = new Date(time).toISOString().slice(0, 10);
+            if (date > latestDate) { recordWaiting(result, run, "report", "before_daily_publication", { date, latestDate }); continue; }
+            logEvent("info", options.backfill ? "backfill_progress" : "sales_report_started", { ...runContext(run), date });
             let bytes: Buffer | null;
-            let downloadFailed = false;
-            try { bytes = await client.downloadFinanceReport(connection.vendor_number, fiscalMonth, regionCode); }
-            catch (error) { fail("download", reportDiagnostic(error), dimensions, error instanceof AppStoreApiError ? error.code : undefined); bytes = null; downloadFailed = true; }
-            if (bytes === null && !downloadFailed) fail("download", "finance_unavailable: Financial report is unavailable", dimensions, "finance_unavailable");
+            try { bytes = await client.downloadSalesReport(connection.vendor_number, date); }
+            catch (error) { fail("download", reportDiagnostic(error), { date }, error instanceof AppStoreApiError ? error.code : undefined); continue; }
+            logEvent("info", "sales_report_downloaded", { ...runContext(run), date, compressedBytes: bytes?.byteLength ?? 0, noSales: bytes === null });
+            let table;
             if (bytes) {
-              logEvent("info", "finance_report_downloaded", { ...runContext(run), ...dimensions, compressedBytes: bytes.byteLength });
-              let text: string;
-              let table;
-              try {
-                text = await gunzipAnalyticsSegment(bytes);
-                table = parseFinanceTsv(text);
-              } catch (error) { fail("parse", reportDiagnostic(error), dimensions, error instanceof AppStoreReportError ? error.code : undefined); table = null; text = ""; }
-              if (table) {
-                progress.parsedRows += table.rows.length;
-                logEvent("info", "finance_report_parsed", { ...runContext(run), ...dimensions, rowCount: table.rows.length, headers: table.headers, trailerStatus: /^Total_Rows\t/m.test(text) ? "validated" : "absent" });
-                const checksum = createHash("sha256").update(bytes).digest("hex");
-                let rows;
-                try { rows = mapFinanceReport(table, id, fiscalMonth, regionCode, checksum); }
-                catch (error) { fail("map", reportDiagnostic(error), dimensions, error instanceof AppStoreReportError ? error.code : undefined); rows = null; }
-                if (rows) {
-                  progress.mappedRows += rows.length;
-                  logEvent("info", "finance_report_mapped", { ...runContext(run), ...dimensions, inputRows: table.rows.length, mappedRows: rows.length });
-                  const commitStartedAt = Date.now();
-                  let outcome: "imported" | "skipped" | null;
-                  try { outcome = await facts.commitFinanceReport(id, connection.updated_at, fiscalMonth, regionCode, checksum, rows); }
-                  catch { fail("commit", "report_import_failed", dimensions, "report_import_failed"); outcome = null; }
-                  if (outcome) {
-                    result[outcome]++;
-                    logEvent("info", "finance_report_committed", { ...runContext(run), ...dimensions, rows: rows.length, outcome, durationMs: Date.now() - commitStartedAt });
-                  }
+              try { table = parseAnalyticsTsv(await gunzipAnalyticsSegment(bytes)); }
+              catch (error) { fail("parse", reportDiagnostic(error), { date }, error instanceof AppStoreReportError ? error.code : undefined); continue; }
+            } else table = { headers: [], rows: [] };
+            progress.parsedRows += table.rows.length;
+            logEvent("info", "sales_report_parsed", { ...runContext(run), date, rowCount: table.rows.length, headers: table.headers });
+            const checksum = bytes ? createHash("sha256").update(bytes).digest("hex") : "no-sales";
+            let rows;
+            try { rows = bytes ? mapSalesReport(table, id, date, checksum) : []; }
+            catch (error) { fail("map", reportDiagnostic(error), { date }, error instanceof AppStoreReportError ? error.code : undefined); continue; }
+            progress.mappedRows += rows.length;
+            logEvent("info", "sales_report_mapped", { ...runContext(run), date, inputRows: table.rows.length, mappedRows: rows.length });
+            const commitStartedAt = Date.now();
+            let outcome: "imported" | "skipped";
+            try { outcome = await facts.commitSalesReport(id, connection.updated_at, date, checksum, rows); }
+            catch { fail("commit", "report_import_failed", { date }, "report_import_failed"); continue; }
+            result[outcome]++;
+            logEvent("info", "sales_report_committed", { ...runContext(run), date, rows: rows.length, outcome, durationMs: Date.now() - commitStartedAt });
+          }
+        } else {
+          const dimensions = { fiscalMonth, regionCode };
+          if (options.backfill) logEvent("info", "backfill_progress", { ...runContext(run), ...dimensions });
+          logEvent("info", "finance_report_started", { ...runContext(run), ...dimensions });
+          let bytes: Buffer | null;
+          let downloadFailed = false;
+          try { bytes = await client.downloadFinanceReport(connection.vendor_number, fiscalMonth, regionCode); }
+          catch (error) { fail("download", reportDiagnostic(error), dimensions, error instanceof AppStoreApiError ? error.code : undefined); bytes = null; downloadFailed = true; }
+          if (bytes === null && !downloadFailed) recordWaiting(result, run, "report", "finance_unavailable", dimensions);
+          if (bytes) {
+            logEvent("info", "finance_report_downloaded", { ...runContext(run), ...dimensions, compressedBytes: bytes.byteLength });
+            let text: string;
+            let table;
+            try {
+              text = await gunzipAnalyticsSegment(bytes);
+              table = parseFinanceTsv(text);
+            } catch (error) { fail("parse", reportDiagnostic(error), dimensions, error instanceof AppStoreReportError ? error.code : undefined); table = null; text = ""; }
+            if (table) {
+              progress.parsedRows += table.rows.length;
+              logEvent("info", "finance_report_parsed", { ...runContext(run), ...dimensions, rowCount: table.rows.length, headers: table.headers, trailerStatus: /^Total_Rows\t/m.test(text) ? "validated" : "absent" });
+              const checksum = createHash("sha256").update(bytes).digest("hex");
+              let rows;
+              try { rows = mapFinanceReport(table, id, fiscalMonth, regionCode, checksum); }
+              catch (error) { fail("map", reportDiagnostic(error), dimensions, error instanceof AppStoreReportError ? error.code : undefined); rows = null; }
+              if (rows) {
+                progress.mappedRows += rows.length;
+                logEvent("info", "finance_report_mapped", { ...runContext(run), ...dimensions, inputRows: table.rows.length, mappedRows: rows.length });
+                const commitStartedAt = Date.now();
+                let outcome: "imported" | "skipped" | null;
+                try { outcome = await facts.commitFinanceReport(id, connection.updated_at, fiscalMonth, regionCode, checksum, rows); }
+                catch { fail("commit", "report_import_failed", dimensions, "report_import_failed"); outcome = null; }
+                if (outcome) {
+                  result[outcome]++;
+                  logEvent("info", "finance_report_committed", { ...runContext(run), ...dimensions, rows: rows.length, outcome, durationMs: Date.now() - commitStartedAt });
                 }
               }
             }
           }
         }
-      } catch (error) { fail(error instanceof AppStoreError ? "connection" : "report", `${kind === "finance" ? `Finance; fiscal month ${fiscalMonth}; region ${regionCode}` : "Sales"}; ${reportDiagnostic(error)}`, {}, error instanceof AppStoreApiError ? error.code : undefined); }
-      result.status = reportSyncStatus(result);
-      await finishReportRun(run, result, progress);
+      }
+    } catch (error) { fail(error instanceof AppStoreError ? "connection" : "report", reportDiagnostic(error), {}, error instanceof AppStoreApiError ? error.code : undefined); }
+    result.status = reportSyncStatus(result);
+    await finishReportRun(run, result, progress);
+  }
+  const total: ReportSyncResult = { status: "success", imported: 0, skipped: 0, waiting: 0, waitingReasons: [], errors: [] };
+  for (const result of Object.values(sources)) { total.imported += result.imported; total.skipped += result.skipped; total.waiting += result.waiting; total.errors.push(...result.errors); total.waitingReasons.push(...result.waitingReasons); }
+  total.status = reportSyncStatus(total);
+  if (options.backfill && options.backfillLifecycle !== false) logEvent("info", "backfill_finished", { connectionId: id, kind: selectedSources.join(","), status: total.status, imported: total.imported, skipped: total.skipped, failures: total.errors.length });
+  return { status: total.status, sources };
+}
+
+export function syncAppStoreRevenue(id: number, viewer: Viewer, input: unknown) {
+  const parsed = revenueSyncInput.safeParse(input);
+  if (!parsed.success) throw new AppStoreError("invalid_filters", 400, "Select Sales dates and an Apple fiscal month; consolidated Finance uses region ZZ");
+  const { from, to } = parsed.data;
+  const days = (Date.parse(to) - Date.parse(from)) / 86400000 + 1;
+  if (days < 1 || days > 90) throw new AppStoreError("invalid_range", 400, "Select a date range of 1–90 days");
+  return withConnection(id, viewer, async (connection) => syncRevenueSources(connection, id, parsed.data));
+}
+
+export async function syncAppStoreRevenueForConnection(connection: ConnectionRow, input: { from: string; to: string; fiscalMonth: string; regionCode: "ZZ" }, options: { trigger: "scheduler"; sources: Array<"analytics" | "sales" | "finance">; snapshotOnly?: boolean; backfill?: boolean }) {
+  if (inFlight.has(connection.id)) throw new AppStoreError("sync_busy", 409, "A report sync is already running for this connection");
+  inFlight.add(connection.id);
+  try {
+    if (!connection.is_active) throw new AppStoreError("connection_disabled", 409, "Enable this connection before syncing");
+    const parsed = revenueSyncInput.parse(input);
+    const days = (Date.parse(parsed.to) - Date.parse(parsed.from)) / 86400000 + 1;
+    if (days < 1 || days > 90) throw new AppStoreError("invalid_range", 400, "Select a date range of 1–90 days");
+    return syncRevenueSources(connection, connection.id, parsed, options);
+  } finally { inFlight.delete(connection.id); }
+}
+function monthDistance(from: string, to: string) { const [fy, fm] = from.split("-").map(Number); const [ty, tm] = to.split("-").map(Number); return (ty - fy) * 12 + tm - fm; }
+
+export async function backfillAppStoreAnalytics(id: number, viewer: Viewer) {
+  return withConnection(id, viewer, async (connection) => {
+    if (!(await analytics.enabledApps(id)).length) throw new AppStoreError("no_enabled_apps", 400, "Enable at least one app before backfilling Analytics");
+    logEvent("info", "backfill_started", { connectionId: id, kind: "analytics", accessType: "ONE_TIME_SNAPSHOT" });
+    const acquisition = await syncAnalyticsReports(connection, ["discovery", "downloads"], "acquisition", "manual", "ONE_TIME_SNAPSHOT");
+    const revenue = await syncAnalyticsReports(connection, ["purchases", "subscriptionState", "subscriptionEvent"], "revenue", "manual", "ONE_TIME_SNAPSHOT");
+    const result: ReportSyncResult = { status: "success", imported: acquisition.imported + revenue.imported, skipped: acquisition.skipped + revenue.skipped, waiting: acquisition.waiting + revenue.waiting, waitingReasons: [...acquisition.waitingReasons, ...revenue.waitingReasons], errors: [...acquisition.errors, ...revenue.errors] };
+    result.status = reportSyncStatus(result);
+    logEvent("info", "backfill_finished", { connectionId: id, kind: "analytics", status: result.status, imported: result.imported, skipped: result.skipped, failures: result.errors.length });
+    return result;
+  });
+}
+
+export async function backfillAppStoreRevenue(id: number, viewer: Viewer, input: unknown) {
+  const schema = z.object({ from: z.iso.date(), to: z.iso.date(), fiscalMonthFrom: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), fiscalMonthTo: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), regionCode: z.literal("ZZ") });
+  const parsed = schema.safeParse(input);
+  if (!parsed.success) throw new AppStoreError("invalid_filters", 400, "Select Sales dates and fiscal months; consolidated Finance uses region ZZ");
+  const { from, to, fiscalMonthFrom, fiscalMonthTo, regionCode } = parsed.data;
+  const days = (Date.parse(to) - Date.parse(from)) / 86400000 + 1;
+  const monthCount = monthDistance(fiscalMonthFrom, fiscalMonthTo) + 1;
+  if (days < 1 || days > 90) throw new AppStoreError("invalid_range", 400, "Select a date range of 1–90 days");
+  if (monthCount < 1 || monthCount > 12) throw new AppStoreError("invalid_range", 400, "Select a fiscal month range of 1–12 months");
+  return withConnection(id, viewer, async (connection) => {
+    const all = { analytics: { status: "success", imported: 0, skipped: 0, waiting: 0, waitingReasons: [], errors: [] } as ReportSyncResult, sales: { status: "success", imported: 0, skipped: 0, waiting: 0, waitingReasons: [], errors: [] } as ReportSyncResult, finance: { status: "success", imported: 0, skipped: 0, waiting: 0, waitingReasons: [], errors: [] } as ReportSyncResult };
+    const base = { from, to, fiscalMonth: fiscalMonthFrom, regionCode };
+    logEvent("info", "backfill_started", { connectionId: id, kind: "revenue", from, to, fiscalMonthFrom, fiscalMonthTo });
+    const salesAndAnalytics = await syncRevenueSources(connection, id, base, { sources: ["analytics", "sales"], backfill: true, backfillLifecycle: false, snapshotOnly: true });
+    all.analytics = salesAndAnalytics.sources.analytics; all.sales = salesAndAnalytics.sources.sales;
+    for (let index = 0; index < monthCount; index++) {
+      const [year, month] = fiscalMonthFrom.split("-").map(Number);
+      const time = Date.UTC(year, month - 1 + index, 1);
+      const fiscalMonth = new Date(time).toISOString().slice(0, 7);
+      const result = await syncRevenueSources(connection, id, { ...base, fiscalMonth }, { sources: ["finance"], backfill: true, backfillLifecycle: false });
+      const current = result.sources.finance;
+      all.finance.imported += current.imported; all.finance.skipped += current.skipped; all.finance.waiting += current.waiting; all.finance.waitingReasons.push(...current.waitingReasons); all.finance.errors.push(...current.errors);
     }
-    return { status: reportSyncStatus({ imported: Object.values(sources).reduce((n, s) => n + s.imported, 0), skipped: Object.values(sources).reduce((n, s) => n + s.skipped, 0), waiting: Object.values(sources).reduce((n, s) => n + s.waiting, 0), errors: Object.values(sources).flatMap((s) => s.errors) }), sources };
+    for (const source of Object.values(all)) source.status = reportSyncStatus(source);
+    const status = reportSyncStatus({ imported: Object.values(all).reduce((sum, source) => sum + source.imported, 0), skipped: Object.values(all).reduce((sum, source) => sum + source.skipped, 0), waiting: Object.values(all).reduce((sum, source) => sum + source.waiting, 0), errors: Object.values(all).flatMap((source) => source.errors) });
+    logEvent("info", "backfill_finished", { connectionId: id, kind: "revenue", status, imported: Object.values(all).reduce((sum, source) => sum + source.imported, 0), failures: Object.values(all).reduce((sum, source) => sum + source.errors.length, 0) });
+    return { status, sources: all };
   });
 }

@@ -31,6 +31,8 @@ export default [
   route("api/app-store/revenue", "api/app-store/revenue/route.ts"),
   route("api/app-store/connections/:id/analytics/sync", "api/app-store/connections/[id]/analytics/sync/route.ts"),
   route("api/app-store/connections/:id/revenue/sync", "api/app-store/connections/[id]/revenue/sync/route.ts"),
+  route("api/app-store/connections/:id/backfill", "api/app-store/connections/[id]/backfill/route.ts"),
+  route("api/app-store/connections/:id/health", "api/app-store/connections/[id]/health/route.ts"),
   route("api/app-store/connections", "api/app-store/connections/route.ts"),
   route("api/app-store/analytics", "api/app-store/analytics/route.ts"),
   route("api/app-store/analytics/apps", "api/app-store/analytics/apps/route.ts"),

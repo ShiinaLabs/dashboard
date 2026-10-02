@@ -1674,6 +1674,19 @@ describe("independent App Store Connect foundation", () => {
     privateKey = await exportPKCS8((await generateKeyPair("ES256", { extractable: true })).privateKey);
   });
 
+  it("guards duplicate source runs, recovers stale work and prunes only finished history", async () => {
+    const connection = await appStoreRepo.createWithApps({ owner_id: viewer.id, name: "Run lifecycle", issuer_id: input().issuerId, key_id: input().keyId, private_key_encrypted: "synthetic-encrypted" }, [], new Date().toISOString());
+    const first = await appStoreRepo.startRun(connection.id, "sales", "revenue");
+    await expect(appStoreRepo.startRun(connection.id, "sales", "revenue")).rejects.toBeInstanceOf(appStoreRepo.AppStoreSyncBusyError);
+    expect(await appStoreRepo.recoverStaleRuns(new Date(Date.now() + 1_000))).toBe(1);
+    expect(await appStoreRepo.getLatestRunForSource(connection.id, "sales", "revenue")).toMatchObject({ status: "error", error_message: "stale_run_recovered", finished_at: expect.any(String) });
+    const next = await appStoreRepo.startRun(connection.id, "sales", "revenue");
+    await appStoreRepo.finishRun(next, "success");
+    await getTestPool().query("UPDATE app_store_sync_runs SET finished_at = '2025-01-01T00:00:00.000Z' WHERE id = $1", [next.id]);
+    expect(await appStoreRepo.pruneFinishedRuns(new Date("2026-01-01T00:00:00.000Z"))).toBe(1);
+    expect(await appStoreRepo.getLatestRunForSource(connection.id, "sales", "revenue")).toMatchObject({ id: first.id, status: "error" });
+  });
+
   it("validates before creation, encrypts the private key and returns only metadata", async () => {
     const spy = vi.spyOn(AppStoreConnectClient.prototype, "listApps").mockResolvedValue(apps);
     try {

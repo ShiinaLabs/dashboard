@@ -925,6 +925,33 @@
       "success": "Success",
       "error": "Error",
       "partial": "Partial"
+    },
+    "health": {
+      "title": "App Store Connect Health",
+      "source": {
+        "connection": "Connection",
+        "analytics": "Analytics",
+        "revenueAnalytics": "Revenue Analytics",
+        "sales": "Sales",
+        "finance": "Finance"
+      },
+      "state": {
+        "healthy": "Healthy",
+        "waiting": "Waiting",
+        "stale": "Stale",
+        "action_required": "Action required",
+        "error": "Error",
+        "never_run": "Never run"
+      },
+      "lastSync": "Last sync: {{value}}",
+      "latestData": "Latest data: {{value}}",
+      "completeThrough": "Complete through: {{value}}"
+    },
+    "backfill": {
+      "analytics": "Backfill Analytics snapshot",
+      "revenue": "Backfill Revenue",
+      "running": "Backfill running…",
+      "financeThrough": "Finance through"
     }
   },
   "appStoreAnalytics": {

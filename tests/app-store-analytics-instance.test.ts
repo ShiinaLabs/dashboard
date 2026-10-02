@@ -1,7 +1,8 @@
 import { gzipSync } from "node:zlib";
 import { describe, expect, it, vi } from "vitest";
 import { AppStoreConnectClient, type AnalyticsReportInstance } from "../lib/infra/app-store/AppStoreConnectClient";
-import { prepareAnalyticsInstance } from "../lib/infra/app-store/analytics-instance";
+import { AnalyticsInstanceError, prepareAnalyticsInstance } from "../lib/infra/app-store/analytics-instance";
+import { AppStoreReportError } from "../lib/infra/app-store/analytics-segment";
 
 const instance: AnalyticsReportInstance = { id: "instance", type: "analyticsReportInstances", attributes: { processingDate: "2026-10-01", granularity: "DAILY" } };
 function mockClient() {
@@ -17,6 +18,17 @@ function mockClient() {
 }
 
 describe("whole-instance preparation", () => {
+  it("keeps generic download errors safe while preserving their diagnostic code", () => {
+    const wrapped = new AnalyticsInstanceError("download", "segment", new Error("SECRET signed URL token=secret raw fetch error"));
+    expect(wrapped).toMatchObject({ code: "download_timeout", message: "Report download failed or timed out" });
+    expect(wrapped.message).not.toMatch(/SECRET|signed URL|token=secret|raw fetch error/);
+  });
+
+  it("preserves an already-safe report error message", () => {
+    const wrapped = new AnalyticsInstanceError("download", "segment", new AppStoreReportError("checksum_mismatch", "Report checksum does not match Apple metadata"));
+    expect(wrapped).toMatchObject({ code: "checksum_mismatch", message: "Report checksum does not match Apple metadata" });
+  });
+
   it("refreshes each URL just before downloading and combines every segment", async () => {
     const { typed, order, listed, client } = mockClient();
     const progress: unknown[] = [];

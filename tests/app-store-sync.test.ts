@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AppStoreConnectClient, type AnalyticsReport } from "../lib/infra/app-store/AppStoreConnectClient";
+import { AppStoreConnectClient, type AnalyticsReport, type AnalyticsReportRequest } from "../lib/infra/app-store/AppStoreConnectClient";
 import type { AppStoreTokenProvider } from "../lib/infra/app-store/AppStoreTokenProvider";
+import { AppStoreReportError } from "../lib/infra/app-store/analytics-segment";
 import { analyticsReportDefinitions, identifyStandardAnalyticsReport } from "../lib/infra/app-store/report-mapping";
-import { syncAppStoreAnalytics, syncAppStoreRevenue } from "../lib/services/app-store-sync";
+import { backfillAppStoreAnalytics, backfillAppStoreRevenue, syncAppStoreAnalytics, syncAppStoreRevenue } from "../lib/services/app-store-sync";
 import { getAppStoreAnalyticsStatus } from "../lib/services/app-store-analytics";
 import { reportRunDisplayStatus } from "../shared/app-store";
 import { latestSalesReportDate } from "../shared/app-store-revenue";
@@ -16,6 +17,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../lib/config", () => ({ isMockMode: () => false }));
 vi.mock("../lib/logger", () => ({ getLogger: () => mocks }));
 vi.mock("../lib/services/app-store", () => ({
+  AppStoreError: class AppStoreError extends Error {},
   authorizedConnection: mocks.authorized,
   clientForConnection: mocks.client,
 }));
@@ -83,6 +85,19 @@ describe("Standard report recognition", () => {
 });
 
 describe("production Analytics sync selection", () => {
+  it("backfills only ONE_TIME_SNAPSHOT requests through the existing importer", async () => {
+    const { client, instances } = clientWithCatalog([analyticsReportDefinitions.discovery.standardName, analyticsReportDefinitions.downloads.standardName]);
+    const requests: AnalyticsReportRequest[] = [
+      { id: "snapshot-request", type: "analyticsReportRequests", attributes: { accessType: "ONE_TIME_SNAPSHOT", stoppedDueToInactivity: false } },
+      { id: "ongoing-request", type: "analyticsReportRequests", attributes: { accessType: "ONGOING", stoppedDueToInactivity: false } },
+    ];
+    vi.spyOn(client, "listAnalyticsReportRequests").mockResolvedValue(requests);
+    const result = await backfillAppStoreAnalytics(1, viewer);
+    expect(result.imported).toBe(2);
+    expect(instances.mock.calls).toEqual([["report-0"], ["report-1"]]);
+    expect(mocks.commit).toHaveBeenCalledTimes(2);
+  });
+
   it("takes both acquisition Standard reports through instances, segments and the real mapper", async () => {
     const { client, instances } = clientWithCatalog([analyticsReportDefinitions.discovery.standardName, analyticsReportDefinitions.downloads.standardName, "App Store Downloads Detailed"]);
     const listSegments = vi.spyOn(client, "listAnalyticsReportSegments");
@@ -156,13 +171,42 @@ describe("production Analytics sync selection", () => {
     expect(JSON.stringify(failures)).not.toContain("SECRET database detail");
   });
 
-  it.each(["download_timeout", "checksum_mismatch", "download_expired"])("logs %s at the download stage without exposing signed URLs", async (code) => {
+  it.each([
+    ["download_timeout", new Error("https://signed.example/path?token=secret raw fetch error: synthetic network failure"), "Report download failed or timed out"],
+    ["checksum_mismatch", new AppStoreReportError("checksum_mismatch", "Report checksum does not match Apple metadata"), "Report checksum does not match Apple metadata"],
+    ["download_expired", new AppStoreReportError("download_expired", "Report download failed (403); refresh segment metadata and retry"), "Report download failed (403); refresh segment metadata and retry"],
+  ] as const)("persists %s at the download stage without exposing signed URLs", async (code, error, safeMessage) => {
     const { client } = clientWithCatalog([analyticsReportDefinitions.downloads.standardName]);
-    vi.spyOn(client, "downloadAnalyticsSegment").mockRejectedValue(new Error(`https://signed.example/path?token=secret ${code}`));
-    expect(await syncAppStoreAnalytics(1, viewer)).toMatchObject({ status: "error" });
+    vi.spyOn(client, "downloadAnalyticsSegment").mockRejectedValue(error);
+    const result = await syncAppStoreAnalytics(1, viewer);
+    expect(result).toMatchObject({ status: "error", errors: [expect.stringContaining(`${code}: ${safeMessage}`)] });
     const events = mocks.error.mock.calls.map(([, message]) => JSON.parse(message));
-    expect(events).toEqual(expect.arrayContaining([expect.objectContaining({ event: "report_failed", stage: "download", code: "download_timeout", instanceId: "instance", segmentId: "segment" })]));
-    expect(JSON.stringify(events)).not.toMatch(/signed\.example|token=secret/);
+    expect(events).toEqual(expect.arrayContaining([expect.objectContaining({ event: "report_failed", stage: "download", code, instanceId: "instance", segmentId: "segment" })]));
+    const durableSummary = JSON.stringify(mocks.finish.mock.calls);
+    for (const output of [JSON.stringify(events), durableSummary, JSON.stringify(result)]) {
+      expect(output).toContain(`${code}: ${safeMessage}`);
+      expect(output).not.toMatch(/signed\.example|token=secret|raw fetch error|synthetic network failure/);
+    }
+  });
+
+  it.each(["sales", "finance"] as const)("does not duplicate the %s prefix when the outer revenue boundary catches", async (source) => {
+    const { client } = clientWithCatalog([]);
+    mocks.authorized.mockResolvedValue({ id: 1, is_active: true, updated_at: "version", vendor_number: "12345678" });
+    vi.spyOn(client, "downloadSalesReport").mockResolvedValue(null);
+    vi.spyOn(client, "downloadFinanceReport").mockResolvedValue(null);
+    const normalClient = client;
+    let call = 0;
+    mocks.client.mockImplementation(() => {
+      call++;
+      if ((source === "sales" && call === 2) || (source === "finance" && call === 3)) throw new Error("SECRET raw client failure");
+      return normalClient;
+    });
+
+    const result = await syncAppStoreRevenue(1, viewer, { from: "2026-09-29", to: "2026-09-29", fiscalMonth: "2026-09", regionCode: "ZZ" });
+    const expected = source === "sales" ? "Sales; report_import_failed" : "Finance; fiscal month 2026-09; region ZZ; report_import_failed";
+    expect(result.sources[source].errors).toContain(expected);
+    expect(result.sources[source].errors).not.toContain(expect.stringMatching(/Sales; Sales;|Finance; fiscal month .*; Finance;/));
+    expect(JSON.stringify(mocks.finish.mock.calls)).not.toContain("SECRET raw client failure");
   });
 
   it.each([
@@ -253,14 +297,20 @@ describe("production Analytics sync selection", () => {
     expect(JSON.stringify(events)).not.toMatch(/12345678|sensitive-sku|private-sku|1\.4|100|https:|synthetic-token/);
   });
 
-  it("keeps an unavailable Finance report as a download-stage failure", async () => {
+  it("rejects Sales backfills over 90 days and Finance backfills over 12 months", async () => {
+    await expect(backfillAppStoreRevenue(1, viewer, { from: "2026-01-01", to: "2026-04-01", fiscalMonthFrom: "2026-01", fiscalMonthTo: "2026-01", regionCode: "ZZ" })).rejects.toThrow("invalid_range");
+    await expect(backfillAppStoreRevenue(1, viewer, { from: "2026-01-01", to: "2026-01-01", fiscalMonthFrom: "2025-01", fiscalMonthTo: "2026-01", regionCode: "ZZ" })).rejects.toThrow("invalid_range");
+    expect(mocks.authorized).not.toHaveBeenCalled();
+  });
+
+  it("treats an unpublished Finance report as waiting", async () => {
     const { client } = clientWithCatalog([]);
     mocks.authorized.mockResolvedValue({ id: 1, is_active: true, updated_at: "version", vendor_number: "12345678" });
     vi.spyOn(client, "downloadFinanceReport").mockResolvedValue(null);
     const result = await syncAppStoreRevenue(1, viewer, { from: "2026-09-29", to: "2026-09-29", fiscalMonth: "2026-09", regionCode: "ZZ" });
-    expect(result.sources.finance).toMatchObject({ status: "error", errors: [expect.stringContaining("finance_unavailable")] });
-    const failures = mocks.error.mock.calls.map(([, message]) => JSON.parse(message));
-    expect(failures).toContainEqual(expect.objectContaining({ event: "report_failed", source: "finance", stage: "download", code: "finance_unavailable" }));
+    expect(result.sources.finance).toMatchObject({ status: "waiting", waitingReasons: [expect.stringContaining("finance_unavailable")], errors: [] });
+    const waiting = mocks.info.mock.calls.map(([, message]) => JSON.parse(message));
+    expect(waiting).toContainEqual(expect.objectContaining({ event: "report_waiting", source: "finance", reason: "finance_unavailable" }));
   });
 
   it.each([400, 403, 429])("persists safe Sales/Finance HTTP %i diagnostics while Analytics waits", async (status) => {

@@ -12,6 +12,10 @@ export class AppStoreConflictError extends Error {
   constructor() { super("Connection changed during sync; refresh and try again"); }
 }
 
+export class AppStoreSyncBusyError extends Error {
+  constructor() { super("A report sync is already running for this connection and source"); }
+}
+
 const mockConnections: ConnectionRow[] = [{
   id: 1, owner_id: 1, name: "Demo Team", issuer_id: "00000000-0000-4000-8000-000000000001", key_id: "DEMO123456",
   private_key_encrypted: "mock-configured", vendor_number: null, is_active: true,
@@ -84,15 +88,63 @@ export async function createWithApps(data: ConnectionInsert, apps: DiscoveredApp
   });
 }
 
-export async function startRun(connectionId: number, kind: RunRow["kind"] = "metadata", scope: string | null = null): Promise<RunRow> {
-  const values = { connection_id: connectionId, kind, scope, trigger: "manual" as const, status: "running" as const, started_at: new Date().toISOString() };
+export async function startRun(connectionId: number, kind: RunRow["kind"] = "metadata", scope: string | null = null, trigger: RunRow["trigger"] = "manual"): Promise<RunRow> {
+  const values = { connection_id: connectionId, kind, scope, trigger, status: "running" as const, started_at: new Date().toISOString() };
   if (isMockMode()) {
+    if (mockRuns.some((row) => row.connection_id === connectionId && row.kind === kind && row.scope === scope && row.status === "running")) throw new AppStoreSyncBusyError();
     const run = { ...values, id: mockRuns.length + 1, finished_at: null, duration_ms: null, error_message: null };
     mockRuns.push(run);
     return { ...run };
   }
-  const [row] = await getDb().insert(app_store_sync_runs).values(values).returning();
+  return getDb().transaction(async (tx) => {
+    const scopeKey = `${connectionId}:${kind}:${scope ?? ""}`;
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${scopeKey}, 0))`);
+    const activeFilter = and(eq(app_store_sync_runs.connection_id, connectionId), eq(app_store_sync_runs.kind, kind), scope === null ? isNull(app_store_sync_runs.scope) : eq(app_store_sync_runs.scope, scope), eq(app_store_sync_runs.status, "running"));
+    const [active] = await tx.select({ id: app_store_sync_runs.id }).from(app_store_sync_runs).where(activeFilter).limit(1);
+    if (active) throw new AppStoreSyncBusyError();
+    const [row] = await tx.insert(app_store_sync_runs).values(values).returning();
+    return row;
+  });
+}
+
+export async function getLatestRunForSource(connectionId: number, kind: RunRow["kind"], scope: string | null): Promise<RunRow | undefined> {
+  if (isMockMode()) return mockRuns.filter((row) => row.connection_id === connectionId && row.kind === kind && row.scope === scope).at(-1);
+  const [row] = await getDb().select().from(app_store_sync_runs).where(and(eq(app_store_sync_runs.connection_id, connectionId), eq(app_store_sync_runs.kind, kind), scope === null ? isNull(app_store_sync_runs.scope) : eq(app_store_sync_runs.scope, scope))).orderBy(desc(app_store_sync_runs.started_at), desc(app_store_sync_runs.id)).limit(1);
   return row;
+}
+
+export async function recoverStaleRuns(cutoff: Date, now = new Date()): Promise<number> {
+  if (isMockMode()) {
+    let recovered = 0;
+    for (const run of mockRuns) {
+      if (run.status !== "running" || Date.parse(run.started_at) >= cutoff.getTime()) continue;
+      Object.assign(run, { status: "error", finished_at: now.toISOString(), duration_ms: Math.max(0, now.getTime() - Date.parse(run.started_at)), error_message: "stale_run_recovered" });
+      recovered++;
+    }
+    return recovered;
+  }
+  const recovered = await getDb().update(app_store_sync_runs).set({
+    status: "error",
+    finished_at: now.toISOString(),
+    duration_ms: sql`GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (${now.toISOString()}::timestamptz - ${app_store_sync_runs.started_at}::timestamptz)) * 1000)::integer)`,
+    error_message: "stale_run_recovered",
+  }).where(and(eq(app_store_sync_runs.status, "running"), sql`${app_store_sync_runs.started_at}::timestamptz < ${cutoff.toISOString()}::timestamptz`)).returning({ id: app_store_sync_runs.id });
+  return recovered.length;
+}
+
+export async function pruneFinishedRuns(cutoff: Date): Promise<number> {
+  if (isMockMode()) {
+    let removed = 0;
+    for (let index = mockRuns.length - 1; index >= 0; index--) {
+      const run = mockRuns[index];
+      if (!run.finished_at || Date.parse(run.finished_at) >= cutoff.getTime()) continue;
+      mockRuns.splice(index, 1);
+      removed++;
+    }
+    return removed;
+  }
+  const rows = await getDb().delete(app_store_sync_runs).where(and(sql`${app_store_sync_runs.finished_at} IS NOT NULL`, sql`${app_store_sync_runs.finished_at}::timestamptz < ${cutoff.toISOString()}::timestamptz`)).returning({ id: app_store_sync_runs.id });
+  return rows.length;
 }
 
 export async function failRun(run: RunRow, message: string) {
