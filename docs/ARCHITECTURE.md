@@ -40,9 +40,9 @@ Serverless, Edge, and Function runtimes are future deployment options, not curre
 
 App Store Connect is an independent data source. Connections are managed on `/accounts` alongside the existing platform tabs, without changing the account domain. Its flow is UI → `lib/api.ts` → `app/api/app-store/` → `lib/services/app-store.ts` → `lib/repositories/app-store.ts` / `lib/infra/app-store/`.
 
-The foundation supports Team API Keys only, encrypted private key storage, complete paginated app discovery, app selection and manual metadata refresh. The existing account scheduler and `fetch_runs` remain account-specific. ASC Analytics Reports, Revenue and its own lane within the existing scheduler lifecycle are later phases.
+The foundation supports Team API Keys only, encrypted private key storage, complete paginated app discovery, app selection and manual metadata refresh. The existing account scheduler and `fetch_runs` remain account-specific. Analytics setup uses `lib/services/app-store-analytics.ts` and app-scoped request metadata. Reports are prepared by the independent ASC client/downloader/TSV modules before any database writer can receive a whole instance. The production reporting service explicitly returns `report_mapping_pending` while the typed adapter is awaiting real sanitized reports; it does not substitute mock metrics or an empty success. Typed facts, correction replacement, manual import and real end-to-end verification are still pending. Revenue and ASC scheduling remain later phases.
 
-Social, Developer and Business are navigation groups, not domain entities. Business currently contains Web Analytics. There is no Product model, generic Business entity, Revenue provider or cross-source association; removing ASC does not require changes to other data-source domains.
+Social, Developer and Business are navigation groups, not domain entities. Business contains Web Analytics and App Store Analytics. There is no Product model, generic Business entity, Revenue provider or cross-source association; removing ASC does not require changes to other data-source domains.
 
 ## Source Layout
 

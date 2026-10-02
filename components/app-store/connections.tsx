@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { AppStoreAnalyticsStatusPanel } from "./analytics-status";
 
 function errorMessage(error: unknown) { return error instanceof Error ? error.message : "App Store Connect operation failed"; }
 
@@ -25,6 +26,8 @@ export function AppStoreConnections({ adding, onClose, onAdd }: { adding: boolea
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["app-store-connections"] }),
       queryClient.invalidateQueries({ queryKey: ["app-store-connection"] }),
+      queryClient.invalidateQueries({ queryKey: ["app-store-analytics-status"] }),
+      queryClient.invalidateQueries({ queryKey: ["app-store-analytics"] }),
     ]);
   };
 
@@ -40,7 +43,7 @@ export function AppStoreConnections({ adding, onClose, onAdd }: { adding: boolea
         <div className="min-w-0 space-y-1"><h2 className="break-words font-semibold">{connection.name}</h2><p className="text-sm text-muted-foreground">{t("appStore.title")} · {connection.key_id}</p></div>
         <div className="flex items-center gap-3">{!connection.is_active && <Badge>{t("badge.inactive")}</Badge>}<Button variant="outline" onClick={() => setSelected(connection.id)}>{t("appStore.manage")}<ArrowRight aria-hidden="true" /></Button></div>
       </CardContent></Card>,
-    ) : <Card><CardContent className="space-y-4 p-8 text-center"><p className="text-sm text-muted-foreground">{t("appStore.empty")}</p><Button onClick={onAdd}>{t("settings.addAccount")}</Button></CardContent></Card>}
+    ) : <Card><CardContent className="space-y-4 p-8 text-center"><p className="text-sm text-muted-foreground">{t("appStore.empty")}</p><Button onClick={onAdd}>{t("settings.addConnection")}</Button></CardContent></Card>}
   </section>;
 }
 
@@ -144,6 +147,7 @@ function ConnectionDetail({ id, onBack, onChanged }: { id: number; onBack: () =>
     ].map(([label, value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="break-all font-medium">{value}</dd></div>)}</dl></CardContent></Card>
     <Card><CardContent className="space-y-3 p-5"><h3 className="font-semibold">{t("appStore.apps")}</h3><p className="text-sm text-muted-foreground">{t("appStore.appsHelp")}</p>{apps.length ? apps.map((app) => <div key={app.id} className="flex items-center gap-3 rounded-lg border p-3"><Checkbox id={`asc-app-${app.id}`} checked={app.is_enabled} disabled={busy} onCheckedChange={(value) => run(() => api.setAppStoreAppEnabled(id, app.id, value === true))} /><Label htmlFor={`asc-app-${app.id}`} className="min-w-0 flex-1 cursor-pointer flex-col items-start gap-1"><span className="break-words">{app.name}</span><span className="break-all text-xs font-normal text-muted-foreground">{app.bundle_id} · {app.apple_id}</span></Label></div>) : <p className="text-sm text-muted-foreground">{t("appStore.noApps")}</p>}</CardContent></Card>
     <Card><CardContent className="space-y-3 p-5"><h3 className="font-semibold">{t("appStore.lastSync")}</h3><p className="text-sm">{t("appStore.apps")}: {lastSuccess?.finished_at ? formatDateTime(lastSuccess.finished_at) : "—"}</p>{recentSyncRuns.map((sync) => <div key={sync.id} className="space-y-1 border-t pt-3 text-sm"><div className="flex flex-wrap justify-between gap-2"><span>{formatDateTime(sync.started_at)}</span><span>{t(`appStore.syncStatus.${sync.status}`)}</span></div>{sync.error_message && <p className="break-words text-destructive">{sync.error_message}</p>}</div>)}</CardContent></Card>
+    <AppStoreAnalyticsStatusPanel connectionId={id} isActive={connection.is_active} />
     <ConfirmDialog open={deleting} onOpenChange={setDeleting} title={t("common.delete")} description={t("settings.deleteConfirm", { name: connection.name })} target={id} action="delete_app_store_connection" onConfirm={async (token) => { await perform(() => api.deleteAppStoreConnection(id, token)); onBack(); }} />
   </section>;
 }

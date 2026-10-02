@@ -14,6 +14,7 @@ function routeContext(pathname: string, t: (key: string) => string) {
     gitlab: t("nav.gitlab"),
     reddit: t("nav.reddit"),
     analytics: t("nav.analytics"),
+    "app-store": t("nav.appStoreAnalytics"),
     ai: t("nav.ai"),
     accounts: t("nav.connections"),
     settings: t("nav.settings"),

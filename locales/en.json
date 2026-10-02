@@ -49,7 +49,8 @@
     "settings": "Settings",
     "ai": "AI Analysis",
     "logout": "Log out",
-    "business": "Business"
+    "business": "Business",
+    "appStoreAnalytics": "App Store Analytics"
   },
   "badge": {
     "inactive": "Inactive",
@@ -598,8 +599,8 @@
   "settings": {
     "accounts": "Connections",
     "accountsDesc": "Manage platform accounts and independent data source connections.",
-    "addAccount": "Add Connection",
-    "addFirstAccount": "Add Your First Connection",
+    "addAccount": "Add Account",
+    "addFirstAccount": "Add Your First Account",
     "edit": "Edit",
     "enable": "Enable",
     "disable": "Disable",
@@ -645,7 +646,8 @@
     "timezoneHint": "Dates on this page will use the selected timezone.",
     "autoSchedule": "Auto · L0 24h / L1 90m / L2 8h",
     "connectionCount_one": "{{count}} connection",
-    "connectionCount_other": "{{count}} connections"
+    "connectionCount_other": "{{count}} connections",
+    "addConnection": "Add Connection"
   },
   "fetchHistory": {
     "title": "Recent fetch runs",
@@ -912,7 +914,59 @@
     "syncStatus": {
       "running": "Running",
       "success": "Success",
-      "error": "Error"
+      "error": "Error",
+      "partial": "Partial"
     }
+  },
+  "appStoreAnalytics": {
+    "analytics": "Analytics",
+    "enabledApps": "Enabled apps",
+    "snapshot": "Snapshot",
+    "ongoing": "Ongoing",
+    "latestData": "Latest data",
+    "completeThrough": "Complete through",
+    "lastSync": "Last sync",
+    "setup": "Set up Analytics",
+    "settingUp": "Setting up…",
+    "operationError": "Analytics operation failed",
+    "waitingHelp": "Apple usually generates the first ongoing reports within 24–48 hours.",
+    "state": {
+      "not_configured": "Not configured",
+      "waiting": "Waiting for first report",
+      "active": "Active",
+      "partial": "Partial",
+      "error": "Error"
+    },
+    "requestState": {
+      "ready": "Ready",
+      "pending": "Pending",
+      "active": "Active",
+      "unavailable": "—"
+    },
+    "description": "Discovery, downloads and acquisition from enabled App Store apps.",
+    "app": "App",
+    "allApps": "All Apps",
+    "dateRange": "Date range",
+    "territory": "Territory",
+    "allTerritories": "All Territories",
+    "updated": "Updated",
+    "noEnabledApps": "Enable an app in Connections to get started.",
+    "overview": "Overview",
+    "acquisition": "Acquisition",
+    "campaigns": "Campaigns",
+    "campaign": "Campaign",
+    "dailyTrend": "Daily Trend",
+    "noData": "No report data available",
+    "downloadsBySource": "Downloads by Source",
+    "source": "Source",
+    "noCampaignData": "No campaign data available",
+    "metrics": {
+      "impressions": "Impressions",
+      "views": "Product Page Views",
+      "firstTimeDownloads": "First-Time Downloads",
+      "downloads": "Total Downloads",
+      "conversion": "Conversion Rate"
+    },
+    "reportUnavailable": "Report data is unavailable"
   }
 }

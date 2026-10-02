@@ -2,6 +2,9 @@ import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { exportPKCS8, generateKeyPair } from "jose";
 import * as appStoreService from "../lib/services/app-store";
 import * as appStoreRepo from "../lib/repositories/app-store";
+import * as appStoreAnalyticsRepo from "../lib/repositories/app-store-analytics";
+import { getAppStoreAnalyticsStatus, setupAppStoreAnalytics } from "../lib/services/app-store-analytics";
+import { getAppStoreAnalyticsDashboard, listEnabledAnalyticsApps } from "../lib/services/app-store-analytics-reporting";
 import { AppStoreConnectClient, AppStoreApiError } from "../lib/infra/app-store/AppStoreConnectClient";
 import { initCrypto, decrypt } from "../lib/crypto";
 import { getTestDatabaseConfig, resetTestDb, getTestPool, closeTestPool } from "./setup";
@@ -1761,5 +1764,78 @@ describe("independent App Store Connect foundation", () => {
     expect((await appStoreRepo.getApps(row.id))[0].name).toBe("Example");
     expect((await appStoreRepo.getRecentRuns(row.id))[0].status).toBe("running");
     await appStoreRepo.failRun(run, "Database import failed");
+  });
+
+  it("keeps app enable local and adopts existing requests without duplicating setup", async () => {
+    const discovery = vi.spyOn(AppStoreConnectClient.prototype, "listApps").mockResolvedValue(apps);
+    const snapshot = { id: "adopt-snapshot", type: "analyticsReportRequests" as const, attributes: { accessType: "ONE_TIME_SNAPSHOT" as const, stoppedDueToInactivity: false } };
+    const ongoing = { id: "adopt-ongoing", type: "analyticsReportRequests" as const, attributes: { accessType: "ONGOING" as const, stoppedDueToInactivity: false } };
+    const read = vi.spyOn(AppStoreConnectClient.prototype, "listAnalyticsReportRequests").mockResolvedValue([snapshot, ongoing]);
+    const create = vi.spyOn(AppStoreConnectClient.prototype, "createAnalyticsReportRequest");
+    try {
+      const connection = await appStoreService.createConnection(viewer, input());
+      const app = (await appStoreRepo.getApps(connection.id))[0];
+      const metadataSuccess = await appStoreRepo.getLastSuccessfulRun(connection.id);
+      await appStoreService.setAppEnabled(connection.id, app.id, viewer, { isEnabled: true });
+      expect(read).not.toHaveBeenCalled();
+      expect(create).not.toHaveBeenCalled();
+      const status = await setupAppStoreAnalytics(connection.id, viewer);
+      expect(status).toMatchObject({ state: "waiting", enabledApps: 1, snapshot: "ready", ongoing: "active", latestData: null, completeThrough: null, lastSync: { kind: "analytics", status: "success" } });
+      await setupAppStoreAnalytics(connection.id, viewer);
+      expect(await appStoreAnalyticsRepo.requestsForApps([app.id])).toHaveLength(2);
+      expect(create).not.toHaveBeenCalled();
+      expect(await appStoreRepo.getLastSuccessfulRun(connection.id)).toEqual(metadataSuccess);
+      await expect(getAppStoreAnalyticsStatus(connection.id, otherViewer)).rejects.toMatchObject({ code: "forbidden" });
+      await expect(setupAppStoreAnalytics(connection.id, otherViewer)).rejects.toMatchObject({ code: "forbidden" });
+      expect(await listEnabledAnalyticsApps(otherViewer)).not.toEqual(expect.arrayContaining([{ id: app.id, name: app.name }]));
+      await expect(getAppStoreAnalyticsDashboard(otherViewer, { appId: app.id, from: "2026-10-01", to: "2026-10-02" })).rejects.toMatchObject({ code: "forbidden" });
+      await expect(getAppStoreAnalyticsDashboard(viewer, { appId: app.id, from: "2026-10-01", to: "2026-10-02" })).rejects.toMatchObject({ code: "report_mapping_pending", status: 503 });
+    } finally { discovery.mockRestore(); read.mockRestore(); create.mockRestore(); }
+  });
+
+  it("retains a stopped ongoing request and creates its replacement and missing snapshot", async () => {
+    const discovery = vi.spyOn(AppStoreConnectClient.prototype, "listApps").mockResolvedValue(apps);
+    const stopped = { id: "stopped-ongoing", type: "analyticsReportRequests" as const, attributes: { accessType: "ONGOING" as const, stoppedDueToInactivity: true } };
+    const read = vi.spyOn(AppStoreConnectClient.prototype, "listAnalyticsReportRequests").mockResolvedValue([stopped]);
+    const create = vi.spyOn(AppStoreConnectClient.prototype, "createAnalyticsReportRequest").mockImplementation(async (_, accessType) => ({ id: `replacement-${accessType}`, type: "analyticsReportRequests", attributes: { accessType, stoppedDueToInactivity: false } }));
+    try {
+      const connection = await appStoreService.createConnection(viewer, input());
+      const app = (await appStoreRepo.getApps(connection.id))[0];
+      await appStoreService.setAppEnabled(connection.id, app.id, viewer, { isEnabled: true });
+      await setupAppStoreAnalytics(connection.id, viewer);
+      expect(create.mock.calls).toEqual([[app.apple_id, "ONE_TIME_SNAPSHOT"], [app.apple_id, "ONGOING"]]);
+      const requests = await appStoreAnalyticsRepo.requestsForApps([app.id]);
+      expect(requests).toHaveLength(3);
+      expect(requests.find((row) => row.apple_request_id === stopped.id)?.stopped_due_to_inactivity).toBe(true);
+      const another = await appStoreService.createConnection(otherViewer, input());
+      const otherApp = (await appStoreRepo.getApps(another.id))[0];
+      await appStoreService.setAppEnabled(another.id, otherApp.id, otherViewer, { isEnabled: true });
+      await expect(appStoreAnalyticsRepo.adoptRequest(otherApp.id, stopped, another.updated_at)).rejects.toBeInstanceOf(appStoreRepo.AppStoreConflictError);
+      expect((await appStoreAnalyticsRepo.requestsForApps([app.id])).find((row) => row.apple_request_id === stopped.id)?.app_id).toBe(app.id);
+      await appStoreService.setAppEnabled(connection.id, app.id, viewer, { isEnabled: false });
+      await expect(appStoreAnalyticsRepo.adoptRequest(app.id, stopped, connection.updated_at)).rejects.toBeInstanceOf(appStoreRepo.AppStoreConflictError);
+      const columns = await getTestPool().query("SELECT column_name FROM information_schema.columns WHERE table_name='app_store_report_imports'");
+      expect(columns.rows.some((row) => /url/i.test(row.column_name))).toBe(false);
+    } finally { discovery.mockRestore(); read.mockRestore(); create.mockRestore(); }
+  });
+
+  it("isolates Analytics permission failures and reports partial then error without disabling discovery", async () => {
+    const discovery = vi.spyOn(AppStoreConnectClient.prototype, "listApps").mockResolvedValue([...apps, { ...apps[0], apple_id: "456" }]);
+    const read = vi.spyOn(AppStoreConnectClient.prototype, "listAnalyticsReportRequests").mockResolvedValue([]);
+    const permission = new AppStoreApiError(403, "FORBIDDEN", "Apple API (403): request creation requires Admin");
+    const create = vi.spyOn(AppStoreConnectClient.prototype, "createAnalyticsReportRequest").mockImplementation(async (appleId, accessType) => {
+      if (appleId === "456") throw permission;
+      return { id: `partial-${accessType}`, type: "analyticsReportRequests", attributes: { accessType, stoppedDueToInactivity: false } };
+    });
+    try {
+      const connection = await appStoreService.createConnection(viewer, input());
+      for (const app of await appStoreRepo.getApps(connection.id)) await appStoreService.setAppEnabled(connection.id, app.id, viewer, { isEnabled: true });
+      const partial = await setupAppStoreAnalytics(connection.id, viewer);
+      expect(partial).toMatchObject({ state: "partial", lastSync: { status: "partial" }, message: expect.stringContaining("Analytics setup requires additional App Store Connect permission.") });
+      expect((await appStoreRepo.getConnection(connection.id))?.is_active).toBe(true);
+      create.mockRejectedValue(permission);
+      expect(await setupAppStoreAnalytics(connection.id, viewer)).toMatchObject({ state: "error", lastSync: { status: "error" } });
+      expect((await appStoreService.refreshApps(connection.id, viewer)).apps).toHaveLength(2);
+    } finally { discovery.mockRestore(); read.mockRestore(); create.mockRestore(); }
   });
 });

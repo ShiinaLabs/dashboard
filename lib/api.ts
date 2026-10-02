@@ -1,5 +1,6 @@
 import { apiJson, apiRequest } from "@/lib/client/api-transport";
 import type { AppStoreConnection, AppStoreConnectionDetail, AppStoreConnectionInput, AppStoreConnectionUpdate, AppStoreApp } from "@/shared/app-store";
+import type { AppStoreAnalyticsStatus, AppStoreAnalyticsAppOption, AppStoreAnalyticsDashboard } from "@/shared/app-store-analytics";
 export { ApiError } from "@/lib/client/api-transport";
 
 // Keep transport helpers available for callers that need a streaming response.
@@ -101,6 +102,15 @@ export type {
 // ─── API methods ────────────────────────────────────────────────
 
 export const api = {
+  getEnabledAppStoreAnalyticsApps: () => apiJson<{ apps: AppStoreAnalyticsAppOption[] }>("/app-store/analytics/apps"),
+  getAppStoreAnalyticsDashboard: (filter: { from: string; to: string; appId?: number; territory?: string }) => {
+    const query = new URLSearchParams({ from: filter.from, to: filter.to });
+    if (filter.appId !== undefined) query.set("appId", String(filter.appId));
+    if (filter.territory) query.set("territory", filter.territory);
+    return apiJson<AppStoreAnalyticsDashboard>(`/app-store/analytics?${query}`);
+  },
+  getAppStoreAnalyticsStatus: (id: number) => apiJson<AppStoreAnalyticsStatus>(`/app-store/connections/${id}/analytics`),
+  setupAppStoreAnalytics: (id: number) => apiJson<AppStoreAnalyticsStatus>(`/app-store/connections/${id}/analytics`, { method: "POST" }),
   getAppStoreConnections: () => apiJson<{ connections: AppStoreConnection[] }>("/app-store/connections"),
   getAppStoreConnection: (id: number) => apiJson<AppStoreConnectionDetail>(`/app-store/connections/${id}`),
   createAppStoreConnection: (data: AppStoreConnectionInput) => apiJson<AppStoreConnection>("/app-store/connections", { method: "POST", body: JSON.stringify(data) }),

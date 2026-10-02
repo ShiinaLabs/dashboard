@@ -21,7 +21,7 @@ All Drizzle ORM schemas live in `db/schema/` and are re-exported from `db/schema
 | `users.ts` | `users` |
 | `accounts.ts` | `accounts` |
 | `analytics.ts` | `analytics_sites`, `analytics_events` |
-| `app-store.ts` | `app_store_connections`, `app_store_apps`, `app_store_sync_runs` |
+| `app-store.ts` | `app_store_connections`, `app_store_apps`, `app_store_sync_runs`, `app_store_analytics_requests`, `app_store_report_imports` |
 | `fetch-runs.ts` | `fetch_runs` |
 | `twitter.ts` | `tweets`, `user_stats` |
 | `github.ts` | `github_stats`, `github_repos`, `github_repo_snapshots`, `github_traffic_clones`, `github_traffic_views`, `github_referrers`, `github_paths`, `github_releases`, `github_release_assets`, `github_contributions` |
@@ -101,7 +101,7 @@ ASC has its own owner-scoped, soft-deleted connections. `app_store_connections` 
 
 `app_store_apps` is unique on `(connection_id, apple_id)`. Newly discovered apps start disabled; metadata upserts preserve the user's selection. Connection creation, app discovery writes and successful sync telemetry commit in one transaction. Credential edits validate Apple access before replacing credentials. Concurrent connection edits or soft deletion prevent a stale sync from committing.
 
-`app_store_sync_runs` records metadata attempts independently of `fetch_runs`. Failed refreshes preserve the previously stored apps and credentials. There are no ASC rows in `accounts`, no Product model and no cross-source foreign keys. Analytics, sales, finance and scheduling tables are not part of this foundation.
+`app_store_sync_runs` records metadata and Analytics setup attempts independently of `fetch_runs`, using `running`, `success`, `partial` and `error`. Analytics permission errors do not disable a connection. The last successful Apps refresh only considers metadata runs. Failed refreshes preserve the previously stored apps and credentials. There are no ASC rows in `accounts`, no Product model and no cross-source foreign keys. `app_store_analytics_requests` references an app and enforces global `apple_request_id` uniqueness. Multiple requests of the same access type are retained, including stopped ongoing history. `app_store_report_imports` reserves instance/segment provenance and checksum metadata without a download URL column. No manifest is marked imported by the current preparation code. Typed Discovery/Downloads facts and their transactional correction writer await real sanitized fixtures; sales, finance and scheduling tables are not implemented.
 
 ## Account Fetch Runs
 

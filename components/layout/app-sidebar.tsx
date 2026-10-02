@@ -50,6 +50,7 @@ export function AppSidebar({ isAdmin, username, role, loggingOut, onLogout }: { 
       icon: ChartNoAxesColumnIncreasing,
       children: [
         { type: "link", to: "/analytics", label: t("nav.analytics"), icon: ChartNoAxesColumnIncreasing },
+        { type: "link", to: "/app-store", label: t("nav.appStoreAnalytics"), icon: ChartNoAxesColumnIncreasing },
       ],
     },
     { type: "link", to: "/ai", label: t("nav.ai"), icon: Bot },

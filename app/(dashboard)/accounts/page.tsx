@@ -90,7 +90,7 @@ export default function AccountsPage() {
           onClick={() => { setEditing(null); setAdding(true); }}
         >
           <Plus size={16} aria-hidden="true" />
-          {t("settings.addAccount")}
+          {t(tab === "app-store" ? "settings.addConnection" : "settings.addAccount")}
         </Button>
       </div>
 

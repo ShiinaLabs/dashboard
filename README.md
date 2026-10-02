@@ -30,7 +30,9 @@ First-party Web Analytics reports page views, visits, acquisition sources, and s
 
 Open **Connections** (`/accounts`), choose **App Store Connect**, and add a Team API Key using its `.p8` private key, Key ID and Issuer ID. Dashboard validates access and discovers apps before saving the connection. Enable the apps you want to sync; new apps start disabled. Vendor Number is optional and can be added later.
 
-The connection foundation currently supports manual app metadata refresh and credential management. Analytics Reports, Revenue and automatic ASC scheduling are subsequent phases. ASC is an independent data source: there is no Product model or association with social accounts, repositories or Web Analytics sites. Mock mode provides a demonstration connection and rejects private key storage.
+Connections support manual app metadata refresh and credential management. **Set up Analytics** separately reads and adopts existing report requests for enabled apps, then creates missing one-time snapshot and active ongoing requests. Enabling an app alone does not create Apple requests. The `/app-store` page includes Overview, Acquisition and Campaigns with app, territory and 7/30/90-day filters.
+
+**P2 is in progress:** request setup, paginated report retrieval, bounded MD5-verified gzip downloads, TSV preparation and the mock analytics UI are implemented. Real report import and production metrics remain unavailable until sanitized Standard Discovery/Downloads fixtures establish the typed schema, correction handling and atomic PostgreSQL writer. The required real Apple → PostgreSQL → UI verification has not passed. Revenue and automatic ASC scheduling remain later phases. ASC is an independent data source: there is no Product model or association with social accounts, repositories or Web Analytics sites. Mock mode provides a demonstration connection and rejects private key storage.
 
 ## Private by deployment
 

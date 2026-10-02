@@ -563,7 +563,7 @@ test("dashboard routes render without horizontal overflow at desktop and tablet 
 test("account form exposes selected platform and Reddit access mode", async ({ page }) => {
   await logIn(page);
   await page.goto("/accounts");
-  await page.getByRole("button", { name: "Add Connection", exact: true }).click();
+  await page.getByRole("button", { name: "Add Account", exact: true }).click();
 
   const platformButton = (name: string) => page.getByRole("button", { name, exact: true });
   await expect(platformButton("X")).toHaveAttribute("aria-pressed", "true");

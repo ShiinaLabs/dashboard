@@ -68,6 +68,7 @@ Routes are declared in `app/routes.ts` (React Router Framework Mode). All pages 
 | `/` | Redirects to `/overview` |
 | `/overview` | Cross-platform overview and Web Analytics portfolio summary |
 | `/analytics` | Site-level first-party Web Analytics dashboard |
+| `/app-store` | App Store Analytics: Overview, Acquisition and Campaigns (mock reporting; production import pending) |
 | `/accounts` | Connections: platform accounts and independent App Store Connect connections |
 | `/x` | X account list |
 | `/x/:id` | X account detail |
@@ -111,7 +112,7 @@ The authenticated layout (`components/layout/authenticated-layout.tsx`) follows 
 - **Header and content** — `Header` and `Main` preserve the safe area and page content width.
 - **Mobile navigation** — Radix Sheet overlay closes on Escape, backdrop click, or route selection; focus is managed by Radix.
 - **Navigation** — React Router links preserve existing route URLs and active-route behavior.
-- **Groups and connections** — Social contains X / Reddit; Developer contains GitHub / GitLab; Business currently contains Web Analytics. AI Analysis remains a main entry. Connections uses `/accounts`, with a separate App Store Connect tab and inline connection details. Settings, Admin and Log out live in the footer user menu.
+- **Groups and connections** — Social contains X / Reddit; Developer contains GitHub / GitLab; Business contains Web Analytics and App Store Analytics. AI Analysis remains a main entry. Connections uses `/accounts`, with a separate App Store Connect tab and inline connection details. Settings, Admin and Log out live in the footer user menu.
 - **Overview** — cross-platform KPI cards lead into Business Pulse and Fetch Health, followed by Top Content and tabs for connected platforms.
 - **Page surfaces** — management and detail pages use consistent page headings, bordered cards, compact metric grids and responsive action groups. The authenticated shell has no wallpaper background.
 

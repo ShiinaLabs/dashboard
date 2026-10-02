@@ -49,7 +49,8 @@
     "settings": "设置",
     "ai": "AI 分析",
     "logout": "退出登录",
-    "business": "业务"
+    "business": "业务",
+    "appStoreAnalytics": "App Store 分析"
   },
   "badge": {
     "inactive": "未激活",
@@ -598,8 +599,8 @@
   "settings": {
     "accounts": "连接",
     "accountsDesc": "管理平台账号和独立数据源连接。",
-    "addAccount": "添加连接",
-    "addFirstAccount": "添加第一个连接",
+    "addAccount": "添加账号",
+    "addFirstAccount": "添加第一个账号",
     "edit": "编辑",
     "enable": "启用",
     "disable": "禁用",
@@ -645,7 +646,8 @@
     "timezoneHint": "此页面的日期将使用所选的时区。",
     "autoSchedule": "自动 · L0 24小时 / L1 90分钟 / L2 8小时",
     "connectionCount_one": "{{count}} 个连接",
-    "connectionCount_other": "{{count}} 个连接"
+    "connectionCount_other": "{{count}} 个连接",
+    "addConnection": "添加连接"
   },
   "fetchHistory": {
     "title": "最近抓取记录",
@@ -912,7 +914,59 @@
     "syncStatus": {
       "running": "同步中",
       "success": "成功",
-      "error": "错误"
+      "error": "错误",
+      "partial": "部分成功"
     }
+  },
+  "appStoreAnalytics": {
+    "analytics": "分析",
+    "enabledApps": "已启用 App",
+    "snapshot": "历史快照",
+    "ongoing": "持续报告",
+    "latestData": "最新数据",
+    "completeThrough": "数据完整至",
+    "lastSync": "最近同步",
+    "setup": "设置 Analytics",
+    "settingUp": "正在设置…",
+    "operationError": "Analytics 操作失败",
+    "waitingHelp": "Apple 通常在 24–48 小时内生成首批持续报告。",
+    "state": {
+      "not_configured": "未配置",
+      "waiting": "等待首份报告",
+      "active": "正常",
+      "partial": "部分成功",
+      "error": "错误"
+    },
+    "requestState": {
+      "ready": "已就绪",
+      "pending": "等待中",
+      "active": "正常",
+      "unavailable": "—"
+    },
+    "description": "已启用 App Store 应用的发现、下载与获客数据。",
+    "app": "应用",
+    "allApps": "所有应用",
+    "dateRange": "日期范围",
+    "territory": "地区",
+    "allTerritories": "所有地区",
+    "updated": "更新时间",
+    "noEnabledApps": "请先在连接中启用应用。",
+    "overview": "概览",
+    "acquisition": "获客",
+    "campaigns": "推广活动",
+    "campaign": "推广活动",
+    "dailyTrend": "每日趋势",
+    "noData": "暂无报告数据",
+    "downloadsBySource": "按来源的下载量",
+    "source": "来源",
+    "noCampaignData": "暂无推广活动数据",
+    "metrics": {
+      "impressions": "展示次数",
+      "views": "产品页浏览量",
+      "firstTimeDownloads": "首次下载量",
+      "downloads": "总下载量",
+      "conversion": "转化率"
+    },
+    "reportUnavailable": "报告数据暂不可用"
   }
 }

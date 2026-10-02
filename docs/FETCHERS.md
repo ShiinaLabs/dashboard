@@ -2,11 +2,23 @@
 
 The scheduler (`lib/scheduler.ts`) runs every 60 seconds, dispatching a single platform per tick in round-robin order. First run is delayed 60–90 seconds (jittered) to avoid hammering APIs on restart.
 
-## App Store Connect — Manual Metadata Refresh
+## App Store Connect — Metadata and Analytics Setup
 
-ASC uses `lib/services/app-store.ts` and `lib/infra/app-store/AppStoreConnectClient.ts`, independently of account fetchers. A five-minute ES256 Team JWT authorizes `GET /v1/apps`; pagination is restricted to Apple's API origin and app endpoint, and redirects are rejected. Apple permission, authentication, malformed-response and network errors remain explicit failures rather than empty app lists.
+ASC uses `lib/services/app-store.ts` and `lib/infra/app-store/AppStoreConnectClient.ts`, independently of account fetchers. A five-minute ES256 Team JWT authorizes `GET /v1/apps`; pagination is restricted to Apple's API origin and the requested endpoint, and redirects are rejected. Apple permission, authentication, malformed-response and network errors remain explicit failures rather than empty app lists.
 
-Refresh commits app metadata and successful run telemetry atomically. It retains app enablement choices; failed attempts keep existing app data and record an error in `app_store_sync_runs`. Disabled or deleted connections cannot refresh, and concurrent connection changes invalidate stale results. Current ASC refresh is manual only; no report ingestion or account fetch policy is applied.
+Refresh commits app metadata and successful run telemetry atomically. It retains app enablement choices; failed attempts keep existing app data and record an error in `app_store_sync_runs`. Disabled or deleted connections cannot refresh, and concurrent connection changes invalidate stale results. Current ASC refresh is manual only; no account fetch policy is applied.
+
+Explicit Analytics setup reads existing requests for enabled apps and creates only a missing `ONE_TIME_SNAPSHOT` or non-stopped `ONGOING` request. Request creation permission failures remain Analytics errors; Apps discovery can still work. New requests may wait for the first report; setup wall time never supplies data freshness.
+
+The report client follows Requests → Reports → DAILY Instances → Segments. Only Standard `App Store Discovery and Engagement` and `App Store Downloads` are eligible. Segment detail is refreshed immediately before downloading; signed HTTPS URLs stay in memory, receive no ASC Bearer header, and cannot redirect. Compressed segments are capped at 32 MiB, timed out after 30 seconds and checked against Apple's MD5 and size metadata. Decompressed instances are capped at 128 MiB. Every segment must validate and parse with consistent headers before preparation returns rows. Empty TSV fields remain null, extra columns and unknown enum strings are retained, and missing required columns fail explicitly.
+
+To capture real sanitized fixtures from a configured database and an enabled app with existing requests:
+
+```sh
+node --env-file=.env --import tsx scripts/capture-app-store-analytics-fixtures.ts <connectionId>
+```
+
+The script writes sanitized TSV and provenance under `tests/fixtures/app-store/`, without original business identifiers or signed URLs. Review the sanitization against the actual headers before committing fixtures. Current synthetic TSV unit tests validate only the transport/format helpers. Production typed import, same-checksum skipping, latest-processing-date partition replacement and the required real Apple → PostgreSQL → UI gate are pending; this phase is not complete.
 
 ## X (Twitter) — `lib/fetcher.ts`
 

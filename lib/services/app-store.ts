@@ -32,7 +32,7 @@ function publicConnection(row: repo.ConnectionRow): AppStoreConnection {
   return { ...metadata, private_key_configured: Boolean(private_key_encrypted) };
 }
 
-async function authorizedConnection(id: number, viewer: Viewer) {
+export async function authorizedConnection(id: number, viewer: Viewer) {
   const row = await repo.getConnection(id);
   if (!row) throw new AppStoreError("not_found", 404, "Connection not found");
   if (row.owner_id !== viewer.id && viewer.role !== "admin") throw new AppStoreError("forbidden", 403, "Forbidden");
@@ -46,6 +46,10 @@ function rejectMockCredential() {
 function storedCredential(row: repo.ConnectionRow): AppStoreCredential {
   try { return { issuerId: row.issuer_id, keyId: row.key_id, privateKey: decrypt(row.private_key_encrypted) }; }
   catch { throw new AppStoreError("credential_unavailable", 503, "Stored private key cannot be decrypted; check the deployment encryption key or replace the credential"); }
+}
+
+export function clientForConnection(row: repo.ConnectionRow) {
+  return new AppStoreConnectClient(new AppStoreTokenProvider(storedCredential(row)));
 }
 
 async function discover(credential: AppStoreCredential) {

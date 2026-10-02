@@ -37,19 +37,27 @@ export async function getConnection(id: number): Promise<ConnectionRow | undefin
   return row;
 }
 
+export async function getApp(appId: number) {
+  if (isMockMode()) {
+    const app = mockApps.find((row) => row.id === appId);
+    return app ? { ...app } : undefined;
+  }
+  return (await getDb().select().from(app_store_apps).where(eq(app_store_apps.id, appId)).limit(1))[0];
+}
+
 export async function getApps(connectionId: number) {
   if (isMockMode()) return mockApps.filter((row) => row.connection_id === connectionId).map((row) => ({ ...row }));
   return getDb().select().from(app_store_apps).where(eq(app_store_apps.connection_id, connectionId)).orderBy(app_store_apps.name);
 }
 
-export async function getRecentRuns(connectionId: number) {
-  if (isMockMode()) return mockRuns.filter((row) => row.connection_id === connectionId).slice(-10).reverse().map((row) => ({ ...row }));
-  return getDb().select().from(app_store_sync_runs).where(eq(app_store_sync_runs.connection_id, connectionId)).orderBy(desc(app_store_sync_runs.started_at), desc(app_store_sync_runs.id)).limit(10);
+export async function getRecentRuns(connectionId: number, kind?: "metadata" | "analytics") {
+  if (isMockMode()) return mockRuns.filter((row) => row.connection_id === connectionId && (!kind || row.kind === kind)).slice(-10).reverse().map((row) => ({ ...row }));
+  return getDb().select().from(app_store_sync_runs).where(and(eq(app_store_sync_runs.connection_id, connectionId), kind ? eq(app_store_sync_runs.kind, kind) : undefined)).orderBy(desc(app_store_sync_runs.started_at), desc(app_store_sync_runs.id)).limit(10);
 }
 
 export async function getLastSuccessfulRun(connectionId: number) {
-  if (isMockMode()) return mockRuns.filter((row) => row.connection_id === connectionId && row.status === "success").at(-1) ?? null;
-  const [row] = await getDb().select().from(app_store_sync_runs).where(and(eq(app_store_sync_runs.connection_id, connectionId), eq(app_store_sync_runs.status, "success")))
+  if (isMockMode()) return mockRuns.filter((row) => row.connection_id === connectionId && row.kind === "metadata" && row.status === "success").at(-1) ?? null;
+  const [row] = await getDb().select().from(app_store_sync_runs).where(and(eq(app_store_sync_runs.connection_id, connectionId), eq(app_store_sync_runs.kind, "metadata"), eq(app_store_sync_runs.status, "success")))
     .orderBy(desc(app_store_sync_runs.started_at), desc(app_store_sync_runs.id)).limit(1);
   return row ?? null;
 }
@@ -76,8 +84,8 @@ export async function createWithApps(data: ConnectionInsert, apps: DiscoveredApp
   });
 }
 
-export async function startRun(connectionId: number): Promise<RunRow> {
-  const values = { connection_id: connectionId, kind: "metadata" as const, trigger: "manual" as const, status: "running" as const, started_at: new Date().toISOString() };
+export async function startRun(connectionId: number, kind: "metadata" | "analytics" = "metadata"): Promise<RunRow> {
+  const values = { connection_id: connectionId, kind, trigger: "manual" as const, status: "running" as const, started_at: new Date().toISOString() };
   if (isMockMode()) {
     const run = { ...values, id: mockRuns.length + 1, finished_at: null, duration_ms: null, error_message: null };
     mockRuns.push(run);
@@ -88,8 +96,12 @@ export async function startRun(connectionId: number): Promise<RunRow> {
 }
 
 export async function failRun(run: RunRow, message: string) {
+  return finishRun(run, "error", message);
+}
+
+export async function finishRun(run: RunRow, status: "success" | "partial" | "error", message: string | null = null) {
   const now = new Date().toISOString();
-  const changes = { status: "error" as const, finished_at: now, duration_ms: Date.parse(now) - Date.parse(run.started_at), error_message: message };
+  const changes = { status, finished_at: now, duration_ms: Date.parse(now) - Date.parse(run.started_at), error_message: message };
   if (isMockMode()) { Object.assign(mockRuns.find((row) => row.id === run.id)!, changes); return; }
   await getDb().update(app_store_sync_runs).set(changes).where(eq(app_store_sync_runs.id, run.id));
 }

@@ -33,9 +33,37 @@ export const app_store_sync_runs = pgTable("app_store_sync_runs", {
   connection_id: integer("connection_id").notNull().references(() => app_store_connections.id),
   kind: text("kind").$type<"metadata" | "analytics" | "sales" | "finance">().notNull(),
   trigger: text("trigger").$type<"manual" | "scheduler">().notNull(),
-  status: text("status").$type<"running" | "success" | "error">().notNull(),
+  status: text("status").$type<"running" | "success" | "partial" | "error">().notNull(),
   started_at: text("started_at").notNull().default(sql`NOW()`),
   finished_at: text("finished_at"),
   duration_ms: integer("duration_ms"),
   error_message: text("error_message"),
 }, (table) => [index("idx_app_store_sync_runs_connection_started").on(table.connection_id, table.started_at.desc())]);
+
+export const app_store_analytics_requests = pgTable("app_store_analytics_requests", {
+  id: serial("id").primaryKey(),
+  app_id: integer("app_id").notNull().references(() => app_store_apps.id),
+  apple_request_id: text("apple_request_id").notNull(),
+  access_type: text("access_type").$type<"ONE_TIME_SNAPSHOT" | "ONGOING">().notNull(),
+  stopped_due_to_inactivity: boolean("stopped_due_to_inactivity").notNull().default(false),
+  created_at: text("created_at").notNull().default(sql`NOW()`),
+  updated_at: text("updated_at").notNull().default(sql`NOW()`),
+  last_seen_at: text("last_seen_at").notNull().default(sql`NOW()`),
+}, (table) => [uniqueIndex("idx_app_store_analytics_requests_apple").on(table.apple_request_id), index("idx_app_store_analytics_requests_app").on(table.app_id)]);
+
+export const app_store_report_imports = pgTable("app_store_report_imports", {
+  id: serial("id").primaryKey(),
+  app_id: integer("app_id").notNull().references(() => app_store_apps.id),
+  analytics_request_id: integer("analytics_request_id").notNull().references(() => app_store_analytics_requests.id),
+  report_name: text("report_name").notNull(),
+  report_category: text("report_category").notNull(),
+  apple_report_id: text("apple_report_id").notNull(),
+  apple_instance_id: text("apple_instance_id").notNull(),
+  apple_segment_id: text("apple_segment_id").notNull(),
+  granularity: text("granularity").$type<"DAILY">().notNull(),
+  processing_date: text("processing_date").notNull(),
+  checksum: text("checksum").notNull(),
+  status: text("status").$type<"pending" | "imported" | "error">().notNull(),
+  error_message: text("error_message"),
+  imported_at: text("imported_at"),
+}, (table) => [uniqueIndex("idx_app_store_imports_app_segment").on(table.app_id, table.apple_instance_id, table.apple_segment_id), index("idx_app_store_imports_app_processing").on(table.app_id, table.processing_date)]);
