@@ -1,4 +1,4 @@
-import { Bot, ChartNoAxesColumnIncreasing, Code2, Ellipsis, LayoutDashboard, LogOut, MessagesSquare, Settings, Shield, UserRound, Users } from "lucide-react";
+import { Bot, ChartNoAxesColumnIncreasing, ChartNoAxesCombined, CircleDollarSign, Code2, Ellipsis, LayoutDashboard, LogOut, MessagesSquare, Settings, Shield, Smartphone, UserRound, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import {
@@ -49,9 +49,9 @@ export function AppSidebar({ isAdmin, username, role, loggingOut, onLogout }: { 
       label: t("nav.business"),
       icon: ChartNoAxesColumnIncreasing,
       children: [
-        { type: "link", to: "/analytics", label: t("nav.analytics"), icon: ChartNoAxesColumnIncreasing },
-        { type: "link", to: "/app-store", label: t("nav.appStoreAnalytics"), icon: ChartNoAxesColumnIncreasing },
-        { type: "link", to: "/revenue", label: t("nav.revenue"), icon: ChartNoAxesColumnIncreasing },
+        { type: "link", to: "/analytics", label: t("nav.analytics"), icon: ChartNoAxesCombined },
+        { type: "link", to: "/app-store", label: t("nav.appStoreAnalytics"), icon: Smartphone },
+        { type: "link", to: "/revenue", label: t("nav.revenue"), icon: CircleDollarSign },
       ],
     },
     { type: "link", to: "/ai", label: t("nav.ai"), icon: Bot },
