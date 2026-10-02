@@ -5,7 +5,7 @@ import { AppStoreReportError } from "./analytics-segment";
 
 export const analyticsReportDefinitions = {
   discovery: { baseName: "App Store Discovery and Engagement", standardName: "App Store Discovery and Engagement Standard" },
-  downloads: { baseName: "App Store Downloads", standardName: "App Store Downloads Standard" },
+  downloads: { baseName: "App Downloads", standardName: "App Downloads Standard" },
   purchases: { baseName: "App Store Purchases", standardName: "App Store Purchases Standard" },
   subscriptionState: { baseName: "App Store Subscription State", standardName: "App Store Subscription State Report Standard" },
   subscriptionEvent: { baseName: "App Store Subscription Event", standardName: "App Store Subscription Event Report Standard" },

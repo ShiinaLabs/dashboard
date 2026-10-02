@@ -1866,7 +1866,7 @@ describe("independent App Store Connect foundation", () => {
       const app = (await appStoreRepo.getApps(connection.id))[0];
       await appStoreService.setAppEnabled(connection.id, app.id, viewer, { isEnabled: true });
       const request = await appStoreAnalyticsRepo.adoptRequest(app.id, { id: "typed-partition-request", type: "analyticsReportRequests", attributes: { accessType: "ONGOING", stoppedDueToInactivity: false } }, connection.updated_at);
-      const context = { appId: app.id, connectionId: connection.id, version: connection.updated_at, requestId: request.id, reportId: "report", reportName: "App Store Downloads Standard", reportCategory: "COMMERCE" };
+      const context = { appId: app.id, connectionId: connection.id, version: connection.updated_at, requestId: request.id, reportId: "report", reportName: "App Downloads Standard", reportCategory: "COMMERCE" };
       const prepared = (instanceId: string, processingDate: string, counts: string, checksum: string) => ({ instanceId, processingDate, granularity: "DAILY" as const, segments: [{ id: "segment-1", checksum }, { id: "segment-2", checksum }], table: parseAnalyticsTsv(`Date\tApp Apple Identifier\tDownload Type\tSource Type\tTerritory\tCounts\n2026-09-29\t123\tFirst-time Download\tApp Store search\tUSA\t${counts}\n2026-09-29\t123\tRedownload\tApp Store search\tUSA\t2`) });
       const commit = async (p: ReturnType<typeof prepared>) => ascFacts.commitAnalyticsInstance(context, p, mapAnalyticsReport("downloads", p.table, { appId: app.id, appleId: "123", instanceId: p.instanceId, processingDate: p.processingDate }));
       const first = prepared("first", "2026-10-01", "10", "a".repeat(32));
@@ -1897,7 +1897,7 @@ describe("independent App Store Connect foundation", () => {
   it("leaves a failed multi-segment instance untouched while importing the next instance and skipping unchanged downloads", async () => {
     const discovery = vi.spyOn(AppStoreConnectClient.prototype, "listApps").mockResolvedValue(apps);
     const requests = vi.spyOn(AppStoreConnectClient.prototype, "listAnalyticsReportRequests").mockResolvedValue([{ id: "atomic-sync-request", type: "analyticsReportRequests", attributes: { accessType: "ONGOING", stoppedDueToInactivity: false } }]);
-    const reports = vi.spyOn(AppStoreConnectClient.prototype, "listAnalyticsReports").mockResolvedValue([{ id: "atomic-report", type: "analyticsReports", attributes: { name: "App Store Downloads Standard", category: "COMMERCE" } }]);
+    const reports = vi.spyOn(AppStoreConnectClient.prototype, "listAnalyticsReports").mockResolvedValue([{ id: "atomic-report", type: "analyticsReports", attributes: { name: "App Downloads Standard", category: "COMMERCE" } }]);
     const instances = vi.spyOn(AppStoreConnectClient.prototype, "listAnalyticsReportInstances").mockResolvedValue(["bad", "good"].map((id) => ({ id, type: "analyticsReportInstances", attributes: { granularity: "DAILY", processingDate: "2026-10-02" } })));
     const bytes = gzipSync("Date\tApp Apple Identifier\tDownload Type\tSource Type\tTerritory\tCounts\n2026-09-29\t123\tFirst-time Download\tApp Store search\tUSA\t5");
     const segment = (id: string) => ({ id, type: "analyticsReportSegments" as const, attributes: { url: "https://synthetic.s3.amazonaws.com/report", checksum: createHash("md5").update(bytes).digest("hex"), sizeInBytes: bytes.length } });

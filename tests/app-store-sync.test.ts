@@ -76,6 +76,12 @@ describe("Standard report recognition", () => {
     for (const name of [definition.baseName, `${definition.baseName} Detailed`, `${definition.baseName} SomethingElse`]) expect(identifyStandardAnalyticsReport(name)).toBeUndefined();
   });
 
+  it("recognizes Apple's App Downloads Standard name and rejects Detailed and the legacy name", () => {
+    expect(identifyStandardAnalyticsReport("App Downloads Standard")).toBe("downloads");
+    expect(identifyStandardAnalyticsReport("App Downloads Detailed")).toBeUndefined();
+    expect(identifyStandardAnalyticsReport("App Store Downloads Standard")).toBeUndefined();
+  });
+
   it("recognizes Apple's Subscription Report Standard names but excludes Detailed reports", () => {
     expect(identifyStandardAnalyticsReport("App Store Subscription State Report Standard")).toBe("subscriptionState");
     expect(identifyStandardAnalyticsReport("App Store Subscription Event Report Standard")).toBe("subscriptionEvent");
@@ -99,7 +105,7 @@ describe("production Analytics sync selection", () => {
   });
 
   it("takes both acquisition Standard reports through instances, segments and the real mapper", async () => {
-    const { client, instances } = clientWithCatalog([analyticsReportDefinitions.discovery.standardName, analyticsReportDefinitions.downloads.standardName, "App Store Downloads Detailed"]);
+    const { client, instances } = clientWithCatalog([analyticsReportDefinitions.discovery.standardName, analyticsReportDefinitions.downloads.standardName, "App Downloads Detailed"]);
     const listSegments = vi.spyOn(client, "listAnalyticsReportSegments");
     expect(await syncAppStoreAnalytics(1, viewer)).toMatchObject({ status: "success", imported: 2, waiting: 0, errors: [] });
     expect(instances.mock.calls).toEqual([["report-0"], ["report-1"]]);
@@ -107,7 +113,7 @@ describe("production Analytics sync selection", () => {
     expect(mocks.commit.mock.calls.map((call) => call[2].kind)).toEqual(["discovery", "downloads"]);
     expect(mocks.commit.mock.calls[1][2].rows[0]).toMatchObject({ app_id: 2, counts: "10" });
     const events = mocks.info.mock.calls.map(([, message]) => JSON.parse(message));
-    expect(events.find((event) => event.event === "analytics_report_catalog")).toMatchObject({ appId: 2, requestId: "request", accessType: "ONGOING", reports: catalog([analyticsReportDefinitions.discovery.standardName, analyticsReportDefinitions.downloads.standardName, "App Store Downloads Detailed"]).map((report) => report.attributes) });
+    expect(events.find((event) => event.event === "analytics_report_catalog")).toMatchObject({ appId: 2, requestId: "request", accessType: "ONGOING", reports: catalog([analyticsReportDefinitions.discovery.standardName, analyticsReportDefinitions.downloads.standardName, "App Downloads Detailed"]).map((report) => report.attributes) });
     for (const event of ["analytics_report_selected", "analytics_instances_discovered", "analytics_instance_started", "analytics_segments_discovered", "analytics_segment_download_started", "analytics_segment_download_finished", "analytics_instance_parsed", "analytics_instance_mapped", "analytics_instance_commit_started", "analytics_instance_committed", "sync_finished"]) expect(events.some((entry) => entry.event === event)).toBe(true);
     const ordered = ["sync_started", "analytics_requests_discovered", "analytics_report_catalog", "analytics_report_selected", "analytics_instances_discovered", "analytics_instance_started", "analytics_segments_discovered", "analytics_segment_download_started", "analytics_segment_download_finished", "analytics_instance_parsed", "analytics_instance_mapped", "analytics_instance_commit_started", "analytics_instance_committed", "sync_finished"];
     const eventNames = events.map((entry) => entry.event);
@@ -116,14 +122,22 @@ describe("production Analytics sync selection", () => {
     expect(JSON.stringify(events)).not.toMatch(/https:|synthetic-token|App Store search/);
   });
 
-  it.each(["App Store Downloads Detailed", "App Store Downloads SomethingElse", "App Store Downloads"])("diagnoses %s without calling the instance API", async (name) => {
+  it.each(["App Downloads Detailed", "App Downloads SomethingElse", "App Downloads"])("diagnoses %s without calling the instance API", async (name) => {
     const { instances } = clientWithCatalog([name]);
     const result = await syncAppStoreAnalytics(1, viewer);
-    expect(result).toMatchObject({ status: "error", imported: 0, skipped: 0, errors: [expect.stringContaining(`expected=App Store Downloads Standard; received=${name}`)] });
+    expect(result).toMatchObject({ status: "error", imported: 0, skipped: 0, errors: [expect.stringContaining(`expected=App Downloads Standard; received=${name}`)] });
     expect(result.errors[0]).toContain("unexpected_report_variant");
     expect(instances).not.toHaveBeenCalled();
     expect(mocks.commit).not.toHaveBeenCalled();
     expect(mocks.finish).toHaveBeenCalledWith(expect.anything(), "error", expect.stringContaining("unexpected_report_variant"));
+  });
+
+  it("does not select the legacy App Store Downloads Standard name", async () => {
+    const { instances } = clientWithCatalog(["App Store Downloads Standard"]);
+    const result = await syncAppStoreAnalytics(1, viewer);
+    expect(result).toMatchObject({ status: "waiting", imported: 0, skipped: 0, errors: [], waitingReasons: expect.arrayContaining([expect.stringContaining("target_report_unavailable")]) });
+    expect(instances).not.toHaveBeenCalled();
+    expect(mocks.commit).not.toHaveBeenCalled();
   });
 
   it.each([[[], "no_reports_generated"], [["App Crashes"], "target_report_unavailable"]] as const)("waits safely when the target is absent (%s)", async (names, reason) => {
@@ -134,9 +148,9 @@ describe("production Analytics sync selection", () => {
   });
 
   it("keeps waiting plus a variant error as error, and imported plus an error as partial", async () => {
-    clientWithCatalog(["App Store Downloads Detailed"]);
+    clientWithCatalog(["App Downloads Detailed"]);
     expect((await syncAppStoreAnalytics(1, viewer)).status).toBe("error");
-    clientWithCatalog([analyticsReportDefinitions.discovery.standardName, "App Store Downloads SomethingElse"]);
+    clientWithCatalog([analyticsReportDefinitions.discovery.standardName, "App Downloads SomethingElse"]);
     expect(await syncAppStoreAnalytics(1, viewer)).toMatchObject({ status: "partial", imported: 1 });
   });
 
