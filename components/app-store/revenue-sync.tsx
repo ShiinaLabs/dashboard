@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { latestSalesReportDate } from "@/shared/app-store-revenue";
 
 export function RevenueSyncPanel({ connectionId, isActive, vendorNumber, onEdit }: { connectionId: number; isActive: boolean; vendorNumber: string | null; onEdit: () => void }) {
   const { t } = useTranslation();
@@ -17,7 +18,7 @@ export function RevenueSyncPanel({ connectionId, isActive, vendorNumber, onEdit 
   const [error, setError] = useState<string | null>(null);
   const sync = async () => {
     setBusy(true); setError(null); setResult(null);
-    const to = new Date().toISOString().slice(0, 10);
+    const to = latestSalesReportDate();
     const from = new Date(Date.parse(to) - (range - 1) * 86400000).toISOString().slice(0, 10);
     try {
       setResult(await api.syncAppStoreRevenue(connectionId, { from, to, fiscalMonth: month, regionCode: "ZZ" }));

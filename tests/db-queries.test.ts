@@ -1,10 +1,11 @@
-import { gzipSync } from "node:zlib";
+import { gzipSync, gunzipSync } from "node:zlib";
 import { createHash } from "node:crypto";
 import * as ascFacts from "../lib/repositories/app-store-facts";
 import { mapAnalyticsReport, analyticsReports, type AnalyticsReportKind } from "../lib/infra/app-store/report-mapping";
 import { parseAnalyticsTsv } from "../lib/infra/app-store/analytics-tsv";
 import { syncAppStoreAnalytics, syncAppStoreRevenue } from "../lib/services/app-store-sync";
 import { getAppStoreRevenueDashboard } from "../lib/services/app-store-revenue";
+import { getLogger } from "../lib/logger";
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { exportPKCS8, generateKeyPair } from "jose";
 import * as appStoreService from "../lib/services/app-store";
@@ -1906,12 +1907,15 @@ describe("independent App Store Connect foundation", () => {
   });
 
   it("imports Revenue with separate currencies, final fiscal settlements and independent missing-vendor failures", async () => {
+    const infoLog = vi.spyOn(getLogger(), "info").mockImplementation(() => undefined);
+    const errorLog = vi.spyOn(getLogger(), "error").mockImplementation(() => undefined);
+    const warnLog = vi.spyOn(getLogger(), "warn").mockImplementation(() => undefined);
     const discovery = vi.spyOn(AppStoreConnectClient.prototype, "listApps").mockResolvedValue(apps);
     const requests = vi.spyOn(AppStoreConnectClient.prototype, "listAnalyticsReportRequests").mockResolvedValue([]);
     const salesBytes = gzipSync("Begin Date\tEnd Date\tSKU\tApple Identifier\tParent Identifier\tProduct Type Identifier\tCountry Code\tUnits\tDeveloper Proceeds\tCurrency of Proceeds\tCustomer Price\tCustomer Currency\n09/29/2026\t09/29/2026\texample-sku\t123\t\t1\tJP\t2\t0.7\tUSD\t100\tJPY");
     const financeBytes = gzipSync("Start Date\tEnd Date\tVendor Identifier\tApple Identifier\tProduct Type Identifier\tCountry of Sale\tQuantity\tExtended Partner Share\tPartner Share Currency\n08/30/2026\t09/26/2026\texample-sku\t123\t1\tJP\t2\t1.4\tUSD\n08/30/2026\t09/26/2026\texample-sku\t123\t1\tJP\t1\t100\tJPY");
     const salesDownload = vi.spyOn(AppStoreConnectClient.prototype, "downloadSalesReport").mockResolvedValue(salesBytes);
-    const financeDownload = vi.spyOn(AppStoreConnectClient.prototype, "downloadFinanceReport").mockRejectedValueOnce(new AppStoreApiError(403, "FORBIDDEN", "SECRET")).mockResolvedValue(financeBytes);
+    const financeDownload = vi.spyOn(AppStoreConnectClient.prototype, "downloadFinanceReport").mockRejectedValueOnce(new AppStoreApiError(403, "FORBIDDEN", "SECRET")).mockResolvedValue(gzipSync(gunzipSync(financeBytes).toString() + "\nTotal_Rows\t2\nTotal_Amount\t101.40\nTotal_Units\t3\n"));
     try {
       const connection = await appStoreService.createConnection(viewer, { ...input(), vendorNumber: "123456" });
       const app = (await appStoreRepo.getApps(connection.id))[0];
@@ -1932,7 +1936,22 @@ describe("independent App Store Connect foundation", () => {
       const otherApp = (await appStoreRepo.getApps(noVendor.id))[0];
       await appStoreService.setAppEnabled(noVendor.id, otherApp.id, viewer, { isEnabled: true });
       expect(await syncAppStoreRevenue(noVendor.id, viewer, filters)).toMatchObject({ status: "partial", sources: { analytics: { status: "success" }, sales: { status: "error", errors: [expect.stringContaining("vendor_required")] }, finance: { status: "error" } } });
-    } finally { for (const spy of [discovery, requests, salesDownload, financeDownload]) spy.mockRestore(); }
+      const clock = vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-02T05:50:00Z"));
+      try {
+        salesDownload.mockClear();
+        expect(await syncAppStoreRevenue(connection.id, viewer, { ...filters, from: "2026-10-01", to: "2026-10-02" })).toMatchObject({ sources: { sales: { status: "success", waiting: 2, imported: 0, errors: [] } } });
+        expect(salesDownload).not.toHaveBeenCalled();
+      } finally { clock.mockRestore(); }
+      const events = [...infoLog.mock.calls, ...errorLog.mock.calls, ...warnLog.mock.calls].map(([component, message]) => { expect(component).toBe("ASC"); return JSON.parse(message); });
+      expect(events).toEqual(expect.arrayContaining([
+        expect.objectContaining({ event: "sync_started", source: "finance", fiscalMonth: "2026-09" }),
+        expect.objectContaining({ event: "report_failed", source: "finance", diagnostic: "Finance; fiscal month 2026-09; region ZZ; apple_report_error (403)" }),
+        expect.objectContaining({ event: "report_waiting", source: "sales", date: "2026-10-01", reason: "before_daily_publication" }),
+        expect.objectContaining({ event: "sync_finished", source: "finance", status: "success", imported: 1 }),
+      ]));
+      expect(JSON.stringify(events)).not.toContain("SECRET");
+      expect(JSON.stringify(events)).not.toContain("123456");
+    } finally { for (const spy of [discovery, requests, salesDownload, financeDownload, infoLog, errorLog, warnLog]) spy.mockRestore(); }
   });
 
   it("persists all five official fact types and replaces corrected Purchases without double counting", async () => {

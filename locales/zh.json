@@ -1018,7 +1018,7 @@
     "syncing": "正在同步收入…",
     "syncError": "收入同步失败",
     "salesDates": "销售日期范围",
-    "syncHelp": "依次导入购买与订阅、每日 Sales Summary 和汇总 Finance (ZZ)。请明确选择 Apple 财政月份；各数据源分别报告结果。",
+    "syncHelp": "销售日期截至最近预计已生成的日报（太平洋时间上午 8 点）。依次导入购买与订阅、每日 Sales Summary 和汇总 Finance (ZZ)。请明确选择 Apple 财政月份；各数据源分别报告结果。",
     "imported": "已导入",
     "skipped": "未变化",
     "waiting": "等待",

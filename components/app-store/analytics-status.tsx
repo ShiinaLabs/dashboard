@@ -47,7 +47,9 @@ export function AppStoreAnalyticsStatusPanel({ connectionId, isActive }: { conne
       {data.message && <p role="alert" className="text-sm text-destructive">{data.message}</p>}
     </>}
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    <Button disabled={busy || !isActive || !data?.enabledApps} onClick={() => void sync()}>{t("appStoreAnalytics.sync")}</Button>
-    <Button variant="outline" disabled={busy || !isActive || !data?.enabledApps} onClick={() => void setup()}>{t(busy ? "appStoreAnalytics.settingUp" : "appStoreAnalytics.setup")}</Button>
+    <div className="flex flex-wrap gap-2">
+      <Button disabled={busy || !isActive || !data?.enabledApps} onClick={() => void sync()}>{t("appStoreAnalytics.sync")}</Button>
+      <Button variant="outline" disabled={busy || !isActive || !data?.enabledApps} onClick={() => void setup()}>{t(busy ? "appStoreAnalytics.settingUp" : "appStoreAnalytics.setup")}</Button>
+    </div>
   </CardContent></Card>;
 }

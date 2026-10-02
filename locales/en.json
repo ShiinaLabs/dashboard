@@ -1018,7 +1018,7 @@
     "syncing": "Syncing Revenue…",
     "syncError": "Revenue sync failed",
     "salesDates": "Sales date range",
-    "syncHelp": "Purchases and subscriptions, daily Sales Summary, then consolidated Finance (ZZ). Select the Apple fiscal month explicitly; each source reports its own result.",
+    "syncHelp": "Sales dates end at the latest scheduled daily report (08:00 Pacific Time). Purchases and subscriptions, daily Sales Summary, then consolidated Finance (ZZ). Select the Apple fiscal month explicitly; each source reports its own result.",
     "imported": "Imported",
     "skipped": "Unchanged",
     "waiting": "Waiting",

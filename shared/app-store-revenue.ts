@@ -11,3 +11,9 @@ export interface RevenueDashboard {
   settlements: { fiscalMonth: string; region: string; currency: string; startDate: string; endDate: string; earned: string | null; units: string | null }[];
   territories: string[];
 }
+/** Apple publishes daily Sales reports the following day, generally by 08:00 PT. */
+export function latestSalesReportDate(now = new Date(Date.now())): string {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(now).map((part) => [part.type, part.value]));
+  const day = Date.parse(`${parts.year}-${parts.month}-${parts.day}T00:00:00Z`);
+  return new Date(day - (Number(parts.hour) >= 8 ? 1 : 2) * 86400000).toISOString().slice(0, 10);
+}

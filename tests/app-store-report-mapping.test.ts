@@ -4,9 +4,23 @@ import { parseAnalyticsTsv } from "../lib/infra/app-store/analytics-tsv";
 import { currencyAmounts, reliablePayingUsers, activeSubscriptionSnapshot } from "../lib/services/app-store-revenue";
 import { analyticsCompleteThrough } from "../lib/services/app-store-analytics-reporting";
 import { reportDiagnostic } from "../lib/services/app-store-sync";
+import { latestSalesReportDate } from "../shared/app-store-revenue";
 const ctx = { appId: 1, appleId: "123", instanceId: "instance", processingDate: "2026-10-02" };
 function tsv(row: Record<string, string>) { return parseAnalyticsTsv(Object.keys(row).join("\t") + "\n" + Object.values(row).join("\t")); }
 const common = { Date: "2026-09-29", "App Apple Identifier": "123", Territory: "USA" };
+describe("Sales daily publication date", () => {
+  it.each([
+    ["2026-10-02T05:50:00Z", "2026-09-30"],
+    ["2026-10-02T14:59:59Z", "2026-09-30"],
+    ["2026-10-02T15:00:00Z", "2026-10-01"],
+    ["2026-01-02T15:59:59Z", "2025-12-31"],
+    ["2026-01-02T16:00:00Z", "2026-01-01"],
+    ["2026-03-08T15:00:00Z", "2026-03-07"],
+    ["2026-11-01T16:00:00Z", "2026-10-31"],
+  ])("uses the 08:00 Pacific boundary, including DST (%s)", (now, expected) => {
+    expect(latestSalesReportDate(new Date(now))).toBe(expected);
+  });
+});
 describe("official Standard Analytics adapters (synthetic data)", () => {
   it("maps Discovery and Downloads without inventing campaigns or unique downloads", () => {
     const discovery = mapAnalyticsReport("discovery", tsv({ ...common, Event: "Impression", "Page Type": "No page", "Source Type": "App Store search", Counts: "10", "Unique Counts": "8", "Future Column": "extra" }), ctx);
