@@ -22,10 +22,15 @@ test("ASC connection management, app selection, vendor setup, refresh and soft d
   await expect(page.getByText("Waiting for first report", { exact: true })).toBeVisible();
   await expect(page.getByText("Ready", { exact: true })).toBeVisible();
 
+  await page.getByRole("button", { name: "Sync Analytics", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Sync Analytics", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Sync Revenue", exact: true }).click();
+  await expect(page.getByText("Partial", { exact: true })).toBeVisible();
+  await expect(page.getByText(/vendor_required/).first()).toBeVisible();
   await page.getByRole("button", { name: "Edit Connection" }).click();
   await page.getByLabel("Vendor Number (Optional)").fill("12345678");
   await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByText("12345678", { exact: true })).toBeVisible();
+  await expect(page.getByText("12345678", { exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: "Disable", exact: true }).click();
   await expect(page.getByRole("button", { name: "Refresh Apps" })).toBeDisabled();
   await page.getByRole("button", { name: "Enable", exact: true }).click();
@@ -120,7 +125,7 @@ test("App Store Analytics tabs, app/date/territory filters and missing campaign 
   await page.getByRole("option", { name: "JPN", exact: true }).click();
   await expect.poll(() => filters.at(-1)?.get("territory")).toBe("JPN");
   await page.getByRole("tab", { name: "Campaigns", exact: true }).click();
-  await expect(page.getByText("No campaign data available", { exact: true })).toBeVisible();
+  await expect(page.getByText("Campaign data is not included in Standard reports.", { exact: true })).toBeVisible();
   await page.getByRole("combobox", { name: "App", exact: true }).click();
   await page.getByRole("option", { name: "All Apps", exact: true }).click();
   await expect.poll(() => filters.at(-1)?.has("appId")).toBe(false);
@@ -130,4 +135,37 @@ test("App Store Analytics tabs, app/date/territory filters and missing campaign 
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
   await page.screenshot({ path: "/tmp/dashboard-app-store-analytics-mobile.png", fullPage: true });
+});
+
+
+test("Business Revenue has four tabs and retains separate currencies, nulls and final fiscal periods", async ({ page }) => {
+  await page.route("**/api/app-store/analytics/apps", (route) => route.fulfill({ json: { apps: [{ id: 1, name: "Synthetic App" }] } }));
+  const amounts = [{ currency: "USD", proceeds: "1.4", sales: "2" }, { currency: "JPY", proceeds: "100", sales: "200" }];
+  await page.route(/\/api\/app-store\/revenue\?/, (route) => route.fulfill({ json: {
+    updatedAt: "2026-09-29", completeThrough: "2026-09-27", overview: { amounts, units: "2", payingUsers: null },
+    trend: amounts.map((a) => ({ ...a, date: "2026-09-29" })), byApp: amounts.map((a) => ({ ...a, app: "Synthetic App" })), byTerritory: [],
+    sales: { rows: [], amounts, units: "2", trend: [], byApp: [], byTerritory: [] },
+    subscriptions: { active: null, starts: null, conversions: null, renewals: null, voluntaryChurn: null, involuntaryChurn: null, trend: [], bySubscription: [] },
+    settlements: [{ fiscalMonth: "2026-09", region: "ZZ", currency: "USD", startDate: "2026-08-30", endDate: "2026-09-26", earned: "1.4", units: "2" }], territories: ["USA", "JP"],
+  } }));
+  await openConnections(page);
+  await page.getByRole("button", { name: "Business", exact: true }).click();
+  for (const name of ["Web Analytics", "App Store Analytics", "Revenue"]) await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Revenue", exact: true }).click();
+  await expect(page).toHaveURL(/\/revenue$/);
+  await expect(page).toHaveTitle("Revenue · Data Hub");
+  await expect(page.getByRole("heading", { name: "Revenue", exact: true })).toBeVisible();
+  for (const name of ["Overview", "Sales", "Subscriptions", "Settlements"]) await expect(page.getByRole("tab", { name, exact: true })).toBeVisible();
+  await expect(page.getByText("Paying Users", { exact: true }).locator("..")).toContainText("—");
+  await expect(page.getByText("USD", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("JPY", { exact: true }).first()).toBeVisible();
+  await page.getByRole("tab", { name: "Subscriptions", exact: true }).click();
+  await expect(page.getByText("No subscription report data for this selection.")).toBeVisible();
+  await page.getByRole("tab", { name: "Settlements", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Final · Financial reports" })).toBeVisible();
+  await expect(page.getByRole("row", { name: /2026-09 ZZ/ })).toContainText("2026-08-30 – 2026-09-26");
+  await page.getByLabel("Apple fiscal month", { exact: true }).fill("2026-09");
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+  await page.screenshot({ path: "/tmp/dashboard-revenue-mobile.png", fullPage: true });
 });

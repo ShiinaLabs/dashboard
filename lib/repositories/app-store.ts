@@ -50,9 +50,9 @@ export async function getApps(connectionId: number) {
   return getDb().select().from(app_store_apps).where(eq(app_store_apps.connection_id, connectionId)).orderBy(app_store_apps.name);
 }
 
-export async function getRecentRuns(connectionId: number, kind?: "metadata" | "analytics") {
-  if (isMockMode()) return mockRuns.filter((row) => row.connection_id === connectionId && (!kind || row.kind === kind)).slice(-10).reverse().map((row) => ({ ...row }));
-  return getDb().select().from(app_store_sync_runs).where(and(eq(app_store_sync_runs.connection_id, connectionId), kind ? eq(app_store_sync_runs.kind, kind) : undefined)).orderBy(desc(app_store_sync_runs.started_at), desc(app_store_sync_runs.id)).limit(10);
+export async function getRecentRuns(connectionId: number, kind?: RunRow["kind"], scope?: string) {
+  if (isMockMode()) return mockRuns.filter((row) => row.connection_id === connectionId && (!kind || row.kind === kind) && (!scope || row.scope === scope || (scope === "acquisition" && row.scope === null))).slice(-10).reverse().map((row) => ({ ...row }));
+  return getDb().select().from(app_store_sync_runs).where(and(eq(app_store_sync_runs.connection_id, connectionId), kind ? eq(app_store_sync_runs.kind, kind) : undefined, scope ? sql`(${app_store_sync_runs.scope} = ${scope} OR (${scope} = 'acquisition' AND ${app_store_sync_runs.scope} IS NULL))` : undefined)).orderBy(desc(app_store_sync_runs.started_at), desc(app_store_sync_runs.id)).limit(10);
 }
 
 export async function getLastSuccessfulRun(connectionId: number) {
@@ -84,8 +84,8 @@ export async function createWithApps(data: ConnectionInsert, apps: DiscoveredApp
   });
 }
 
-export async function startRun(connectionId: number, kind: "metadata" | "analytics" = "metadata"): Promise<RunRow> {
-  const values = { connection_id: connectionId, kind, trigger: "manual" as const, status: "running" as const, started_at: new Date().toISOString() };
+export async function startRun(connectionId: number, kind: RunRow["kind"] = "metadata", scope: string | null = null): Promise<RunRow> {
+  const values = { connection_id: connectionId, kind, scope, trigger: "manual" as const, status: "running" as const, started_at: new Date().toISOString() };
   if (isMockMode()) {
     const run = { ...values, id: mockRuns.length + 1, finished_at: null, duration_ms: null, error_message: null };
     mockRuns.push(run);

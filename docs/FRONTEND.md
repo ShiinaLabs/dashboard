@@ -68,7 +68,8 @@ Routes are declared in `app/routes.ts` (React Router Framework Mode). All pages 
 | `/` | Redirects to `/overview` |
 | `/overview` | Cross-platform overview and Web Analytics portfolio summary |
 | `/analytics` | Site-level first-party Web Analytics dashboard |
-| `/app-store` | App Store Analytics: Overview, Acquisition and Campaigns (mock reporting; production import pending) |
+| `/app-store` | App Store Analytics: Overview, Acquisition and Campaigns, reading imported PostgreSQL facts |
+| `/revenue` | Revenue: Overview, Sales, Subscriptions and final fiscal Settlements |
 | `/accounts` | Connections: platform accounts and independent App Store Connect connections |
 | `/x` | X account list |
 | `/x/:id` | X account detail |
@@ -112,7 +113,7 @@ The authenticated layout (`components/layout/authenticated-layout.tsx`) follows 
 - **Header and content** — `Header` and `Main` preserve the safe area and page content width.
 - **Mobile navigation** — Radix Sheet overlay closes on Escape, backdrop click, or route selection; focus is managed by Radix.
 - **Navigation** — React Router links preserve existing route URLs and active-route behavior.
-- **Groups and connections** — Social contains X / Reddit; Developer contains GitHub / GitLab; Business contains Web Analytics and App Store Analytics. AI Analysis remains a main entry. Connections uses `/accounts`, with a separate App Store Connect tab and inline connection details. Settings, Admin and Log out live in the footer user menu.
+- **Groups and connections** — Social contains X / Reddit; Developer contains GitHub / GitLab; Business contains Web Analytics, App Store Analytics and Revenue. AI Analysis remains a main entry. Connections uses `/accounts`, with a separate App Store Connect tab and inline connection details. Settings, Admin and Log out live in the footer user menu.
 - **Overview** — cross-platform KPI cards lead into Business Pulse and Fetch Health, followed by Top Content and tabs for connected platforms.
 - **Page surfaces** — management and detail pages use consistent page headings, bordered cards, compact metric grids and responsive action groups. The authenticated shell has no wallpaper background.
 
@@ -152,3 +153,5 @@ Multi-layered loading strategy for smooth UX on slow networks:
 4. **Progress bar** — animated gradient bar at top of page only while navigation is pending
 5. **Skeleton loading** — `MetricCardSkeleton` / `ChartCardSkeleton` replace "Loading…" text
 6. **Fade-in animation** — `page-enter` class on route content for smooth appearance; disabled under `prefers-reduced-motion`
+
+ASC connection details expose manual Sync Analytics and Sync Revenue alongside the existing Analytics setup and Edit Connection controls. Vendor Number setup uses Edit Connection rather than a separate wizard. Revenue supports enabled All Apps/single App, 7/30/90-day and Territory filters; Settlements use a separate Apple fiscal-month filter. Original currencies render separately, unknown metrics render `—`, Paying Users is not summed across rows, and subscription Active uses the latest per-app snapshot. Production charts read imported facts; no production report samples are requested by the UI. The browser converts decimal strings to chart coordinates only; monetary cards and tables preserve exact strings.

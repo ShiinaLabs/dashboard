@@ -2,6 +2,8 @@ import { z } from "zod";
 import { isMockMode } from "../config";
 import { listConnections, getApps } from "../repositories/app-store";
 import { AppStoreError } from "./app-store";
+import { readAnalyticsFacts } from "../repositories/app-store-facts";
+import { sumDecimals, completionDays } from "../infra/app-store/report-mapping";
 import type { AppStoreAnalyticsAppOption, AppStoreAnalyticsDashboard } from "@/shared/app-store-analytics";
 
 type Viewer = { id: number; role: string };
@@ -11,9 +13,9 @@ export async function listEnabledAnalyticsApps(viewer: Viewer): Promise<AppStore
   return apps.map((app) => ({ id: app.id, name: app.name }));
 }
 
-const filterSchema = z.object({ from: z.iso.date(), to: z.iso.date(), appId: z.coerce.number().int().positive().optional(), territory: z.string().trim().min(1).max(100).optional() });
+export const filterSchema = z.object({ from: z.iso.date(), to: z.iso.date(), appId: z.coerce.number().int().positive().optional(), territory: z.string().trim().min(1).max(100).optional() });
 
-function emptyDashboard(): AppStoreAnalyticsDashboard {
+export function emptyDashboard(): AppStoreAnalyticsDashboard {
   return { updatedAt: null, completeThrough: null, overview: { impressions: null, views: null, firstTimeDownloads: null, downloads: null, conversion: null }, trend: [], acquisition: [], campaigns: [], territories: [] };
 }
 
@@ -38,7 +40,50 @@ export async function getAppStoreAnalyticsDashboard(viewer: Viewer, input: unkno
       ...["App Referrer", "Web Referrer", "Campaign"].map((source) => ({ source, impressions: null, views: null, firstTimeDownloads: null, downloads: null, conversion: null })),
     ], campaigns: [], territories: ["USA"] };
   }
-  // A real typed adapter must be derived from captured reports before this gate is removed.
-  // Do not pretend an absent implementation is an empty or zero-valued report.
-  throw new AppStoreError("report_mapping_pending", 503, "Analytics reports cannot be displayed yet; report import configuration is incomplete");
+  const appIds = apps.filter((app) => !filter.appId || app.id === filter.appId).map((app) => app.id);
+  const data = await readAnalyticsFacts(appIds, filter);
+  const relevant = <T extends { date: string; territory: string | null }>(rows: T[]) => rows.filter((r) => r.date >= filter.from && r.date <= filter.to && (!filter.territory || r.territory === filter.territory));
+  const discovery = relevant(data.discovery), downloads = relevant(data.downloads);
+  const partitions = data.partitions.filter((p) => p.report_kind === "discovery" || p.report_kind === "downloads");
+  const covered = (kind: string, from: string, to: string) => appIds.every((id) => partitions.some((p) => p.app_id === id && p.report_kind === kind && p.date >= from && p.date <= to));
+  const total = (rows: { counts: string | null }[], known: boolean): number | null => {
+    if (!known) return null;
+    const amount = rows.length ? sumDecimals(rows.map((r) => r.counts)) : "0";
+    if (amount === null) return null;
+    const n = Number(amount);
+    return Number.isSafeInteger(n) ? n : null;
+  };
+  const metrics = (from: string, to: string, source?: string) => {
+    const d = discovery.filter((r) => r.date >= from && r.date <= to && (!source || r.source_type === source));
+    const dl = downloads.filter((r) => r.date >= from && r.date <= to && (!source || r.source_type === source));
+    return {
+      impressions: total(d.filter((r) => r.event === "Impression"), covered("discovery", from, to)),
+      views: total(d.filter((r) => r.event === "Page view" && r.page_type === "Product page"), covered("discovery", from, to)),
+      firstTimeDownloads: total(dl.filter((r) => r.download_type === "First-time Download"), covered("downloads", from, to)),
+      downloads: total(dl.filter((r) => r.download_type === "First-time Download" || r.download_type === "Redownload"), covered("downloads", from, to)),
+      conversion: null, // Unique users are not additive across report dimensions.
+    };
+  };
+  const dates = [...new Set(partitions.filter((p) => p.date >= filter.from && p.date <= filter.to).map((p) => p.date))].sort();
+  return {
+    updatedAt: dates.at(-1) ?? null,
+    completeThrough: analyticsCompleteThrough(partitions, appIds, ["discovery", "downloads"], filter.from, filter.to),
+    overview: metrics(filter.from, filter.to),
+    trend: dates.map((date) => ({ date, ...metrics(date, date) })),
+    acquisition: [...new Set([...discovery, ...downloads].flatMap((r) => r.source_type ? [r.source_type] : []))].sort().map((source) => ({ source, ...metrics(filter.from, filter.to, source) })),
+    campaigns: [], // Standard reports do not contain Campaign; Detailed data is not inferred.
+    territories: [...new Set([...data.discovery, ...data.downloads].flatMap((r) => r.territory ? [r.territory] : []))].sort(),
+  };
+}
+
+export function analyticsCompleteThrough(partitions: { app_id: number; report_kind: string; date: string; processing_date: string }[], appIds: number[], kinds: (keyof typeof completionDays)[], from: string, to: string): string | null {
+  if (!appIds.length) return null;
+  let complete: string | null = null;
+  for (let time = Date.parse(from); time <= Date.parse(to); time += 86400000) {
+    const date = new Date(time).toISOString().slice(0, 10);
+    const known = appIds.every((appId) => kinds.every((kind) => partitions.some((p) => p.app_id === appId && p.report_kind === kind && p.date === date && Date.parse(p.processing_date) - time >= completionDays[kind] * 86400000)));
+    if (!known) break;
+    complete = date;
+  }
+  return complete;
 }

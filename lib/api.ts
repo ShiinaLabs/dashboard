@@ -1,3 +1,5 @@
+import type { RevenueDashboard } from "@/shared/app-store-revenue";
+import type { ReportSyncResult } from "@/lib/services/app-store-sync";
 import { apiJson, apiRequest } from "@/lib/client/api-transport";
 import type { AppStoreConnection, AppStoreConnectionDetail, AppStoreConnectionInput, AppStoreConnectionUpdate, AppStoreApp } from "@/shared/app-store";
 import type { AppStoreAnalyticsStatus, AppStoreAnalyticsAppOption, AppStoreAnalyticsDashboard } from "@/shared/app-store-analytics";
@@ -102,6 +104,15 @@ export type {
 // ─── API methods ────────────────────────────────────────────────
 
 export const api = {
+  syncAppStoreAnalytics: (id: number) => apiJson<ReportSyncResult>(`/app-store/connections/${id}/analytics/sync`, { method: "POST" }),
+  syncAppStoreRevenue: (id: number, input: { from: string; to: string; fiscalMonth: string; regionCode: "ZZ" }) => apiJson<{ status: ReportSyncResult["status"]; sources: Record<"analytics" | "sales" | "finance", ReportSyncResult> }>(`/app-store/connections/${id}/revenue/sync`, { method: "POST", body: JSON.stringify(input) }),
+  getAppStoreRevenueDashboard: (filter: { from: string; to: string; appId?: number; territory?: string; fiscalMonth?: string }) => {
+    const query = new URLSearchParams({ from: filter.from, to: filter.to });
+    if (filter.appId !== undefined) query.set("appId", String(filter.appId));
+    if (filter.territory) query.set("territory", filter.territory);
+    if (filter.fiscalMonth) query.set("fiscalMonth", filter.fiscalMonth);
+    return apiJson<RevenueDashboard>(`/app-store/revenue?${query}`);
+  },
   getEnabledAppStoreAnalyticsApps: () => apiJson<{ apps: AppStoreAnalyticsAppOption[] }>("/app-store/analytics/apps"),
   getAppStoreAnalyticsDashboard: (filter: { from: string; to: string; appId?: number; territory?: string }) => {
     const query = new URLSearchParams({ from: filter.from, to: filter.to });

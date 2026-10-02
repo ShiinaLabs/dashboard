@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { AppStoreTokenProvider } from "./AppStoreTokenProvider";
-import { downloadAnalyticsSegment } from "./analytics-segment";
+import { downloadAnalyticsSegment, AppStoreReportError, MAX_SEGMENT_BYTES } from "./analytics-segment";
 
 const ORIGIN = "https://api.appstoreconnect.apple.com";
 const resourceId = z.string().min(1).max(200);
@@ -95,6 +95,52 @@ export class AppStoreConnectClient {
       next = page.links?.next ?? null;
     }
     return resources;
+  }
+
+  private async binaryReport(path: string, filters: Record<string, string>): Promise<Buffer | null> {
+    const url = new URL(path, ORIGIN);
+    for (const [key, value] of Object.entries(filters)) url.searchParams.set(`filter[${key}]`, value);
+    try {
+      const response = await this.request(url.href, { headers: { Authorization: `Bearer ${await this.tokens.getToken()}`, Accept: "application/a-gzip" }, redirect: "error", signal: AbortSignal.timeout(30_000) });
+      const limit = response.ok ? MAX_SEGMENT_BYTES : 64 * 1024;
+      const advertised = response.headers.get("content-length");
+      if (advertised && (!/^\d+$/.test(advertised) || Number(advertised) > limit)) {
+        await response.body?.cancel();
+        throw new AppStoreReportError("report_size", "Report response exceeds the size limit");
+      }
+      if (!response.body) throw new AppStoreReportError("empty_report", "Report response has no content");
+      const reader = response.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let size = 0;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.byteLength;
+          if (size > limit) throw new AppStoreReportError("report_size", "Report response exceeds the size limit");
+          chunks.push(value);
+        }
+      } finally { await reader.cancel().catch(() => undefined); }
+      const bytes = Buffer.concat(chunks, size);
+      if (!response.ok) {
+        // Only an explicit no-sales response is empty; missing/unavailable reports remain failures.
+        if (path === "/v1/salesReports" && response.status === 404 && /(?:there (?:were|are) no sales|no sales for the (?:date|period))/i.test(bytes.toString("utf8"))) return null;
+        throw new AppStoreApiError(response.status, "report_request_failed", `Apple report request failed (${response.status})`);
+      }
+      if (!size) throw new AppStoreReportError("empty_report", "Report response has no content");
+      return bytes;
+    } catch (error) {
+      if (error instanceof AppStoreApiError || error instanceof AppStoreReportError) throw error;
+      throw new AppStoreApiError(502, "report_request_failed", "Apple report request failed or timed out");
+    }
+  }
+
+  downloadSalesReport(vendorNumber: string, date: string) {
+    return this.binaryReport("/v1/salesReports", { vendorNumber, reportDate: date, reportType: "SALES", reportSubType: "SUMMARY", frequency: "DAILY" });
+  }
+
+  downloadFinanceReport(vendorNumber: string, fiscalMonth: string, regionCode: string) {
+    return this.binaryReport("/v1/financeReports", { vendorNumber, reportDate: fiscalMonth, regionCode, reportType: "FINANCIAL" });
   }
 
   async listApps(): Promise<DiscoveredApp[]> {

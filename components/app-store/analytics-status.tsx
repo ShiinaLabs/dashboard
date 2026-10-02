@@ -21,6 +21,15 @@ export function AppStoreAnalyticsStatusPanel({ connectionId, isActive }: { conne
     } catch (error) { setError(error instanceof Error ? error.message : t("appStoreAnalytics.operationError")); }
     finally { setBusy(false); }
   };
+  const sync = async () => {
+    setBusy(true); setError(null);
+    try {
+      const result = await api.syncAppStoreAnalytics(connectionId);
+      if (result.errors.length) setError(result.errors.join("; "));
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ["app-store-analytics"] }), queryClient.invalidateQueries({ queryKey: ["app-store-analytics-status", connectionId] }), queryClient.invalidateQueries({ queryKey: ["app-store-connection", connectionId] })]);
+    } catch (e) { setError(e instanceof Error ? e.message : t("appStoreAnalytics.operationError")); }
+    finally { setBusy(false); }
+  };
   const data = status.data;
   return <Card><CardContent className="space-y-4 p-5">
     <h3 className="font-semibold">{t("appStoreAnalytics.analytics")}</h3>
@@ -38,6 +47,7 @@ export function AppStoreAnalyticsStatusPanel({ connectionId, isActive }: { conne
       {data.message && <p role="alert" className="text-sm text-destructive">{data.message}</p>}
     </>}
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    <Button disabled={busy || !isActive || !data?.enabledApps} onClick={() => void sync()}>{t("appStoreAnalytics.sync")}</Button>
     <Button variant="outline" disabled={busy || !isActive || !data?.enabledApps} onClick={() => void setup()}>{t(busy ? "appStoreAnalytics.settingUp" : "appStoreAnalytics.setup")}</Button>
   </CardContent></Card>;
 }

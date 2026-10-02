@@ -32,6 +32,7 @@ export const app_store_sync_runs = pgTable("app_store_sync_runs", {
   id: serial("id").primaryKey(),
   connection_id: integer("connection_id").notNull().references(() => app_store_connections.id),
   kind: text("kind").$type<"metadata" | "analytics" | "sales" | "finance">().notNull(),
+  scope: text("scope"),
   trigger: text("trigger").$type<"manual" | "scheduler">().notNull(),
   status: text("status").$type<"running" | "success" | "partial" | "error">().notNull(),
   started_at: text("started_at").notNull().default(sql`NOW()`),

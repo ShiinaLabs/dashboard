@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
-import { formatDateTime } from "@/lib/client/datetime";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -64,7 +63,7 @@ export default function AppStoreAnalyticsPage() {
       </SelectContent></Select>
     </div>
     <dl className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted-foreground">
-      <div className="flex gap-2"><dt>{t("appStoreAnalytics.updated")}</dt><dd>{data?.updatedAt ? formatDateTime(data.updatedAt) : "—"}</dd></div>
+      <div className="flex gap-2"><dt>{t("appStoreAnalytics.updated")}</dt><dd>{data?.updatedAt?.slice(0, 10) ?? "—"}</dd></div>
       <div className="flex gap-2"><dt>{t("appStoreAnalytics.completeThrough")}</dt><dd>{data?.completeThrough ?? "—"}</dd></div>
     </dl>
     {(apps.isError || dashboard.isError) && <p role="alert" className="rounded-lg border border-destructive/40 p-4 text-sm text-destructive">{apps.error?.message ?? dashboard.error?.message}</p>}

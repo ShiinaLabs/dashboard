@@ -238,7 +238,9 @@ test("Analytics keeps All Sites available with one site and skips the global que
   const requests: string[] = [];
   page.on("request", (request) => {
     if (request.url().endsWith("/api/graphql") && request.method() === "POST") {
-      requests.push((request.postDataJSON() as { query?: string }).query?.includes("query AnalyticsGlobalDashboard(") ? "global" : "site");
+      const query = (request.postDataJSON() as { query?: string }).query;
+      if (query?.includes("query AnalyticsGlobalDashboard(")) requests.push("global");
+      else if (query?.includes("query AnalyticsDashboard(")) requests.push("site");
     }
   });
   await page.goto("/analytics");

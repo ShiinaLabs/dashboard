@@ -50,7 +50,8 @@
     "ai": "AI Analysis",
     "logout": "Log out",
     "business": "Business",
-    "appStoreAnalytics": "App Store Analytics"
+    "appStoreAnalytics": "App Store Analytics",
+    "revenue": "Revenue"
   },
   "badge": {
     "inactive": "Inactive",
@@ -959,7 +960,7 @@
     "noData": "No report data available",
     "downloadsBySource": "Downloads by Source",
     "source": "Source",
-    "noCampaignData": "No campaign data available",
+    "noCampaignData": "Campaign data is not included in Standard reports.",
     "metrics": {
       "impressions": "Impressions",
       "views": "Product Page Views",
@@ -967,6 +968,69 @@
       "downloads": "Total Downloads",
       "conversion": "Conversion Rate"
     },
-    "reportUnavailable": "Report data is unavailable"
+    "reportUnavailable": "Report data is unavailable",
+    "sync": "Sync Analytics"
+  },
+  "revenue": {
+    "description": "Apple-reported estimates and final fiscal settlements, kept in their original currencies.",
+    "overview": "Overview",
+    "sales": "Sales",
+    "subscriptions": "Subscriptions",
+    "settlements": "Settlements",
+    "estimated": "Estimated proceeds · Purchases Analytics",
+    "final": "Final · Financial reports",
+    "proceeds": "Proceeds",
+    "units": "Units",
+    "payingUsers": "Paying Users",
+    "currency": "Currency",
+    "byApp": "By app",
+    "byTerritory": "By territory",
+    "active": "Active",
+    "starts": "Starts",
+    "conversions": "Conversions",
+    "renewals": "Renewals",
+    "voluntaryChurn": "Voluntary churn",
+    "involuntaryChurn": "Involuntary churn",
+    "churn": "Churn",
+    "subscription": "Subscription / date",
+    "fiscalMonth": "Apple fiscal month",
+    "region": "Report region",
+    "period": "Fiscal period",
+    "earned": "Final earned amount",
+    "noData": "No imported revenue data.",
+    "noSubscriptions": "No subscription report data for this selection.",
+    "noSettlements": "No imported settlements for this selection.",
+    "payingUsersHelp": "Paying Users is shown only when one report row supports the count. Apple user counts cannot be added across rows.",
+    "activeHelp": "Active uses the latest subscription state per app in this range, without adding snapshots across days.",
+    "salesHelp": "Sales Summary retains original currencies. Proceeds use signed Units; Sales use absolute Units with the already-signed Customer Price. Zero-unit partial-refund totals remain unknown.",
+    "settlementHelp": "Final earnings use the selected Apple fiscal month and consolidated region ZZ. Unattributed items remain visible in All Apps; app filters require a reliable identifier mapping. The daily range does not filter fiscal settlements.",
+    "syncLocation": "Run manual Sync Revenue from an App Store connection in",
+    "setupRequired": "Revenue setup required: add Vendor Number in Edit Connection. Purchases and subscriptions can still sync independently.",
+    "addVendor": "Add Vendor Number",
+    "sync": "Sync Revenue",
+    "syncing": "Syncing Revenue…",
+    "syncError": "Revenue sync failed",
+    "salesDates": "Sales date range",
+    "syncHelp": "Purchases and subscriptions, daily Sales Summary, then consolidated Finance (ZZ). Select the Apple fiscal month explicitly; each source reports its own result.",
+    "imported": "Imported",
+    "skipped": "Unchanged",
+    "waiting": "Waiting",
+    "status": {
+      "success": "Success",
+      "partial": "Partial",
+      "error": "Failed"
+    },
+    "sources": {
+      "analytics": "Purchases & subscriptions",
+      "sales": "Sales Summary",
+      "finance": "Finance"
+    },
+    "date": "Date",
+    "appItem": "App / Item",
+    "sku": "SKU",
+    "type": "Type",
+    "territory": "Territory",
+    "vendorReady": "Vendor configured",
+    "perUnit": "Per unit"
   }
 }

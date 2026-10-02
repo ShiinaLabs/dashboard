@@ -20,3 +20,5 @@ export { analytics_sites, analytics_events } from "./analytics";
 export { app_store_connections, app_store_apps, app_store_sync_runs, app_store_analytics_requests, app_store_report_imports } from "./app-store";
 
 export { fetchPolicy, accountFetchState } from "./fetch-policy";
+
+export * from "./app-store-facts";

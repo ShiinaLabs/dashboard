@@ -40,9 +40,26 @@ Serverless, Edge, and Function runtimes are future deployment options, not curre
 
 App Store Connect is an independent data source. Connections are managed on `/accounts` alongside the existing platform tabs, without changing the account domain. Its flow is UI → `lib/api.ts` → `app/api/app-store/` → `lib/services/app-store.ts` → `lib/repositories/app-store.ts` / `lib/infra/app-store/`.
 
-The foundation supports Team API Keys only, encrypted private key storage, complete paginated app discovery, app selection and manual metadata refresh. The existing account scheduler and `fetch_runs` remain account-specific. Analytics setup uses `lib/services/app-store-analytics.ts` and app-scoped request metadata. Reports are prepared by the independent ASC client/downloader/TSV modules before any database writer can receive a whole instance. The production reporting service explicitly returns `report_mapping_pending` while the typed adapter is awaiting real sanitized reports; it does not substitute mock metrics or an empty success. Typed facts, correction replacement, manual import and real end-to-end verification are still pending. Revenue and ASC scheduling remain later phases.
+```text
+App Store Connect
+├── Analytics Reports
+│   ├── Discovery / Downloads → App Store Analytics
+│   ├── Purchases → estimated operational revenue
+│   └── Subscription State / Event → subscription lifecycle
+├── Sales & Trends
+│   └── Sales Summary → daily units and per-unit prices
+└── Financial Reports
+    └── Finance → final fiscal settlements
+```
 
-Social, Developer and Business are navigation groups, not domain entities. Business contains Web Analytics and App Store Analytics. There is no Product model, generic Business entity, Revenue provider or cross-source association; removing ASC does not require changes to other data-source domains.
+
+ASC supports Team API Keys with encrypted private keys, paginated app discovery, independent app selection and manual setup/sync. Analytics transport prepares all DAILY segments before `app-store-facts` writes typed facts and manifests in one transaction. Connection version/active status and app selection are checked again at commit. `app_store_report_partitions` selects the latest processing date for each app/report/data date; same-instance checksum changes replace the complete partition. Other instances continue after a failed instance.
+
+`app-store-sync` offers two manual product operations: acquisition Analytics, and Revenue (Purchases/Subscription State/Event, Sales Summary and Finance). They reuse `app_store_sync_runs` kinds analytics/sales/finance; acquisition/revenue scopes keep status histories distinct. No ASC work is dispatched by the account scheduler. Production queries read PostgreSQL through owner-scoped enabled apps. Finance stays at authorized connection/vendor scope, with conservative identifier mapping for individual-app queries.
+
+Business contains Web Analytics, App Store Analytics and Revenue. These are navigation entries, not shared domain entities. Money stays in original currencies; Apple Purchases reports provide USD amounts themselves. Paying Users cannot be summed across rows; subscription Active uses the latest state snapshot per app. Standard reports lack Campaign, and unknown values stay null. Updated dates come from report partitions; complete-through requires contiguous imported coverage satisfying Apple's documented processing lag.
+
+Mappings are based on official Apple schemas and synthetic tests. Production credentials, report contents and signed URLs stay inside the deployed application; no fixture export/capture workflow is provided. Diagnostics contain structural report information only, never raw rows, business amounts, download URLs or credentials.
 
 ## Source Layout
 

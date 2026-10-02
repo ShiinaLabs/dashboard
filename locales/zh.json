@@ -50,7 +50,8 @@
     "ai": "AI 分析",
     "logout": "退出登录",
     "business": "业务",
-    "appStoreAnalytics": "App Store 分析"
+    "appStoreAnalytics": "App Store 分析",
+    "revenue": "收入"
   },
   "badge": {
     "inactive": "未激活",
@@ -959,7 +960,7 @@
     "noData": "暂无报告数据",
     "downloadsBySource": "按来源的下载量",
     "source": "来源",
-    "noCampaignData": "暂无推广活动数据",
+    "noCampaignData": "Standard 报表不包含 Campaign 数据。",
     "metrics": {
       "impressions": "展示次数",
       "views": "产品页浏览量",
@@ -967,6 +968,69 @@
       "downloads": "总下载量",
       "conversion": "转化率"
     },
-    "reportUnavailable": "报告数据暂不可用"
+    "reportUnavailable": "报告数据暂不可用",
+    "sync": "同步 Analytics"
+  },
+  "revenue": {
+    "description": "Apple 提供的预估收入与财政结算，保留原始币种。",
+    "overview": "概览",
+    "sales": "销售",
+    "subscriptions": "订阅",
+    "settlements": "结算",
+    "estimated": "预估收益 · Purchases Analytics",
+    "final": "最终收益 · 财务报表",
+    "proceeds": "收益",
+    "units": "数量",
+    "payingUsers": "付费用户",
+    "currency": "币种",
+    "byApp": "按应用",
+    "byTerritory": "按地区",
+    "active": "活跃订阅",
+    "starts": "开始订阅",
+    "conversions": "转为付费",
+    "renewals": "续订",
+    "voluntaryChurn": "主动流失",
+    "involuntaryChurn": "被动流失",
+    "churn": "流失",
+    "subscription": "订阅 / 日期",
+    "fiscalMonth": "Apple 财政月份",
+    "region": "报表区域",
+    "period": "财政周期",
+    "earned": "最终收益",
+    "noData": "暂无已导入的收入数据。",
+    "noSubscriptions": "当前筛选下暂无订阅报表数据。",
+    "noSettlements": "当前筛选下暂无已导入的结算。",
+    "payingUsersHelp": "仅当一条报表记录能够支持该人数时显示付费用户。Apple 用户数不能跨行相加。",
+    "activeHelp": "活跃订阅取所选范围内每个应用的最新状态，不累计不同日期的快照。",
+    "salesHelp": "Sales Summary 保留原币种。收益使用带符号的数量；销售额使用数量绝对值与已带符号的客户单价。数量为零的部分退款总额保持未知。",
+    "settlementHelp": "最终收益按 Apple 财政月份和汇总区域 ZZ 展示。无法归属的项目保留在全部应用中；单应用筛选需要可靠标识映射。日范围不筛选财政结算。",
+    "syncLocation": "在 App Store 连接中手动同步收入：",
+    "setupRequired": "收入设置未完成：请在编辑连接中添加 Vendor Number。购买和订阅报表仍可独立同步。",
+    "addVendor": "添加 Vendor Number",
+    "sync": "同步收入",
+    "syncing": "正在同步收入…",
+    "syncError": "收入同步失败",
+    "salesDates": "销售日期范围",
+    "syncHelp": "依次导入购买与订阅、每日 Sales Summary 和汇总 Finance (ZZ)。请明确选择 Apple 财政月份；各数据源分别报告结果。",
+    "imported": "已导入",
+    "skipped": "未变化",
+    "waiting": "等待",
+    "status": {
+      "success": "成功",
+      "partial": "部分成功",
+      "error": "失败"
+    },
+    "sources": {
+      "analytics": "购买与订阅",
+      "sales": "Sales Summary",
+      "finance": "Finance"
+    },
+    "date": "日期",
+    "appItem": "应用 / 项目",
+    "sku": "SKU",
+    "type": "类型",
+    "territory": "地区",
+    "vendorReady": "Vendor 已配置",
+    "perUnit": "单价"
   }
 }

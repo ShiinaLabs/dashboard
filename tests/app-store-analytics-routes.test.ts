@@ -44,10 +44,10 @@ describe("ASC Analytics route authorization", () => {
     expect(setupAppStoreAnalytics).not.toHaveBeenCalled();
   });
 
-  it("makes the pending real report mapping explicit instead of returning false empty data", async () => {
-    vi.mocked(getAppStoreAnalyticsDashboard).mockRejectedValueOnce(new AppStoreError("report_mapping_pending", 503, "Import configuration incomplete"));
+  it("returns unknown metrics as null before any reports have been imported", async () => {
+    vi.mocked(getAppStoreAnalyticsDashboard).mockResolvedValueOnce({ updatedAt: null, completeThrough: null, overview: { impressions: null, views: null, firstTimeDownloads: null, downloads: null, conversion: null }, trend: [], acquisition: [], campaigns: [], territories: [] });
     const response = await dashboardLoader(args());
-    expect(response.status).toBe(503);
-    expect(await response.json()).toMatchObject({ code: "report_mapping_pending" });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ updatedAt: null, overview: { impressions: null } });
   });
 });

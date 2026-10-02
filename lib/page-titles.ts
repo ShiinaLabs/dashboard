@@ -29,6 +29,7 @@ export const PAGE_TITLES = {
   "nav.gitlab": en.nav.gitlab,
   "nav.reddit": en.nav.reddit,
   "nav.analytics": en.nav.analytics,
+  "nav.revenue": en.nav.revenue,
   "nav.appStoreAnalytics": en.nav.appStoreAnalytics,
   "nav.ai": en.nav.ai,
   "nav.settings": en.nav.settings,

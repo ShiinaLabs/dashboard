@@ -1,3 +1,10 @@
+import { gzipSync } from "node:zlib";
+import { createHash } from "node:crypto";
+import * as ascFacts from "../lib/repositories/app-store-facts";
+import { mapAnalyticsReport, analyticsReports, type AnalyticsReportKind } from "../lib/infra/app-store/report-mapping";
+import { parseAnalyticsTsv } from "../lib/infra/app-store/analytics-tsv";
+import { syncAppStoreAnalytics, syncAppStoreRevenue } from "../lib/services/app-store-sync";
+import { getAppStoreRevenueDashboard } from "../lib/services/app-store-revenue";
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { exportPKCS8, generateKeyPair } from "jose";
 import * as appStoreService from "../lib/services/app-store";
@@ -1789,7 +1796,7 @@ describe("independent App Store Connect foundation", () => {
       await expect(setupAppStoreAnalytics(connection.id, otherViewer)).rejects.toMatchObject({ code: "forbidden" });
       expect(await listEnabledAnalyticsApps(otherViewer)).not.toEqual(expect.arrayContaining([{ id: app.id, name: app.name }]));
       await expect(getAppStoreAnalyticsDashboard(otherViewer, { appId: app.id, from: "2026-10-01", to: "2026-10-02" })).rejects.toMatchObject({ code: "forbidden" });
-      await expect(getAppStoreAnalyticsDashboard(viewer, { appId: app.id, from: "2026-10-01", to: "2026-10-02" })).rejects.toMatchObject({ code: "report_mapping_pending", status: 503 });
+      expect(await getAppStoreAnalyticsDashboard(viewer, { appId: app.id, from: "2026-10-01", to: "2026-10-02" })).toMatchObject({ updatedAt: null, overview: { impressions: null, downloads: null } });
     } finally { discovery.mockRestore(); read.mockRestore(); create.mockRestore(); }
   });
 
@@ -1838,4 +1845,125 @@ describe("independent App Store Connect foundation", () => {
       expect((await appStoreService.refreshApps(connection.id, viewer)).apps).toHaveLength(2);
     } finally { discovery.mockRestore(); read.mockRestore(); create.mockRestore(); }
   });
+  it("atomically replaces typed partitions, skips identical checksums and rejects stale corrections", async () => {
+    const discovery = vi.spyOn(AppStoreConnectClient.prototype, "listApps").mockResolvedValue(apps);
+    try {
+      const connection = await appStoreService.createConnection(viewer, input());
+      const app = (await appStoreRepo.getApps(connection.id))[0];
+      await appStoreService.setAppEnabled(connection.id, app.id, viewer, { isEnabled: true });
+      const request = await appStoreAnalyticsRepo.adoptRequest(app.id, { id: "typed-partition-request", type: "analyticsReportRequests", attributes: { accessType: "ONGOING", stoppedDueToInactivity: false } }, connection.updated_at);
+      const context = { appId: app.id, connectionId: connection.id, version: connection.updated_at, requestId: request.id, reportId: "report", reportName: "App Store Downloads", reportCategory: "COMMERCE" };
+      const prepared = (instanceId: string, processingDate: string, counts: string, checksum: string) => ({ instanceId, processingDate, granularity: "DAILY" as const, segments: [{ id: "segment-1", checksum }, { id: "segment-2", checksum }], table: parseAnalyticsTsv(`Date\tApp Apple Identifier\tDownload Type\tSource Type\tTerritory\tCounts\n2026-09-29\t123\tFirst-time Download\tApp Store search\tUSA\t${counts}\n2026-09-29\t123\tRedownload\tApp Store search\tUSA\t2`) });
+      const commit = async (p: ReturnType<typeof prepared>) => ascFacts.commitAnalyticsInstance(context, p, mapAnalyticsReport("downloads", p.table, { appId: app.id, appleId: "123", instanceId: p.instanceId, processingDate: p.processingDate }));
+      const first = prepared("first", "2026-10-01", "10", "a".repeat(32));
+      expect(await commit(first)).toBe("imported");
+      expect(await commit(first)).toBe("skipped");
+      expect((await ascFacts.readAnalyticsFacts([app.id])).downloads).toHaveLength(2);
+      await commit(prepared("corrected", "2026-10-02", "20", "b".repeat(32)));
+      expect(await commit(prepared("older", "2026-09-30", "99", "c".repeat(32)))).toBe("skipped");
+      expect(await commit(prepared("equal-other", "2026-10-02", "98", "d".repeat(32)))).toBe("skipped");
+      let facts = await ascFacts.readAnalyticsFacts([app.id]);
+      expect(facts.downloads.map((r) => Number(r.counts))).toEqual([20, 2]);
+      await commit(prepared("corrected", "2026-10-02", "21", "e".repeat(32)));
+      facts = await ascFacts.readAnalyticsFacts([app.id]);
+      expect(facts.downloads.map((r) => Number(r.counts))).toEqual([21, 2]);
+      const bad = prepared("rollback", "2026-10-03", "1", "f".repeat(32));
+      const mapped = mapAnalyticsReport("downloads", bad.table, { appId: app.id, appleId: "123", instanceId: bad.instanceId, processingDate: bad.processingDate });
+      mapped.rows[1].app_id = -1; // FK failure after partition deletion must roll back facts AND manifest.
+      await expect(ascFacts.commitAnalyticsInstance(context, bad, mapped)).rejects.toThrow();
+      expect((await ascFacts.readAnalyticsFacts([app.id])).downloads.map((r) => Number(r.counts))).toEqual([21, 2]);
+      expect((await appStoreAnalyticsRepo.importsForApps([app.id])).some((r) => r.apple_instance_id === "rollback")).toBe(false);
+      const dashboard = await getAppStoreAnalyticsDashboard(viewer, { appId: app.id, from: "2026-09-29", to: "2026-09-29" });
+      expect(dashboard).toMatchObject({ updatedAt: "2026-09-29", completeThrough: null, overview: { firstTimeDownloads: 21, downloads: 23, impressions: null, conversion: null } });
+      await appStoreService.setAppEnabled(connection.id, app.id, viewer, { isEnabled: false });
+      await expect(commit(prepared("disabled", "2026-10-04", "1", "0".repeat(32)))).rejects.toBeInstanceOf(appStoreRepo.AppStoreConflictError);
+    } finally { discovery.mockRestore(); }
+  });
+
+  it("leaves a failed multi-segment instance untouched while importing the next instance and skipping unchanged downloads", async () => {
+    const discovery = vi.spyOn(AppStoreConnectClient.prototype, "listApps").mockResolvedValue(apps);
+    const requests = vi.spyOn(AppStoreConnectClient.prototype, "listAnalyticsReportRequests").mockResolvedValue([{ id: "atomic-sync-request", type: "analyticsReportRequests", attributes: { accessType: "ONGOING", stoppedDueToInactivity: false } }]);
+    const reports = vi.spyOn(AppStoreConnectClient.prototype, "listAnalyticsReports").mockResolvedValue([{ id: "atomic-report", type: "analyticsReports", attributes: { name: "App Store Downloads", category: "COMMERCE" } }]);
+    const instances = vi.spyOn(AppStoreConnectClient.prototype, "listAnalyticsReportInstances").mockResolvedValue(["bad", "good"].map((id) => ({ id, type: "analyticsReportInstances", attributes: { granularity: "DAILY", processingDate: "2026-10-02" } })));
+    const bytes = gzipSync("Date\tApp Apple Identifier\tDownload Type\tSource Type\tTerritory\tCounts\n2026-09-29\t123\tFirst-time Download\tApp Store search\tUSA\t5");
+    const segment = (id: string) => ({ id, type: "analyticsReportSegments" as const, attributes: { url: "https://synthetic.s3.amazonaws.com/report", checksum: createHash("md5").update(bytes).digest("hex"), sizeInBytes: bytes.length } });
+    const segments = vi.spyOn(AppStoreConnectClient.prototype, "listAnalyticsReportSegments").mockImplementation(async (id) => id === "bad" ? [segment("bad-one"), segment("bad-two")] : [segment("good-one")]);
+    const details = vi.spyOn(AppStoreConnectClient.prototype, "getAnalyticsReportSegment").mockImplementation(async (id) => segment(id));
+    const downloads = vi.spyOn(AppStoreConnectClient.prototype, "downloadAnalyticsSegment").mockImplementation(async (s) => { if (s.id === "bad-two") throw new Error("SECRET signed URL"); return bytes; });
+    try {
+      const connection = await appStoreService.createConnection(viewer, input());
+      const app = (await appStoreRepo.getApps(connection.id))[0];
+      await appStoreService.setAppEnabled(connection.id, app.id, viewer, { isEnabled: true });
+      expect(await syncAppStoreAnalytics(connection.id, viewer)).toMatchObject({ status: "partial", imported: 1, errors: [expect.stringContaining("instance bad")] });
+      expect((await ascFacts.readAnalyticsFacts([app.id])).downloads).toHaveLength(1);
+      expect((await appStoreAnalyticsRepo.importsForApps([app.id])).map((r) => r.apple_instance_id)).toEqual(["good"]);
+      expect((await appStoreRepo.getRecentRuns(connection.id))[0].error_message).not.toContain("SECRET");
+      downloads.mockClear();
+      expect(await syncAppStoreAnalytics(connection.id, viewer)).toMatchObject({ skipped: 1 });
+      expect(downloads.mock.calls.every(([s]) => s.id !== "good-one")).toBe(true);
+      await expect(syncAppStoreAnalytics(connection.id, otherViewer)).rejects.toMatchObject({ code: "forbidden" });
+    } finally { for (const spy of [discovery, requests, reports, instances, segments, details, downloads]) spy.mockRestore(); }
+  });
+
+  it("imports Revenue with separate currencies, final fiscal settlements and independent missing-vendor failures", async () => {
+    const discovery = vi.spyOn(AppStoreConnectClient.prototype, "listApps").mockResolvedValue(apps);
+    const requests = vi.spyOn(AppStoreConnectClient.prototype, "listAnalyticsReportRequests").mockResolvedValue([]);
+    const salesBytes = gzipSync("Begin Date\tEnd Date\tSKU\tApple Identifier\tParent Identifier\tProduct Type Identifier\tCountry Code\tUnits\tDeveloper Proceeds\tCurrency of Proceeds\tCustomer Price\tCustomer Currency\n09/29/2026\t09/29/2026\texample-sku\t123\t\t1\tJP\t2\t0.7\tUSD\t100\tJPY");
+    const financeBytes = gzipSync("Start Date\tEnd Date\tVendor Identifier\tApple Identifier\tProduct Type Identifier\tCountry of Sale\tQuantity\tExtended Partner Share\tPartner Share Currency\n08/30/2026\t09/26/2026\texample-sku\t123\t1\tJP\t2\t1.4\tUSD\n08/30/2026\t09/26/2026\texample-sku\t123\t1\tJP\t1\t100\tJPY");
+    const salesDownload = vi.spyOn(AppStoreConnectClient.prototype, "downloadSalesReport").mockResolvedValue(salesBytes);
+    const financeDownload = vi.spyOn(AppStoreConnectClient.prototype, "downloadFinanceReport").mockRejectedValueOnce(new AppStoreApiError(403, "FORBIDDEN", "SECRET")).mockResolvedValue(financeBytes);
+    try {
+      const connection = await appStoreService.createConnection(viewer, { ...input(), vendorNumber: "123456" });
+      const app = (await appStoreRepo.getApps(connection.id))[0];
+      await appStoreService.setAppEnabled(connection.id, app.id, viewer, { isEnabled: true });
+      const filters = { from: "2026-09-29", to: "2026-09-29", fiscalMonth: "2026-09", regionCode: "ZZ" };
+      expect(await syncAppStoreRevenue(connection.id, viewer, filters)).toMatchObject({ status: "partial", sources: { sales: { status: "success", imported: 1 }, finance: { status: "error" } } });
+      expect(await syncAppStoreRevenue(connection.id, viewer, filters)).toMatchObject({ status: "success", sources: { sales: { skipped: 1 }, finance: { imported: 1 } } });
+      const dashboard = await getAppStoreRevenueDashboard(viewer, { ...filters, appId: app.id });
+      expect(dashboard.sales).toMatchObject({ units: "2", amounts: [{ currency: "JPY", proceeds: null, sales: "200" }, { currency: "USD", proceeds: "1.4", sales: null }] });
+      expect(dashboard.settlements).toEqual(expect.arrayContaining([expect.objectContaining({ fiscalMonth: "2026-09", region: "ZZ", currency: "USD", earned: "1.4" }), expect.objectContaining({ currency: "JPY", earned: "100" })]));
+      expect(dashboard.overview.payingUsers).toBeNull();
+      expect(dashboard.subscriptions.active).toBeNull();
+      await expect(syncAppStoreRevenue(connection.id, otherViewer, filters)).rejects.toMatchObject({ code: "forbidden" });
+      await expect(getAppStoreRevenueDashboard(otherViewer, { ...filters, appId: app.id })).rejects.toMatchObject({ code: "forbidden" });
+      const noVendor = await appStoreService.createConnection(viewer, input());
+      const otherApp = (await appStoreRepo.getApps(noVendor.id))[0];
+      await appStoreService.setAppEnabled(noVendor.id, otherApp.id, viewer, { isEnabled: true });
+      expect(await syncAppStoreRevenue(noVendor.id, viewer, filters)).toMatchObject({ status: "partial", sources: { analytics: { status: "success" }, sales: { status: "error", errors: [expect.stringContaining("vendor_required")] }, finance: { status: "error" } } });
+    } finally { for (const spy of [discovery, requests, salesDownload, financeDownload]) spy.mockRestore(); }
+  });
+
+  it("persists all five official fact types and replaces corrected Purchases without double counting", async () => {
+    const discovery = vi.spyOn(AppStoreConnectClient.prototype, "listApps").mockResolvedValue(apps);
+    try {
+      const connection = await appStoreService.createConnection(viewer, input());
+      const app = (await appStoreRepo.getApps(connection.id))[0];
+      await appStoreService.setAppEnabled(connection.id, app.id, viewer, { isEnabled: true });
+      const request = await appStoreAnalyticsRepo.adoptRequest(app.id, { id: "all-typed-request", type: "analyticsReportRequests", attributes: { accessType: "ONGOING", stoppedDueToInactivity: false } }, connection.updated_at);
+      const common = { Date: "2026-09-29", "App Apple Identifier": "123", Territory: "USA" };
+      const subscription = { ...common, "Subscription Name": "Synthetic Plan", "Subscription Identifier": "456", "Subscription Group": "Plans", "Subscription Group Identifier": "789", Counts: "3" };
+      const rows: Record<AnalyticsReportKind, Record<string, string>> = {
+        discovery: { ...common, Event: "Impression", "Page Type": "No page", "Source Type": "App Store search", Counts: "10", "Unique Counts": "8" },
+        downloads: { ...common, "Download Type": "First-time Download", "Source Type": "App Store search", Counts: "2" },
+        purchases: { ...common, "Purchase Type": "In-app purchase", "Content Name": "Synthetic", "Content Apple Identifier": "456", "Source Type": "App Store search", Purchases: "1", "Proceeds in USD": "0.7", "Sales in USD": "1", "Paying Users": "1" },
+        subscriptionState: { ...subscription, "State Metric": "Full price", "State Metric Grouping": "Paid plans" },
+        subscriptionEvent: { ...subscription, "Event Date": common.Date, "Event Sub Type": "Subscribe", "Event Grouping": "Paid Subscription Starts", "Offer Type": "" },
+      };
+      const commit = async (kind: AnalyticsReportKind, row: Record<string, string>, instanceId = kind, processingDate = "2026-10-02") => {
+        const prepared = { instanceId, processingDate, granularity: "DAILY" as const, segments: [{ id: kind, checksum: "a".repeat(32) }], table: parseAnalyticsTsv(Object.keys(row).join("\t") + "\n" + Object.values(row).join("\t")) };
+        const mapped = mapAnalyticsReport(kind, prepared.table, { appId: app.id, appleId: "123", instanceId, processingDate });
+        return ascFacts.commitAnalyticsInstance({ appId: app.id, connectionId: connection.id, version: connection.updated_at, requestId: request.id, reportId: kind, reportName: analyticsReports[kind], reportCategory: "COMMERCE" }, prepared, mapped);
+      };
+      for (const kind of Object.keys(rows) as AnalyticsReportKind[]) expect(await commit(kind, rows[kind])).toBe("imported");
+      const analytics = await getAppStoreAnalyticsDashboard(viewer, { appId: app.id, from: common.Date, to: common.Date });
+      expect(analytics).toMatchObject({ completeThrough: common.Date, overview: { impressions: 10, downloads: 2 } });
+      let revenue = await getAppStoreRevenueDashboard(viewer, { appId: app.id, from: common.Date, to: common.Date });
+      expect(revenue).toMatchObject({ completeThrough: common.Date, overview: { amounts: [{ currency: "USD", proceeds: "0.7", sales: "1" }] }, subscriptions: { active: "3", starts: "3" } });
+      await commit("purchases", { ...rows.purchases, "Proceeds in USD": "-0.7", "Sales in USD": "-1", Purchases: "-1" }, "purchase-correction", "2026-10-03");
+      revenue = await getAppStoreRevenueDashboard(viewer, { appId: app.id, from: common.Date, to: common.Date });
+      expect(revenue.overview.amounts).toEqual([{ currency: "USD", proceeds: "-0.7", sales: "-1" }]);
+      expect((await ascFacts.readAnalyticsFacts([app.id])).purchases).toHaveLength(1);
+    } finally { discovery.mockRestore(); }
+  });
+
 });

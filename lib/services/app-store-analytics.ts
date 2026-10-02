@@ -1,3 +1,5 @@
+import { readAnalyticsPartitions } from "../repositories/app-store-facts";
+import { analyticsCompleteThrough } from "./app-store-analytics-reporting";
 import { isMockMode } from "../config";
 import { authorizedConnection, clientForConnection, AppStoreError } from "./app-store";
 import * as analytics from "../repositories/app-store-analytics";
@@ -27,15 +29,17 @@ export async function getAppStoreAnalyticsStatus(connectionId: number, viewer: V
   const [requests, runs, imports] = await Promise.all([analytics.requestsForApps(apps.map((app) => app.id)), analytics.analyticsRuns(connectionId), analytics.importsForApps(apps.map((app) => app.id))]);
   const ongoingReady = apps.length > 0 && apps.every((app) => requests.some((request) => request.app_id === app.id && request.access_type === "ONGOING" && !request.stopped_due_to_inactivity));
   const snapshotReady = apps.length > 0 && apps.every((app) => requests.some((request) => request.app_id === app.id && request.access_type === "ONE_TIME_SNAPSHOT"));
-  const imported = imports.filter((row) => row.status === "imported");
+  const imported = imports.filter((row) => row.status === "imported" && ["App Store Discovery and Engagement", "App Store Downloads"].includes(row.report_name));
   const lastSync = runs[0] ?? null;
   const state = lastSync?.status === "error" ? "error" : lastSync?.status === "partial" ? "partial" : !requests.length ? "not_configured" : imported.length ? "active" : "waiting";
+  const partitions = (await readAnalyticsPartitions(apps.map((a) => a.id))).filter((p) => p.report_kind === "discovery" || p.report_kind === "downloads");
+  const dates = partitions.map((p) => p.date).sort();
   return {
     enabledApps: apps.length, state,
     snapshot: snapshotReady ? "ready" : requests.length ? "pending" : "unavailable",
     ongoing: ongoingReady ? "active" : requests.length ? "pending" : "unavailable",
     // Freshness is not inferred from setup/sync wall time, or from a manifest alone.
-    latestData: null, completeThrough: null, lastSync, message: lastSync?.error_message ?? null,
+    latestData: dates.at(-1) ?? null, completeThrough: dates.length ? analyticsCompleteThrough(partitions, apps.map((a) => a.id), ["discovery", "downloads"], dates[0], dates.at(-1)!) : null, lastSync, message: lastSync?.error_message ?? null,
   };
 }
 
@@ -49,7 +53,7 @@ export async function setupAppStoreAnalytics(connectionId: number, viewer: Viewe
   setupInFlight.add(connectionId);
   let run;
   try {
-    run = await startRun(connectionId, "analytics");
+    run = await startRun(connectionId, "analytics", "acquisition");
     const client = isMockMode() ? null : clientForConnection(connection);
     let succeeded = 0;
     const errors: string[] = [];

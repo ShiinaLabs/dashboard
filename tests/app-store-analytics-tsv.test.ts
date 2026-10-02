@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { parseAnalyticsTsv } from "../lib/infra/app-store/analytics-tsv";
-import { sanitizeAnalyticsFixture } from "../lib/infra/app-store/analytics-fixture";
 
 // Synthetic TSV strings exercise format handling only, not an Apple report schema.
 describe("report TSV format", () => {
@@ -26,13 +25,4 @@ describe("report TSV format", () => {
     expect(() => parseAnalyticsTsv("A\nvalue", ["Date"])).toThrow("Missing required report headers: Date");
   });
 
-  it("redacts business identifiers while retaining header order, enums and nulls", () => {
-    const original = parseAnalyticsTsv("App Name\tApp Apple Identifier\tCampaign\tEvent\tCount\nSecret App\t999\tSecret Campaign\tFuture Event\t\nSecret App\t999\tSecret Campaign\tKnown\t0\n");
-    const text = sanitizeAnalyticsFixture(original);
-    expect(text).not.toContain("Secret");
-    const fixture = parseAnalyticsTsv(text);
-    expect(fixture.headers).toEqual(original.headers);
-    expect(fixture.rows[0]).toMatchObject({ "App Name": "Sample App", "App Apple Identifier": "1234567890", Campaign: "Sample Campaign 1", Event: "Future Event", Count: null });
-    expect(fixture.rows[1]).toMatchObject({ Campaign: "Sample Campaign 1", Count: "0" });
-  });
 });

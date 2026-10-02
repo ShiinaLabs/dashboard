@@ -52,7 +52,7 @@ export async function assertAppStillEnabled(appId: number, connectionId: number,
 }
 
 export async function analyticsRuns(connectionId: number) {
-  return getRecentRuns(connectionId, "analytics");
+  return getRecentRuns(connectionId, "analytics", "acquisition");
 }
 
 export async function importsForApps(appIds: number[]) {
