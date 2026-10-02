@@ -48,11 +48,25 @@ function parseReportTsv(input: string, requiredHeaders: readonly string[], finan
   const missing = requiredHeaders.filter((name) => !headers.includes(name));
   if (missing.length) throw new AppStoreReportError("missing_headers", `Missing required report headers: ${missing.join(", ")}`);
   if (finance) {
-    const trailerIndex = records.findIndex((row) => row.length === 2 && row[0] === "Total_Rows");
+    const trailerIndex = records.findIndex((row) => row[0] === "Total_Rows");
     if (trailerIndex !== -1) {
       const trailer = records.slice(trailerIndex).filter((row) => !(row.length === 1 && row[0] === ""));
-      const labels = ["Total_Rows", "Total_Amount", "Total_Units"];
-      if (trailer.length !== labels.length || trailer.some((row, index) => row.length !== 2 || row[0] !== labels[index] || !/^-?(?:\d+(?:\.\d+)?|\.\d+)$/.test(row[1])) || !/^\d+$/.test(trailer[0][1])) {
+      const groupedHeader = ["Country Of Sale", "Partner Share Currency", "Quantity", "Extended Partner Share"];
+      const validAmount = (value: string) => /^-?(?:\d+(?:\.\d+)?|\.\d+)$/.test(value);
+      const validRowCount = trailer[0]?.length === 2 && /^\d+$/.test(trailer[0][1]);
+      const legacyLabels = ["Total_Rows", "Total_Amount", "Total_Units"];
+      const legacy = validRowCount && trailer.length === legacyLabels.length
+        && trailer.every((row, index) => row.length === 2 && row[0] === legacyLabels[index] && validAmount(row[1]))
+        && /^\d+$/.test(trailer[2]?.[1] ?? "");
+      const grouped = validRowCount
+        && trailer[1]?.length === groupedHeader.length
+        && trailer[1].every((field, index) => field === groupedHeader[index])
+        && trailer.slice(2).every((row) => row.length === groupedHeader.length
+          && /^[A-Z]{2}$/.test(row[0])
+          && /^[A-Z]{3}$/.test(row[1])
+          && /^-?\d+$/.test(row[2])
+          && /^-?\d+\.\d{2}$/.test(row[3]));
+      if (!legacy && !grouped) {
         throw new AppStoreReportError("invalid_finance_trailer", "Finance trailer is incomplete or malformed");
       }
       const detailCount = records.slice(0, trailerIndex).filter((row) => !(row.length === 1 && row[0] === "")).length;

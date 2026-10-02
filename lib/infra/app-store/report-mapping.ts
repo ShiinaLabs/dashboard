@@ -7,8 +7,8 @@ export const analyticsReportDefinitions = {
   discovery: { baseName: "App Store Discovery and Engagement", standardName: "App Store Discovery and Engagement Standard" },
   downloads: { baseName: "App Store Downloads", standardName: "App Store Downloads Standard" },
   purchases: { baseName: "App Store Purchases", standardName: "App Store Purchases Standard" },
-  subscriptionState: { baseName: "App Store Subscription State", standardName: "App Store Subscription State Standard" },
-  subscriptionEvent: { baseName: "App Store Subscription Event", standardName: "App Store Subscription Event Standard" },
+  subscriptionState: { baseName: "App Store Subscription State", standardName: "App Store Subscription State Report Standard" },
+  subscriptionEvent: { baseName: "App Store Subscription Event", standardName: "App Store Subscription Event Report Standard" },
 } as const;
 export type AnalyticsReportKind = keyof typeof analyticsReportDefinitions;
 export function identifyStandardAnalyticsReport(name: string): AnalyticsReportKind | undefined {
@@ -113,12 +113,13 @@ export function mapSalesReport(input: AnalyticsTsv, connectionId: number, report
 }
 export function mapFinanceReport(input: AnalyticsTsv, connectionId: number, fiscalMonth: string, regionCode: string, checksum: string): (typeof schema.app_store_finance_rows.$inferInsert)[] {
   const table = normalized(input);
-  requireHeaders(table, ["Start Date", "End Date", "Vendor Identifier", "Apple Identifier", "Product Type Identifier", "Country of Sale", "Quantity", "Extended Partner Share", "Partner Share Currency"]);
+  const countryOfSaleHeader = table.headers.includes("Country Of Sale") ? "Country Of Sale" : "Country of Sale";
+  requireHeaders(table, ["Start Date", "End Date", "Vendor Identifier", "Apple Identifier", "Product Type Identifier", countryOfSaleHeader, "Quantity", "Extended Partner Share", "Partner Share Currency"]);
   return table.rows.map((r, index) => {
     try {
       const start = isoDate(r["Start Date"], true), end = isoDate(r["End Date"], true);
       if (end < start) throw new AppStoreReportError("invalid_period", "Invalid financial period");
-      return { connection_id: connectionId, fiscal_month: fiscalMonth, region_code: regionCode, start_date: start, end_date: end, vendor_identifier: r["Vendor Identifier"], sku: r["Vendor Identifier"], product_id: r["Apple Identifier"], product_type: r["Product Type Identifier"], territory: r["Country of Sale"], units: number(r, "Quantity"), earned_amount: number(r, "Extended Partner Share"), currency: r["Partner Share Currency"], import_identity: checksum };
+      return { connection_id: connectionId, fiscal_month: fiscalMonth, region_code: regionCode, start_date: start, end_date: end, vendor_identifier: r["Vendor Identifier"], sku: r["Vendor Identifier"], product_id: r["Apple Identifier"], product_type: r["Product Type Identifier"], territory: r[countryOfSaleHeader], units: number(r, "Quantity"), earned_amount: number(r, "Extended Partner Share"), currency: r["Partner Share Currency"], import_identity: checksum };
     } catch { throw new AppStoreReportError("invalid_finance_row", `Invalid Finance report row ${index + 2}`); }
   });
 }

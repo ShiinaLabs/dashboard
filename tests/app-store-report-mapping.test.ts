@@ -59,6 +59,10 @@ describe("Sales and Finance (synthetic official schemas)", () => {
     expect(rows[0]).toMatchObject({ fiscal_month: "2026-09", region_code: "ZZ", start_date: "2026-08-30", units: "-2", earned_amount: "-1.4", currency: "USD" });
     expect(rows[0]).not.toHaveProperty("app_id");
   });
+  it("maps Apple's current Finance header casing for Country Of Sale", () => {
+    const rows = mapFinanceReport(tsv({ "Start Date": "08/30/2026", "End Date": "09/26/2026", "Vendor Identifier": "synthetic.product", "Apple Identifier": "456", "Product Type Identifier": "IAP", "Country Of Sale": "JP", Quantity: "2", "Extended Partner Share": "1.40", "Partner Share Currency": "USD" }), 1, "2026-09", "ZZ", "hash");
+    expect(rows[0]).toMatchObject({ territory: "JP", units: "2", earned_amount: "1.4" });
+  });
   it("calculates exact decimals, keeps null and separates currencies", () => {
     expect(sumDecimals(["0.1", "0.2"])).toBe("0.3");
     expect(decimal("-0.000000000001")).toBe("-0.000000000001");

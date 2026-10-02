@@ -73,6 +73,13 @@ describe("Standard report recognition", () => {
     expect(identifyStandardAnalyticsReport(definition.standardName)).toBe(kind);
     for (const name of [definition.baseName, `${definition.baseName} Detailed`, `${definition.baseName} SomethingElse`]) expect(identifyStandardAnalyticsReport(name)).toBeUndefined();
   });
+
+  it("recognizes Apple's Subscription Report Standard names but excludes Detailed reports", () => {
+    expect(identifyStandardAnalyticsReport("App Store Subscription State Report Standard")).toBe("subscriptionState");
+    expect(identifyStandardAnalyticsReport("App Store Subscription Event Report Standard")).toBe("subscriptionEvent");
+    expect(identifyStandardAnalyticsReport("App Store Subscription State Report Detailed")).toBeUndefined();
+    expect(identifyStandardAnalyticsReport("App Store Subscription Event Report Detailed")).toBeUndefined();
+  });
 });
 
 describe("production Analytics sync selection", () => {

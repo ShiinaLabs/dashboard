@@ -41,6 +41,19 @@ describe("Finance report trailer (synthetic)", () => {
     expect(parseFinanceTsv(body + footer).rows[0]).toMatchObject({ "Start Date": "08/30/2026", "End Date": "09/26/2026", Quantity: "2" });
     expect(() => parseAnalyticsTsv(body + footer)).toThrow("Report row 3 has an unexpected number of fields (expected 22, received 2, non-empty 2, more rows follow)");
   });
+  it("accepts Apple's grouped Finance summary trailer and excludes it from facts", () => {
+    const groupedFooter = "Total_Rows\t1\nCountry Of Sale\tPartner Share Currency\tQuantity\tExtended Partner Share\nUS\tUSD\t2\t1.40\n";
+    const parsed = parseFinanceTsv(body + groupedFooter);
+    expect(parsed.rows).toHaveLength(1);
+    expect(parsed.rows[0]).toMatchObject({ "Start Date": "08/30/2026", "End Date": "09/26/2026", Quantity: "2" });
+  });
+  it.each([
+    "Total_Rows\t1.0\nCountry Of Sale\tPartner Share Currency\tQuantity\tExtended Partner Share\nUS\tUSD\t2\t1.40\n",
+    "Total_Rows\t1\nTerritory\tPartner Share Currency\tQuantity\tExtended Partner Share\nUS\tUSD\t2\t1.40\n",
+    "Total_Rows\t1\nCountry Of Sale\tPartner Share Currency\tQuantity\tExtended Partner Share\nUSA\tUSD\t2\t1.40\n",
+  ])("rejects a malformed grouped Finance trailer", (groupedFooter) => {
+    expect(() => parseFinanceTsv(body + groupedFooter)).toThrow(/Finance trailer/);
+  });
   it.each([
     footer.replace("Total_Rows\t1", "Total_Rows\t2"),
     footer.replace("Total_Units", "Unknown"),
