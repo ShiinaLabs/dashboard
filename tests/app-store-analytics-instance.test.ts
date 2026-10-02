@@ -1,7 +1,7 @@
 import { gzipSync } from "node:zlib";
 import { describe, expect, it, vi } from "vitest";
 import { AppStoreConnectClient, type AnalyticsReportInstance } from "../lib/infra/app-store/AppStoreConnectClient";
-import { prepareAnalyticsInstance, isStandardP2Report } from "../lib/infra/app-store/analytics-instance";
+import { prepareAnalyticsInstance } from "../lib/infra/app-store/analytics-instance";
 
 const instance: AnalyticsReportInstance = { id: "instance", type: "analyticsReportInstances", attributes: { processingDate: "2026-10-01", granularity: "DAILY" } };
 function mockClient() {
@@ -43,11 +43,7 @@ describe("whole-instance preparation", () => {
     await expect(prepareAnalyticsInstance(third.typed, instance)).rejects.toMatchObject({ code: "invalid_segment" });
   });
 
-  it("accepts only the two Standard reports and DAILY instances", async () => {
-    expect(isStandardP2Report("App Store Downloads")).toBe(true);
-    expect(isStandardP2Report("App Store Discovery and Engagement")).toBe(true);
-    expect(isStandardP2Report("App Store Downloads Detailed")).toBe(false);
-    expect(isStandardP2Report("Purchases")).toBe(false);
+  it("accepts only DAILY instances", async () => {
     const { typed, client } = mockClient();
     await expect(prepareAnalyticsInstance(typed, { ...instance, attributes: { ...instance.attributes, granularity: "WEEKLY" } })).rejects.toMatchObject({ code: "unsupported_granularity" });
     expect(client.listAnalyticsReportSegments).not.toHaveBeenCalled();

@@ -52,3 +52,8 @@ export interface AppStoreConnectionInput {
 }
 
 export type AppStoreConnectionUpdate = Partial<AppStoreConnectionInput> & { isActive?: boolean };
+
+/** Waiting runs finish normally in the existing DB status model; their reason is durable. */
+export function reportRunDisplayStatus(run: Pick<AppStoreSyncRun, "status" | "error_message">): AppStoreSyncRun["status"] | "waiting" {
+  return run.status === "success" && run.error_message?.startsWith("waiting: ") ? "waiting" : run.status;
+}

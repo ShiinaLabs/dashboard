@@ -11,9 +11,10 @@ export function AppStoreAnalyticsStatusPanel({ connectionId, isActive }: { conne
   const queryClient = useQueryClient();
   const status = useQuery({ queryKey: ["app-store-analytics-status", connectionId], queryFn: () => api.getAppStoreAnalyticsStatus(connectionId) });
   const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<Awaited<ReturnType<typeof api.syncAppStoreAnalytics>> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const setup = async () => {
-    setBusy(true); setError(null);
+    setBusy(true); setError(null); setResult(null);
     try {
       const next = await api.setupAppStoreAnalytics(connectionId);
       queryClient.setQueryData(["app-store-analytics-status", connectionId], next);
@@ -22,9 +23,10 @@ export function AppStoreAnalyticsStatusPanel({ connectionId, isActive }: { conne
     finally { setBusy(false); }
   };
   const sync = async () => {
-    setBusy(true); setError(null);
+    setBusy(true); setError(null); setResult(null);
     try {
       const result = await api.syncAppStoreAnalytics(connectionId);
+      setResult(result);
       if (result.errors.length) setError(result.errors.join("; "));
       await Promise.all([queryClient.invalidateQueries({ queryKey: ["app-store-analytics"] }), queryClient.invalidateQueries({ queryKey: ["app-store-analytics-status", connectionId] }), queryClient.invalidateQueries({ queryKey: ["app-store-connection", connectionId] })]);
     } catch (e) { setError(e instanceof Error ? e.message : t("appStoreAnalytics.operationError")); }
@@ -43,9 +45,10 @@ export function AppStoreAnalyticsStatusPanel({ connectionId, isActive }: { conne
         <div><dt className="text-muted-foreground">{t("appStoreAnalytics.completeThrough")}</dt><dd>{data.completeThrough ?? "—"}</dd></div>
         <div><dt className="text-muted-foreground">{t("appStoreAnalytics.lastSync")}</dt><dd>{data.lastSync?.finished_at ? formatDateTime(data.lastSync.finished_at) : "—"}</dd></div>
       </dl>
-      {data.state === "waiting" && <p className="text-sm text-muted-foreground">{t("appStoreAnalytics.waitingHelp")}</p>}
-      {data.message && <p role="alert" className="text-sm text-destructive">{data.message}</p>}
+      {data.state === "waiting" && !data.latestData && <p className="text-sm text-muted-foreground">{t("appStoreAnalytics.waitingHelp")}</p>}
+      {data.message && <p role={data.state === "error" || data.state === "partial" ? "alert" : "status"} className={`text-sm ${data.state === "error" || data.state === "partial" ? "text-destructive" : "text-muted-foreground"}`}>{data.message}</p>}
     </>}
+    {result && <div role="status" className="space-y-1 text-sm"><p>{t(`revenue.status.${result.status}`)}</p>{result.waitingReasons?.map((reason, index) => <p key={index} className="text-muted-foreground">{reason}</p>)}</div>}
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     <div className="flex flex-wrap gap-2">
       <Button disabled={busy || !isActive || !data?.enabledApps} onClick={() => void sync()}>{t("appStoreAnalytics.sync")}</Button>

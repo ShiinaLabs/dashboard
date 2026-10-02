@@ -32,17 +32,43 @@ export type AnalyticsReportSegment = z.infer<typeof segmentResource>;
 export type AnalyticsAccessType = AnalyticsReportRequest["attributes"]["accessType"];
 export interface DiscoveredApp { apple_id: string; name: string; bundle_id: string; sku: string }
 
+function safeAppleMessage(message: string, values: readonly string[] = []): string {
+  let safe = message.replace(/-----BEGIN [\s\S]*?-----END [^-]+-----/g, "[redacted]")
+    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, "[redacted]")
+    .replace(/\bBearer\s+\S+/gi, "Bearer [redacted]")
+    .replace(/https?:\/\/\S+/gi, "[URL redacted]");
+  // Literal replacement, longest first: filter values can contain regex metacharacters.
+  for (const value of [...new Set(values)].filter(Boolean).sort((a, b) => b.length - a.length)) safe = safe.split(value).join("[redacted]");
+  return safe.slice(0, 1000);
+}
+
 export class AppStoreApiError extends Error {
-  constructor(public readonly status: number, public readonly code: string, message: string) {
-    super(message);
+  public readonly code: string;
+  public readonly title?: string;
+  public readonly parameter?: string;
+  constructor(public readonly status: number, code: string, message: string, metadata: { title?: string; parameter?: string } = {}) {
+    super(safeAppleMessage(message));
     this.name = "AppStoreApiError";
+    this.code = safeAppleMessage(code);
+    this.title = metadata.title === undefined ? undefined : safeAppleMessage(metadata.title);
+    this.parameter = metadata.parameter === undefined ? undefined : safeAppleMessage(metadata.parameter);
   }
 }
 
-function safeAppleMessage(message: string): string {
-  return message.replace(/-----BEGIN [\s\S]*?-----END [^-]+-----/g, "[redacted]")
-    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, "[redacted]")
-    .replace(/https?:\/\/\S+/g, "[URL redacted]").slice(0, 1000);
+const appleErrorResponse = z.object({ errors: z.array(z.object({
+  code: z.string(), title: z.string(), detail: z.string().optional(),
+  source: z.object({ parameter: z.string().optional() }).optional(),
+})).min(1) });
+function appleApiError(status: number, body: unknown, values: readonly string[], fallback: string): AppStoreApiError {
+  const parsed = appleErrorResponse.safeParse(body);
+  if (!parsed.success) return new AppStoreApiError(status, "apple_error", fallback);
+  const error = parsed.data.errors[0];
+  const parameter = error.source?.parameter;
+  return new AppStoreApiError(status, safeAppleMessage(error.code, values), safeAppleMessage(error.detail || error.title, values), {
+    title: safeAppleMessage(error.title, values),
+    // Parameter names are schema metadata, never echoed parameter values.
+    parameter: parameter && /^filter\[[A-Za-z][A-Za-z0-9]*\]$/.test(parameter) ? safeAppleMessage(parameter, values) : undefined,
+  });
 }
 
 export class AppStoreConnectClient {
@@ -59,10 +85,7 @@ export class AppStoreConnectClient {
       });
       const result: unknown = await response.json().catch(() => null);
       if (!response.ok) {
-        const parsed = z.object({ errors: z.array(z.object({ code: z.string(), title: z.string(), detail: z.string().optional() })) }).safeParse(result);
-        const errors = parsed.success ? parsed.data.errors : [];
-        const message = errors.map((error) => `${error.title}${error.detail ? `: ${error.detail}` : ""}`).join("; ");
-        throw new AppStoreApiError(response.status, errors[0]?.code ?? "apple_error", `Apple API (${response.status}): ${safeAppleMessage(message || response.statusText)}`);
+        throw appleApiError(response.status, result, [token], `Apple API request failed (${response.status})`);
       }
       return result;
     } catch (error) {
@@ -101,14 +124,18 @@ export class AppStoreConnectClient {
     const url = new URL(path, ORIGIN);
     for (const [key, value] of Object.entries(filters)) url.searchParams.set(`filter[${key}]`, value);
     try {
-      const response = await this.request(url.href, { headers: { Authorization: `Bearer ${await this.tokens.getToken()}`, Accept: "application/a-gzip" }, redirect: "error", signal: AbortSignal.timeout(30_000) });
+      const token = await this.tokens.getToken();
+      const response = await this.request(url.href, { headers: { Authorization: `Bearer ${token}`, Accept: "application/a-gzip" }, redirect: "error", signal: AbortSignal.timeout(30_000) });
       const limit = response.ok ? MAX_SEGMENT_BYTES : 64 * 1024;
       const advertised = response.headers.get("content-length");
       if (advertised && (!/^\d+$/.test(advertised) || Number(advertised) > limit)) {
         await response.body?.cancel();
         throw new AppStoreReportError("report_size", "Report response exceeds the size limit");
       }
-      if (!response.body) throw new AppStoreReportError("empty_report", "Report response has no content");
+      if (!response.body) {
+        if (!response.ok) throw appleApiError(response.status, null, [], `Apple report request failed (${response.status})`);
+        throw new AppStoreReportError("empty_report", "Report response has no content");
+      }
       const reader = response.body.getReader();
       const chunks: Uint8Array[] = [];
       let size = 0;
@@ -125,7 +152,9 @@ export class AppStoreConnectClient {
       if (!response.ok) {
         // Only an explicit no-sales response is empty; missing/unavailable reports remain failures.
         if (path === "/v1/salesReports" && response.status === 404 && /(?:there (?:were|are) no sales|no sales for the (?:date|period))/i.test(bytes.toString("utf8"))) return null;
-        throw new AppStoreApiError(response.status, "report_request_failed", `Apple report request failed (${response.status})`);
+        let body: unknown;
+        try { body = JSON.parse(bytes.toString("utf8")); } catch { body = null; }
+        throw appleApiError(response.status, body, [...Object.values(filters), token], `Apple report request failed (${response.status})`);
       }
       if (!size) throw new AppStoreReportError("empty_report", "Report response has no content");
       return bytes;
@@ -136,7 +165,7 @@ export class AppStoreConnectClient {
   }
 
   downloadSalesReport(vendorNumber: string, date: string) {
-    return this.binaryReport("/v1/salesReports", { vendorNumber, reportDate: date, reportType: "SALES", reportSubType: "SUMMARY", frequency: "DAILY" });
+    return this.binaryReport("/v1/salesReports", { vendorNumber, reportDate: date, reportType: "SALES", reportSubType: "SUMMARY", frequency: "DAILY", version: "1_0" });
   }
 
   downloadFinanceReport(vendorNumber: string, fiscalMonth: string, regionCode: string) {

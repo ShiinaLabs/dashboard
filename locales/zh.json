@@ -920,6 +920,7 @@
       "finance": "Finance"
     },
     "syncStatus": {
+      "waiting": "等待 Apple 报告数据",
       "running": "同步中",
       "success": "成功",
       "error": "错误",
@@ -940,7 +941,7 @@
     "waitingHelp": "Apple 通常在 24–48 小时内生成首批持续报告。",
     "state": {
       "not_configured": "未配置",
-      "waiting": "等待首份报告",
+      "waiting": "等待 Apple 报告数据",
       "active": "正常",
       "partial": "部分成功",
       "error": "错误"
@@ -1023,6 +1024,7 @@
     "skipped": "未变化",
     "waiting": "等待",
     "status": {
+      "waiting": "等待 Apple 报告数据",
       "success": "成功",
       "partial": "部分成功",
       "error": "失败"

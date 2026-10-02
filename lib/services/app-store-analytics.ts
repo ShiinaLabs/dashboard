@@ -5,6 +5,7 @@ import { authorizedConnection, clientForConnection, AppStoreError } from "./app-
 import * as analytics from "../repositories/app-store-analytics";
 import { startRun, finishRun, AppStoreConflictError } from "../repositories/app-store";
 import { AppStoreApiError } from "../infra/app-store/AppStoreConnectClient";
+import { reportRunDisplayStatus } from "../../shared/app-store";
 import type { AppStoreAnalyticsStatus } from "@/shared/app-store-analytics";
 
 type Viewer = { id: number; role: string };
@@ -26,13 +27,13 @@ export function analyticsRunStatus(succeeded: number, failed: number): "success"
 export async function getAppStoreAnalyticsStatus(connectionId: number, viewer: Viewer): Promise<AppStoreAnalyticsStatus> {
   await authorizedConnection(connectionId, viewer);
   const apps = await analytics.enabledApps(connectionId);
-  const [requests, runs, imports] = await Promise.all([analytics.requestsForApps(apps.map((app) => app.id)), analytics.analyticsRuns(connectionId), analytics.importsForApps(apps.map((app) => app.id))]);
+  const [requests, runs, allPartitions] = await Promise.all([analytics.requestsForApps(apps.map((app) => app.id)), analytics.analyticsRuns(connectionId), readAnalyticsPartitions(apps.map((app) => app.id))]);
   const ongoingReady = apps.length > 0 && apps.every((app) => requests.some((request) => request.app_id === app.id && request.access_type === "ONGOING" && !request.stopped_due_to_inactivity));
   const snapshotReady = apps.length > 0 && apps.every((app) => requests.some((request) => request.app_id === app.id && request.access_type === "ONE_TIME_SNAPSHOT"));
-  const imported = imports.filter((row) => row.status === "imported" && ["App Store Discovery and Engagement", "App Store Downloads"].includes(row.report_name));
+  const partitions = allPartitions.filter((p) => p.report_kind === "discovery" || p.report_kind === "downloads");
   const lastSync = runs[0] ?? null;
-  const state = lastSync?.status === "error" ? "error" : lastSync?.status === "partial" ? "partial" : !requests.length ? "not_configured" : imported.length ? "active" : "waiting";
-  const partitions = (await readAnalyticsPartitions(apps.map((a) => a.id))).filter((p) => p.report_kind === "discovery" || p.report_kind === "downloads");
+  const lastStatus = lastSync ? reportRunDisplayStatus(lastSync) : null;
+  const state = lastStatus === "error" ? "error" : lastStatus === "partial" ? "partial" : lastStatus === "waiting" ? "waiting" : partitions.length ? "active" : !requests.length ? "not_configured" : "waiting";
   const dates = partitions.map((p) => p.date).sort();
   return {
     enabledApps: apps.length, state,

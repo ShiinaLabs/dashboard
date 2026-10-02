@@ -38,7 +38,3 @@ export async function prepareAnalyticsInstance(
   }
   return { instanceId: instance.id, processingDate: instance.attributes.processingDate, granularity: "DAILY", segments, table: table! };
 }
-
-export function isStandardP2Report(name: string): boolean {
-  return name === "App Store Discovery and Engagement" || name === "App Store Downloads";
-}

@@ -920,6 +920,7 @@
       "finance": "Finance"
     },
     "syncStatus": {
+      "waiting": "Waiting for Apple report data",
       "running": "Running",
       "success": "Success",
       "error": "Error",
@@ -940,7 +941,7 @@
     "waitingHelp": "Apple usually generates the first ongoing reports within 24–48 hours.",
     "state": {
       "not_configured": "Not configured",
-      "waiting": "Waiting for first report",
+      "waiting": "Waiting for Apple report data",
       "active": "Active",
       "partial": "Partial",
       "error": "Error"
@@ -1023,6 +1024,7 @@
     "skipped": "Unchanged",
     "waiting": "Waiting",
     "status": {
+      "waiting": "Waiting for Apple report data",
       "success": "Success",
       "partial": "Partial",
       "error": "Failed"

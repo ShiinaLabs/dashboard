@@ -3,14 +3,17 @@ import type * as schema from "@/db/schema/app-store-facts";
 import type { AnalyticsTsv } from "./analytics-tsv";
 import { AppStoreReportError } from "./analytics-segment";
 
-export const analyticsReports = {
-  discovery: "App Store Discovery and Engagement",
-  downloads: "App Store Downloads",
-  purchases: "App Store Purchases",
-  subscriptionState: "App Store Subscription State",
-  subscriptionEvent: "App Store Subscription Event",
+export const analyticsReportDefinitions = {
+  discovery: { baseName: "App Store Discovery and Engagement", standardName: "App Store Discovery and Engagement Standard" },
+  downloads: { baseName: "App Store Downloads", standardName: "App Store Downloads Standard" },
+  purchases: { baseName: "App Store Purchases", standardName: "App Store Purchases Standard" },
+  subscriptionState: { baseName: "App Store Subscription State", standardName: "App Store Subscription State Standard" },
+  subscriptionEvent: { baseName: "App Store Subscription Event", standardName: "App Store Subscription Event Standard" },
 } as const;
-export type AnalyticsReportKind = keyof typeof analyticsReports;
+export type AnalyticsReportKind = keyof typeof analyticsReportDefinitions;
+export function identifyStandardAnalyticsReport(name: string): AnalyticsReportKind | undefined {
+  return (Object.keys(analyticsReportDefinitions) as AnalyticsReportKind[]).find((kind) => analyticsReportDefinitions[kind].standardName === name);
+}
 export const completionDays: Record<AnalyticsReportKind, number> = { discovery: 3, downloads: 2, purchases: 2, subscriptionState: 3, subscriptionEvent: 3 };
 const SCALE = 10n ** 12n;
 export function decimal(value: string): string {

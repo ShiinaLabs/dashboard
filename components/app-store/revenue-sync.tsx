@@ -37,6 +37,6 @@ export function RevenueSyncPanel({ connectionId, isActive, vendorNumber, onEdit 
     </div>
     <p className="text-xs text-muted-foreground">{t("revenue.syncHelp")}</p>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    {result && <div role="status" className="space-y-2 text-sm"><p>{t(`revenue.status.${result.status}`)}</p>{Object.entries(result.sources).map(([source, outcome]) => <div key={source}><p>{t(`revenue.sources.${source}`)}: {t(`revenue.status.${outcome.status}`)} · {t("revenue.imported")}: {outcome.imported} · {t("revenue.skipped")}: {outcome.skipped} · {t("revenue.waiting")}: {outcome.waiting}</p>{outcome.errors.map((message, index) => <p key={index} className="text-destructive">{message}</p>)}</div>)}</div>}
+    {result && <div role="status" className="space-y-2 text-sm"><p>{t(`revenue.status.${result.status}`)}</p>{Object.entries(result.sources).map(([source, outcome]) => <div key={source}><p>{t(`revenue.sources.${source}`)}: {t(`revenue.status.${outcome.status}`)} · {t("revenue.imported")}: {outcome.imported} · {t("revenue.skipped")}: {outcome.skipped} · {t("revenue.waiting")}: {outcome.waiting}</p>{outcome.waitingReasons?.map((reason, index) => <p key={`waiting-${index}`} className="text-muted-foreground">{reason}</p>)}{outcome.errors.map((message, index) => <p key={index} className="text-destructive">{message}</p>)}</div>)}</div>}
   </CardContent></Card>;
 }

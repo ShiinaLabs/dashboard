@@ -59,7 +59,9 @@ ASC supports Team API Keys with encrypted private keys, paginated app discovery,
 
 Business contains Web Analytics, App Store Analytics and Revenue. These are navigation entries, not shared domain entities. Money stays in original currencies; Apple Purchases reports provide USD amounts themselves. Paying Users cannot be summed across rows; subscription Active uses the latest state snapshot per app. Standard reports lack Campaign, and unknown values stay null. Updated dates come from report partitions; complete-through requires contiguous imported coverage satisfying Apple's documented processing lag.
 
-Mappings are based on official Apple schemas and synthetic tests. Production credentials, report contents and signed URLs stay inside the deployed application; no fixture export/capture workflow is provided. Diagnostics contain structural report information only, never raw rows, business amounts, download URLs or credentials.
+Mappings are based on official Apple schemas and synthetic tests. Production credentials, report contents and signed URLs stay inside the deployed application. `analyticsReportDefinitions` is the canonical report-name definition; the ingestion boundary recognizes only exact Standard names. Status and freshness use internal `report_kind` partitions, keeping Apple names in integration metadata and import provenance.
+
+Waiting does not count as imported/skipped work or soften errors to partial. Pure waiting returns `waiting` to the API/UI and finishes with the existing DB `success` status plus a `waiting: ` reason in `error_message`; history displays it as Waiting. A successful import with additional waiting uses `report_waiting: ` instead. No database status or schema change is needed. Catalog diagnostics log only resource identifiers and report names/categories, and instance/segment/commit events identify the ingestion stage. Binary-report errors are bounded and parsed as Apple ErrorResponse, with request filter values, JWTs, authorization values, private keys and URLs redacted before service logging or persistence.
 
 ## Source Layout
 

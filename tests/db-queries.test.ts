@@ -1,7 +1,7 @@
 import { gzipSync, gunzipSync } from "node:zlib";
 import { createHash } from "node:crypto";
 import * as ascFacts from "../lib/repositories/app-store-facts";
-import { mapAnalyticsReport, analyticsReports, type AnalyticsReportKind } from "../lib/infra/app-store/report-mapping";
+import { mapAnalyticsReport, analyticsReportDefinitions, type AnalyticsReportKind } from "../lib/infra/app-store/report-mapping";
 import { parseAnalyticsTsv } from "../lib/infra/app-store/analytics-tsv";
 import { syncAppStoreAnalytics, syncAppStoreRevenue } from "../lib/services/app-store-sync";
 import { getAppStoreRevenueDashboard } from "../lib/services/app-store-revenue";
@@ -1853,7 +1853,7 @@ describe("independent App Store Connect foundation", () => {
       const app = (await appStoreRepo.getApps(connection.id))[0];
       await appStoreService.setAppEnabled(connection.id, app.id, viewer, { isEnabled: true });
       const request = await appStoreAnalyticsRepo.adoptRequest(app.id, { id: "typed-partition-request", type: "analyticsReportRequests", attributes: { accessType: "ONGOING", stoppedDueToInactivity: false } }, connection.updated_at);
-      const context = { appId: app.id, connectionId: connection.id, version: connection.updated_at, requestId: request.id, reportId: "report", reportName: "App Store Downloads", reportCategory: "COMMERCE" };
+      const context = { appId: app.id, connectionId: connection.id, version: connection.updated_at, requestId: request.id, reportId: "report", reportName: "App Store Downloads Standard", reportCategory: "COMMERCE" };
       const prepared = (instanceId: string, processingDate: string, counts: string, checksum: string) => ({ instanceId, processingDate, granularity: "DAILY" as const, segments: [{ id: "segment-1", checksum }, { id: "segment-2", checksum }], table: parseAnalyticsTsv(`Date\tApp Apple Identifier\tDownload Type\tSource Type\tTerritory\tCounts\n2026-09-29\t123\tFirst-time Download\tApp Store search\tUSA\t${counts}\n2026-09-29\t123\tRedownload\tApp Store search\tUSA\t2`) });
       const commit = async (p: ReturnType<typeof prepared>) => ascFacts.commitAnalyticsInstance(context, p, mapAnalyticsReport("downloads", p.table, { appId: app.id, appleId: "123", instanceId: p.instanceId, processingDate: p.processingDate }));
       const first = prepared("first", "2026-10-01", "10", "a".repeat(32));
@@ -1884,7 +1884,7 @@ describe("independent App Store Connect foundation", () => {
   it("leaves a failed multi-segment instance untouched while importing the next instance and skipping unchanged downloads", async () => {
     const discovery = vi.spyOn(AppStoreConnectClient.prototype, "listApps").mockResolvedValue(apps);
     const requests = vi.spyOn(AppStoreConnectClient.prototype, "listAnalyticsReportRequests").mockResolvedValue([{ id: "atomic-sync-request", type: "analyticsReportRequests", attributes: { accessType: "ONGOING", stoppedDueToInactivity: false } }]);
-    const reports = vi.spyOn(AppStoreConnectClient.prototype, "listAnalyticsReports").mockResolvedValue([{ id: "atomic-report", type: "analyticsReports", attributes: { name: "App Store Downloads", category: "COMMERCE" } }]);
+    const reports = vi.spyOn(AppStoreConnectClient.prototype, "listAnalyticsReports").mockResolvedValue([{ id: "atomic-report", type: "analyticsReports", attributes: { name: "App Store Downloads Standard", category: "COMMERCE" } }]);
     const instances = vi.spyOn(AppStoreConnectClient.prototype, "listAnalyticsReportInstances").mockResolvedValue(["bad", "good"].map((id) => ({ id, type: "analyticsReportInstances", attributes: { granularity: "DAILY", processingDate: "2026-10-02" } })));
     const bytes = gzipSync("Date\tApp Apple Identifier\tDownload Type\tSource Type\tTerritory\tCounts\n2026-09-29\t123\tFirst-time Download\tApp Store search\tUSA\t5");
     const segment = (id: string) => ({ id, type: "analyticsReportSegments" as const, attributes: { url: "https://synthetic.s3.amazonaws.com/report", checksum: createHash("md5").update(bytes).digest("hex"), sizeInBytes: bytes.length } });
@@ -1915,37 +1915,37 @@ describe("independent App Store Connect foundation", () => {
     const salesBytes = gzipSync("Begin Date\tEnd Date\tSKU\tApple Identifier\tParent Identifier\tProduct Type Identifier\tCountry Code\tUnits\tDeveloper Proceeds\tCurrency of Proceeds\tCustomer Price\tCustomer Currency\n09/29/2026\t09/29/2026\texample-sku\t123\t\t1\tJP\t2\t0.7\tUSD\t100\tJPY");
     const financeBytes = gzipSync("Start Date\tEnd Date\tVendor Identifier\tApple Identifier\tProduct Type Identifier\tCountry of Sale\tQuantity\tExtended Partner Share\tPartner Share Currency\n08/30/2026\t09/26/2026\texample-sku\t123\t1\tJP\t2\t1.4\tUSD\n08/30/2026\t09/26/2026\texample-sku\t123\t1\tJP\t1\t100\tJPY");
     const salesDownload = vi.spyOn(AppStoreConnectClient.prototype, "downloadSalesReport").mockResolvedValue(salesBytes);
-    const financeDownload = vi.spyOn(AppStoreConnectClient.prototype, "downloadFinanceReport").mockRejectedValueOnce(new AppStoreApiError(403, "FORBIDDEN", "SECRET")).mockResolvedValue(gzipSync(gunzipSync(financeBytes).toString() + "\nTotal_Rows\t2\nTotal_Amount\t101.40\nTotal_Units\t3\n"));
+    const financeDownload = vi.spyOn(AppStoreConnectClient.prototype, "downloadFinanceReport").mockRejectedValueOnce(new AppStoreApiError(403, "FORBIDDEN", "Insufficient report access")).mockResolvedValue(gzipSync(gunzipSync(financeBytes).toString() + "\nTotal_Rows\t2\nTotal_Amount\t101.40\nTotal_Units\t3\n"));
     try {
       const connection = await appStoreService.createConnection(viewer, { ...input(), vendorNumber: "123456" });
       const app = (await appStoreRepo.getApps(connection.id))[0];
       await appStoreService.setAppEnabled(connection.id, app.id, viewer, { isEnabled: true });
       const filters = { from: "2026-09-29", to: "2026-09-29", fiscalMonth: "2026-09", regionCode: "ZZ" };
-      expect(await syncAppStoreRevenue(connection.id, viewer, filters)).toMatchObject({ status: "partial", sources: { sales: { status: "success", imported: 1 }, finance: { status: "error", errors: ["Finance; fiscal month 2026-09; region ZZ; apple_report_error (403)"] } } });
+      expect(await syncAppStoreRevenue(connection.id, viewer, filters)).toMatchObject({ status: "partial", sources: { sales: { status: "success", imported: 1 }, finance: { status: "error", errors: ["Finance; fiscal month 2026-09; region ZZ; apple_report_error status=403 code=FORBIDDEN message=Insufficient report access"] } } });
       expect(await syncAppStoreRevenue(connection.id, viewer, filters)).toMatchObject({ status: "success", sources: { sales: { skipped: 1 }, finance: { imported: 1 } } });
       const dashboard = await getAppStoreRevenueDashboard(viewer, { ...filters, appId: app.id });
       expect(dashboard.sales).toMatchObject({ units: "2", amounts: [{ currency: "JPY", proceeds: null, sales: "200" }, { currency: "USD", proceeds: "1.4", sales: null }] });
       expect(dashboard.settlements).toEqual(expect.arrayContaining([expect.objectContaining({ fiscalMonth: "2026-09", region: "ZZ", currency: "USD", earned: "1.4" }), expect.objectContaining({ currency: "JPY", earned: "100" })]));
       expect(dashboard.overview.payingUsers).toBeNull();
       expect(dashboard.subscriptions.active).toBeNull();
-      salesDownload.mockRejectedValueOnce(new AppStoreApiError(404, "NOT_FOUND", "SECRET"));
-      expect(await syncAppStoreRevenue(connection.id, viewer, filters)).toMatchObject({ status: "partial", sources: { sales: { status: "error", errors: ["Sales; date 2026-09-29; apple_report_error (404)"] }, finance: { status: "success", skipped: 1 } } });
+      salesDownload.mockRejectedValueOnce(new AppStoreApiError(404, "NOT_FOUND", "Report not available"));
+      expect(await syncAppStoreRevenue(connection.id, viewer, filters)).toMatchObject({ status: "partial", sources: { sales: { status: "error", errors: ["Sales; date 2026-09-29; apple_report_error status=404 code=NOT_FOUND message=Report not available"] }, finance: { status: "success", skipped: 1 } } });
       await expect(syncAppStoreRevenue(connection.id, otherViewer, filters)).rejects.toMatchObject({ code: "forbidden" });
       await expect(getAppStoreRevenueDashboard(otherViewer, { ...filters, appId: app.id })).rejects.toMatchObject({ code: "forbidden" });
       const noVendor = await appStoreService.createConnection(viewer, input());
       const otherApp = (await appStoreRepo.getApps(noVendor.id))[0];
       await appStoreService.setAppEnabled(noVendor.id, otherApp.id, viewer, { isEnabled: true });
-      expect(await syncAppStoreRevenue(noVendor.id, viewer, filters)).toMatchObject({ status: "partial", sources: { analytics: { status: "success" }, sales: { status: "error", errors: [expect.stringContaining("vendor_required")] }, finance: { status: "error" } } });
+      expect(await syncAppStoreRevenue(noVendor.id, viewer, filters)).toMatchObject({ status: "error", sources: { analytics: { status: "waiting" }, sales: { status: "error", errors: [expect.stringContaining("vendor_required")] }, finance: { status: "error" } } });
       const clock = vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-02T05:50:00Z"));
       try {
         salesDownload.mockClear();
-        expect(await syncAppStoreRevenue(connection.id, viewer, { ...filters, from: "2026-10-01", to: "2026-10-02" })).toMatchObject({ sources: { sales: { status: "success", waiting: 2, imported: 0, errors: [] } } });
+        expect(await syncAppStoreRevenue(connection.id, viewer, { ...filters, from: "2026-10-01", to: "2026-10-02" })).toMatchObject({ sources: { sales: { status: "waiting", waiting: 2, imported: 0, errors: [] } } });
         expect(salesDownload).not.toHaveBeenCalled();
       } finally { clock.mockRestore(); }
       const events = [...infoLog.mock.calls, ...errorLog.mock.calls, ...warnLog.mock.calls].map(([component, message]) => { expect(component).toBe("ASC"); return JSON.parse(message); });
       expect(events).toEqual(expect.arrayContaining([
         expect.objectContaining({ event: "sync_started", source: "finance", fiscalMonth: "2026-09" }),
-        expect.objectContaining({ event: "report_failed", source: "finance", diagnostic: "Finance; fiscal month 2026-09; region ZZ; apple_report_error (403)" }),
+        expect.objectContaining({ event: "report_failed", source: "finance", diagnostic: "Finance; fiscal month 2026-09; region ZZ; apple_report_error status=403 code=FORBIDDEN message=Insufficient report access" }),
         expect.objectContaining({ event: "report_waiting", source: "sales", date: "2026-10-01", reason: "before_daily_publication" }),
         expect.objectContaining({ event: "sync_finished", source: "finance", status: "success", imported: 1 }),
       ]));
@@ -1973,7 +1973,7 @@ describe("independent App Store Connect foundation", () => {
       const commit = async (kind: AnalyticsReportKind, row: Record<string, string>, instanceId = kind, processingDate = "2026-10-02") => {
         const prepared = { instanceId, processingDate, granularity: "DAILY" as const, segments: [{ id: kind, checksum: "a".repeat(32) }], table: parseAnalyticsTsv(Object.keys(row).join("\t") + "\n" + Object.values(row).join("\t")) };
         const mapped = mapAnalyticsReport(kind, prepared.table, { appId: app.id, appleId: "123", instanceId, processingDate });
-        return ascFacts.commitAnalyticsInstance({ appId: app.id, connectionId: connection.id, version: connection.updated_at, requestId: request.id, reportId: kind, reportName: analyticsReports[kind], reportCategory: "COMMERCE" }, prepared, mapped);
+        return ascFacts.commitAnalyticsInstance({ appId: app.id, connectionId: connection.id, version: connection.updated_at, requestId: request.id, reportId: kind, reportName: analyticsReportDefinitions[kind].standardName, reportCategory: "COMMERCE" }, prepared, mapped);
       };
       for (const kind of Object.keys(rows) as AnalyticsReportKind[]) expect(await commit(kind, rows[kind])).toBe("imported");
       const analytics = await getAppStoreAnalyticsDashboard(viewer, { appId: app.id, from: common.Date, to: common.Date });

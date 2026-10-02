@@ -19,13 +19,20 @@ test("ASC connection management, app selection, vendor setup, refresh and soft d
   await expect(app).toBeChecked();
   await expect(page.getByText("Not configured", { exact: true }).last()).toBeVisible();
   await page.getByRole("button", { name: "Set up Analytics", exact: true }).click();
-  await expect(page.getByText("Waiting for first report", { exact: true })).toBeVisible();
+  await expect(page.getByText("Waiting for Apple report data", { exact: true })).toBeVisible();
   await expect(page.getByText("Ready", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Sync Analytics", exact: true }).click();
   await expect(page.getByRole("button", { name: "Sync Analytics", exact: true })).toBeEnabled();
+  await expect(page.getByText("Waiting for Apple report data", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/no_reports_generated/).first()).toBeVisible();
+  await page.reload();
+  await page.getByRole("tab", { name: "App Store Connect" }).click();
+  await page.getByRole("button", { name: "Manage", exact: true }).click();
+  await expect(page.getByText("Waiting for Apple report data", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/no_reports_generated/).first()).toBeVisible();
   await page.getByRole("button", { name: "Sync Revenue", exact: true }).click();
-  await expect(page.getByText("Partial", { exact: true })).toBeVisible();
+  await expect(page.getByText("Error", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/vendor_required/).first()).toBeVisible();
   await page.getByRole("button", { name: "Edit Connection" }).click();
   await page.getByLabel("Vendor Number (Optional)").fill("12345678");

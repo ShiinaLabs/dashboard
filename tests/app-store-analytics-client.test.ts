@@ -23,7 +23,7 @@ describe("ASC Analytics API", () => {
   });
 
   it.each([
-    { method: "listAnalyticsReports" as const, path: "/v1/analyticsReportRequests/id/reports", resource: { id: "one", type: "analyticsReports", attributes: { name: "App Store Downloads", category: "COMMERCE" } } },
+    { method: "listAnalyticsReports" as const, path: "/v1/analyticsReportRequests/id/reports", resource: { id: "one", type: "analyticsReports", attributes: { name: "App Store Downloads Standard", category: "COMMERCE" } } },
     { method: "listAnalyticsReportInstances" as const, path: "/v1/analyticsReports/id/instances", resource: { id: "one", type: "analyticsReportInstances", attributes: { granularity: "DAILY", processingDate: "2026-10-01" } } },
     { method: "listAnalyticsReportSegments" as const, path: "/v1/analyticsReportInstances/id/segments", resource: { id: "one", type: "analyticsReportSegments", attributes: { sizeInBytes: 10, checksum: "a".repeat(32), url: "https://bucket.s3.us-west-2.amazonaws.com/object" } } },
   ])("follows every $method page", async ({ method, path, resource }) => {
