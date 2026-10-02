@@ -2,6 +2,12 @@
 
 The scheduler (`lib/scheduler.ts`) runs every 60 seconds, dispatching a single platform per tick in round-robin order. First run is delayed 60–90 seconds (jittered) to avoid hammering APIs on restart.
 
+## App Store Connect — Manual Metadata Refresh
+
+ASC uses `lib/services/app-store.ts` and `lib/infra/app-store/AppStoreConnectClient.ts`, independently of account fetchers. A five-minute ES256 Team JWT authorizes `GET /v1/apps`; pagination is restricted to Apple's API origin and app endpoint, and redirects are rejected. Apple permission, authentication, malformed-response and network errors remain explicit failures rather than empty app lists.
+
+Refresh commits app metadata and successful run telemetry atomically. It retains app enablement choices; failed attempts keep existing app data and record an error in `app_store_sync_runs`. Disabled or deleted connections cannot refresh, and concurrent connection changes invalidate stale results. Current ASC refresh is manual only; no report ingestion or account fetch policy is applied.
+
 ## X (Twitter) — `lib/fetcher.ts`
 
 Note: The X fetcher lives at `lib/fetcher.ts` (not in `server/fetchers/`). It uses the `twitter-openapi-typescript` library.

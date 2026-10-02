@@ -17,5 +17,6 @@ export {
 export { reddit_stats, reddit_posts, reddit_comments } from "./reddit";
 export { settings } from "./settings";
 export { analytics_sites, analytics_events } from "./analytics";
+export { app_store_connections, app_store_apps, app_store_sync_runs } from "./app-store";
 
 export { fetchPolicy, accountFetchState } from "./fetch-policy";

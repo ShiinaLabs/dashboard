@@ -36,6 +36,14 @@ Single-process deployment is intentional and supported. This is a first-class ar
 
 Serverless, Edge, and Function runtimes are future deployment options, not current architecture targets. Do not prepare for them by removing Node APIs, replacing `pg` or Argon2, externalizing the scheduler, introducing queues or cron services, or changing cryptography. Portability is desirable only when it does not add current operational or code complexity without present value.
 
+## App Store Connect Boundary
+
+App Store Connect is an independent data source. Connections are managed on `/accounts` alongside the existing platform tabs, without changing the account domain. Its flow is UI → `lib/api.ts` → `app/api/app-store/` → `lib/services/app-store.ts` → `lib/repositories/app-store.ts` / `lib/infra/app-store/`.
+
+The foundation supports Team API Keys only, encrypted private key storage, complete paginated app discovery, app selection and manual metadata refresh. The existing account scheduler and `fetch_runs` remain account-specific. ASC Analytics Reports, Revenue and its own lane within the existing scheduler lifecycle are later phases.
+
+Social, Developer and Business are navigation groups, not domain entities. Business currently contains Web Analytics. There is no Product model, generic Business entity, Revenue provider or cross-source association; removing ASC does not require changes to other data-source domains.
+
 ## Source Layout
 
 ```

@@ -20,10 +20,17 @@ First-party Web Analytics reports page views, visits, acquisition sources, and s
 
 - One overview for activity across developer platforms
 - First-party web analytics for sites you own
+- App Store Connect team connections, app discovery and app selection
 - 7, 30, and 90-day trends and acquisition summaries
 - Fetch health with run history, stale-data, and failure visibility
 - Multi-user access with owner-scoped data
 - Self-hosted deployment backed by PostgreSQL
+
+### Connect App Store Connect
+
+Open **Connections** (`/accounts`), choose **App Store Connect**, and add a Team API Key using its `.p8` private key, Key ID and Issuer ID. Dashboard validates access and discovers apps before saving the connection. Enable the apps you want to sync; new apps start disabled. Vendor Number is optional and can be added later.
+
+The connection foundation currently supports manual app metadata refresh and credential management. Analytics Reports, Revenue and automatic ASC scheduling are subsequent phases. ASC is an independent data source: there is no Product model or association with social accounts, repositories or Web Analytics sites. Mock mode provides a demonstration connection and rejects private key storage.
 
 ## Private by deployment
 

@@ -36,7 +36,7 @@
   },
   "nav": {
     "overview": "概览",
-    "accounts": "账户管理",
+    "accounts": "连接",
     "social": "社交",
     "developer": "开发者",
     "connections": "连接",
@@ -48,7 +48,8 @@
     "admin": "管理",
     "settings": "设置",
     "ai": "AI 分析",
-    "logout": "退出登录"
+    "logout": "退出登录",
+    "business": "业务"
   },
   "badge": {
     "inactive": "未激活",
@@ -595,17 +596,17 @@
     "noReleases": "未找到发行版。"
   },
   "settings": {
-    "accounts": "账户管理",
-    "accountsDesc": "在一个地方管理所有追踪的账户。",
-    "addAccount": "添加账户",
-    "addFirstAccount": "添加第一个账户",
+    "accounts": "连接",
+    "accountsDesc": "管理平台账号和独立数据源连接。",
+    "addAccount": "添加连接",
+    "addFirstAccount": "添加第一个连接",
     "edit": "编辑",
     "enable": "启用",
     "disable": "禁用",
     "delete": "删除",
     "deleteConfirm": "确定要删除 {{name}} 吗？",
-    "noAccounts": "暂无账户",
-    "noAccountsDesc": "还没有此类型的账户。添加一个以开始追踪。",
+    "noAccounts": "尚未配置连接",
+    "noAccountsDesc": "尚无此类型的连接，添加一个以开始追踪。",
     "interval": "每 {{minutes}} 分钟",
     "lastFetched": "上次抓取：{{date}}",
     "fetchNow": "立即重试",
@@ -642,7 +643,9 @@
     "searchTimezone": "搜索时区…",
     "noTimezoneResults": "没有匹配的时区。",
     "timezoneHint": "此页面的日期将使用所选的时区。",
-    "autoSchedule": "自动 · L0 24小时 / L1 90分钟 / L2 8小时"
+    "autoSchedule": "自动 · L0 24小时 / L1 90分钟 / L2 8小时",
+    "connectionCount_one": "{{count}} 个连接",
+    "connectionCount_other": "{{count}} 个连接"
   },
   "fetchHistory": {
     "title": "最近抓取记录",
@@ -878,5 +881,38 @@
   "accountActive": {
     "pause": "暂停抓取",
     "resume": "启用抓取"
+  },
+  "appStore": {
+    "title": "App Store Connect",
+    "intro": "连接 Apple 开发者团队，并选择需要同步的 App。",
+    "manage": "管理",
+    "empty": "尚未配置 App Store Connect 连接。",
+    "retry": "重试",
+    "back": "所有连接",
+    "add": "添加 App Store Connect",
+    "edit": "编辑连接",
+    "name": "名称",
+    "teamKeyHelp": "使用具有 App 访问权限的 Team API Key。私钥加密后存储。",
+    "privateKey": "私钥（.p8）",
+    "keyId": "Key ID",
+    "issuerId": "Issuer ID",
+    "vendorNumber": "Vendor Number",
+    "vendorNumberOptional": "Vendor Number（可选）",
+    "fileError": "请选择可读取且不超过 16 KB 的 .p8 文件。",
+    "keepPrivateKey": "不选择文件则保留已配置的私钥。",
+    "validating": "正在验证并保存…",
+    "refresh": "刷新 App",
+    "connection": "连接",
+    "configured": "已配置",
+    "notConfigured": "未配置",
+    "apps": "App",
+    "appsHelp": "选择需要跟踪的 App。新发现的 App 默认关闭；App 报表暂未开放。",
+    "noApps": "Apple 未返回此密钥可访问的 App。",
+    "lastSync": "最近同步",
+    "syncStatus": {
+      "running": "同步中",
+      "success": "成功",
+      "error": "错误"
+    }
   }
 }

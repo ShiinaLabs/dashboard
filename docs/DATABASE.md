@@ -21,6 +21,7 @@ All Drizzle ORM schemas live in `db/schema/` and are re-exported from `db/schema
 | `users.ts` | `users` |
 | `accounts.ts` | `accounts` |
 | `analytics.ts` | `analytics_sites`, `analytics_events` |
+| `app-store.ts` | `app_store_connections`, `app_store_apps`, `app_store_sync_runs` |
 | `fetch-runs.ts` | `fetch_runs` |
 | `twitter.ts` | `tweets`, `user_stats` |
 | `github.ts` | `github_stats`, `github_repos`, `github_repo_snapshots`, `github_traffic_clones`, `github_traffic_views`, `github_referrers`, `github_paths`, `github_releases`, `github_release_assets`, `github_contributions` |
@@ -94,7 +95,15 @@ UPDATE users SET deleted_at = NULL WHERE id = $1;
 
 `getUserByUsername` and `getUserById` both filter with `deleted_at IS NULL`. Reviving a soft-deleted user on re-creation is handled in `createUser()`.
 
-## Fetch Runs
+## App Store Connect
+
+ASC has its own owner-scoped, soft-deleted connections. `app_store_connections` stores the Team API Key's Issuer ID, Key ID and AES-256-GCM encrypted `.p8` private key, plus an optional Vendor Number. Public API objects expose only `private_key_configured`; private keys and encrypted values are excluded. Generated ES256 JWTs are never stored.
+
+`app_store_apps` is unique on `(connection_id, apple_id)`. Newly discovered apps start disabled; metadata upserts preserve the user's selection. Connection creation, app discovery writes and successful sync telemetry commit in one transaction. Credential edits validate Apple access before replacing credentials. Concurrent connection edits or soft deletion prevent a stale sync from committing.
+
+`app_store_sync_runs` records metadata attempts independently of `fetch_runs`. Failed refreshes preserve the previously stored apps and credentials. There are no ASC rows in `accounts`, no Product model and no cross-source foreign keys. Analytics, sales, finance and scheduling tables are not part of this foundation.
+
+## Account Fetch Runs
 
 `fetch_runs` records one row per dispatch. `started_at` is the attempt time; `finished_at`, `status`, duration, and error details describe the outcome. `capability_gaps` stores a JSON array for optional capabilities that could not be collected (for example GitHub traffic without sufficient PAT scope). Health queries use these records instead of treating `accounts.last_fetched_at` as a success time.
 

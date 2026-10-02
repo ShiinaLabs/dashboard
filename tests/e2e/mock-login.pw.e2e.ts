@@ -261,6 +261,7 @@ test("Analytics keeps All Sites available with one site and skips the global que
 
 test("Web Analytics adds and selects sites, then switches the complete dashboard across ranges", async ({ page }) => {
   await logIn(page);
+  await page.getByRole("button", { name: "Business", exact: true }).click();
   await page.getByRole("link", { name: "Web Analytics" }).click();
   await expect(page).toHaveURL(/\/analytics$/);
   await expect(page.getByRole("heading", { name: "Web Analytics", level: 1 })).toBeVisible();
@@ -562,7 +563,7 @@ test("dashboard routes render without horizontal overflow at desktop and tablet 
 test("account form exposes selected platform and Reddit access mode", async ({ page }) => {
   await logIn(page);
   await page.goto("/accounts");
-  await page.getByRole("button", { name: "Add Account", exact: true }).click();
+  await page.getByRole("button", { name: "Add Connection", exact: true }).click();
 
   const platformButton = (name: string) => page.getByRole("button", { name, exact: true });
   await expect(platformButton("X")).toHaveAttribute("aria-pressed", "true");
@@ -608,7 +609,8 @@ test("mobile navigation opens, closes, and logout returns to login", async ({ pa
   await expect(page.getByRole("button", { name: "Expand sidebar" })).toBeVisible();
 
   await page.getByRole("button", { name: "Expand sidebar" }).click();
-  await page.getByRole("button", { name: "Log out" }).click();
+  await page.getByRole("button", { name: "admin admin", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Log out" }).click();
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
 });

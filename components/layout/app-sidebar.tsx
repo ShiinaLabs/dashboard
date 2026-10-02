@@ -44,7 +44,14 @@ export function AppSidebar({ isAdmin, username, role, loggingOut, onLogout }: { 
         { type: "link", to: "/gitlab", label: t("nav.gitlab"), icon: GitlabIcon },
       ],
     },
-    { type: "link", to: "/analytics", label: t("nav.analytics"), icon: ChartNoAxesColumnIncreasing },
+    {
+      type: "group",
+      label: t("nav.business"),
+      icon: ChartNoAxesColumnIncreasing,
+      children: [
+        { type: "link", to: "/analytics", label: t("nav.analytics"), icon: ChartNoAxesColumnIncreasing },
+      ],
+    },
     { type: "link", to: "/ai", label: t("nav.ai"), icon: Bot },
   ];
   const connectionItems: NavEntry[] = [

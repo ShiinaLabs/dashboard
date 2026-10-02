@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { GithubIcon, GitlabIcon, RedditIcon, XIcon } from "@/components/BrandIcons";
 import { formatDateTime } from "@/lib/client/datetime";
 import { useNow } from "@/lib/client/use-now";
-import { Pencil, Plus, PlayCircle, PauseCircle, Trash2, AlertCircle, ArrowUpRight, LoaderCircle } from "lucide-react";
+import { Pencil, Plus, PlayCircle, PauseCircle, Trash2, AlertCircle, ArrowUpRight, LoaderCircle, Store } from "lucide-react";
+import { AppStoreConnections } from "@/components/app-store/connections";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TriggerPanel } from "@/components/TriggerPanel";
 import { ActionIcon, PasswordInput, TextInput } from "@/components/ui/form-controls";
@@ -17,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 
-const titleKey = "nav.accounts" satisfies PageTitleKey;
+const titleKey = "nav.connections" satisfies PageTitleKey;
 
 export const meta = pageMeta(titleKey);
 export const handle = { titleKey } satisfies TitleHandle;
@@ -35,7 +36,7 @@ export default function AccountsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<Platform>("twitter");
+  const [tab, setTab] = useState<Platform | "app-store">("twitter");
   const [editing, setEditing] = useState<Account | null>(null);
   const [adding, setAdding] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
@@ -44,6 +45,7 @@ export default function AccountsPage() {
     queryKey: ["accounts"],
     queryFn: api.getAccounts,
     refetchInterval: 3 * 60_000,
+    enabled: tab !== "app-store",
   });
 
   const accounts = (data?.accounts ?? []).filter((a: Account) => a.platform === tab);
@@ -69,11 +71,11 @@ export default function AccountsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["accounts"] }),
   });
 
-  if (isLoading) {
+  if (isLoading && tab !== "app-store") {
     return <div className="text-center py-12 text-[var(--muted-foreground)]">{t("common.loading")}</div>;
   }
 
-  const currentTab = TABS.find((t) => t.key === tab)!;
+  const currentTab = TABS.find((t) => t.key === tab) ?? TABS[0];
   const showForm = adding || editing;
 
   return (
@@ -81,7 +83,7 @@ export default function AccountsPage() {
       {/* header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1.5">
-          <h1 className="text-2xl font-semibold tracking-tight">{t("settings.accounts")}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("nav.connections")}</h1>
           <p className="text-sm text-muted-foreground">{t("settings.accountsDesc")}</p>
         </div>
         <Button
@@ -93,15 +95,17 @@ export default function AccountsPage() {
       </div>
 
       {/* platform tabs */}
-      <Tabs value={tab} onValueChange={(value) => { setTab(value as Platform); setAdding(false); setEditing(null); }}>
+      <Tabs value={tab} onValueChange={(value) => { setTab(value as Platform | "app-store"); setAdding(false); setEditing(null); }}>
         <div className="w-full overflow-x-auto pb-1">
           <TabsList className="w-max min-w-full justify-start sm:min-w-0">
             {TABS.map(({ key, headingKey, Icon }) => <TabsTrigger key={key} value={key} className="gap-2 px-3"><Icon size={15} />{t(headingKey)}</TabsTrigger>)}
+            <TabsTrigger value="app-store" className="gap-2 px-3"><Store size={15} aria-hidden="true" />{t("appStore.title")}</TabsTrigger>
           </TabsList>
         </div>
       </Tabs>
 
       {/* inline form — uses key to force remount when editing target changes */}
+      {tab === "app-store" ? <AppStoreConnections adding={adding} onClose={() => setAdding(false)} onAdd={() => setAdding(true)} /> : <>
       {showForm && (
         <Card>
           <CardContent className="p-5 pt-5 sm:pt-5">
@@ -118,7 +122,7 @@ export default function AccountsPage() {
       {/* account list — full width */}
       <section className="space-y-3">
         <h2 className="text-sm font-medium text-muted-foreground">
-          {accounts.length > 0 ? `${accounts.length} accounts` : t("settings.noAccounts")}
+          {accounts.length > 0 ? t("settings.connectionCount", { count: accounts.length }) : t("settings.noAccounts")}
         </h2>
         {accounts.length > 0 ? (
           <div className="grid gap-3">
@@ -207,6 +211,7 @@ export default function AccountsPage() {
           </Card>
         )}
       </section>
+      </>}
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}

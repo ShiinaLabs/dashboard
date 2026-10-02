@@ -23,6 +23,7 @@ export const APP_NAME = en.common.dashboard;
 export const PAGE_TITLES = {
   "nav.overview": en.nav.overview,
   "nav.accounts": en.nav.accounts,
+  "nav.connections": en.nav.connections,
   "nav.x": en.nav.x,
   "nav.github": en.nav.github,
   "nav.gitlab": en.nav.gitlab,

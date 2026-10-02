@@ -36,7 +36,7 @@
   },
   "nav": {
     "overview": "Overview",
-    "accounts": "Accounts",
+    "accounts": "Connections",
     "social": "Social",
     "developer": "Developer",
     "connections": "Connections",
@@ -48,7 +48,8 @@
     "admin": "Admin",
     "settings": "Settings",
     "ai": "AI Analysis",
-    "logout": "Log out"
+    "logout": "Log out",
+    "business": "Business"
   },
   "badge": {
     "inactive": "Inactive",
@@ -595,17 +596,17 @@
     "noReleases": "No releases found."
   },
   "settings": {
-    "accounts": "Account Management",
-    "accountsDesc": "Manage all your tracked accounts in one place.",
-    "addAccount": "Add Account",
-    "addFirstAccount": "Add Your First Account",
+    "accounts": "Connections",
+    "accountsDesc": "Manage platform accounts and independent data source connections.",
+    "addAccount": "Add Connection",
+    "addFirstAccount": "Add Your First Connection",
     "edit": "Edit",
     "enable": "Enable",
     "disable": "Disable",
     "delete": "Delete",
     "deleteConfirm": "Delete {{name}}?",
-    "noAccounts": "No accounts configured",
-    "noAccountsDesc": "No accounts of this type yet. Add one to start tracking.",
+    "noAccounts": "No connections configured",
+    "noAccountsDesc": "No connections of this type yet. Add one to start tracking.",
     "interval": "Every {{minutes}}m",
     "lastFetched": "Last: {{date}}",
     "fetchNow": "Retry now",
@@ -642,7 +643,9 @@
     "searchTimezone": "Search timezones...",
     "noTimezoneResults": "No timezones found.",
     "timezoneHint": "Dates on this page will use the selected timezone.",
-    "autoSchedule": "Auto · L0 24h / L1 90m / L2 8h"
+    "autoSchedule": "Auto · L0 24h / L1 90m / L2 8h",
+    "connectionCount_one": "{{count}} connection",
+    "connectionCount_other": "{{count}} connections"
   },
   "fetchHistory": {
     "title": "Recent fetch runs",
@@ -878,5 +881,38 @@
   "accountActive": {
     "pause": "Pause fetching",
     "resume": "Resume fetching"
+  },
+  "appStore": {
+    "title": "App Store Connect",
+    "intro": "Connect your Apple developer team and choose which apps to sync.",
+    "manage": "Manage",
+    "empty": "No App Store Connect connections yet.",
+    "retry": "Retry",
+    "back": "All connections",
+    "add": "Add App Store Connect",
+    "edit": "Edit Connection",
+    "name": "Name",
+    "teamKeyHelp": "Use a Team API Key with access to your apps. Your private key is encrypted before storage.",
+    "privateKey": "Private Key (.p8)",
+    "keyId": "Key ID",
+    "issuerId": "Issuer ID",
+    "vendorNumber": "Vendor Number",
+    "vendorNumberOptional": "Vendor Number (Optional)",
+    "fileError": "Select a readable .p8 file no larger than 16 KB.",
+    "keepPrivateKey": "Leave the file empty to keep the configured private key.",
+    "validating": "Validating and saving…",
+    "refresh": "Refresh Apps",
+    "connection": "Connection",
+    "configured": "Configured",
+    "notConfigured": "Not configured",
+    "apps": "Apps",
+    "appsHelp": "Select the apps you want to track. Newly discovered apps start disabled. App reports are not available yet.",
+    "noApps": "Apple returned no accessible apps for this key.",
+    "lastSync": "Last Sync",
+    "syncStatus": {
+      "running": "Running",
+      "success": "Success",
+      "error": "Error"
+    }
   }
 }

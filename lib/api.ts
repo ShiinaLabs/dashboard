@@ -1,4 +1,5 @@
 import { apiJson, apiRequest } from "@/lib/client/api-transport";
+import type { AppStoreConnection, AppStoreConnectionDetail, AppStoreConnectionInput, AppStoreConnectionUpdate, AppStoreApp } from "@/shared/app-store";
 export { ApiError } from "@/lib/client/api-transport";
 
 // Keep transport helpers available for callers that need a streaming response.
@@ -100,6 +101,13 @@ export type {
 // ─── API methods ────────────────────────────────────────────────
 
 export const api = {
+  getAppStoreConnections: () => apiJson<{ connections: AppStoreConnection[] }>("/app-store/connections"),
+  getAppStoreConnection: (id: number) => apiJson<AppStoreConnectionDetail>(`/app-store/connections/${id}`),
+  createAppStoreConnection: (data: AppStoreConnectionInput) => apiJson<AppStoreConnection>("/app-store/connections", { method: "POST", body: JSON.stringify(data) }),
+  updateAppStoreConnection: (id: number, data: AppStoreConnectionUpdate) => apiJson<AppStoreConnection>(`/app-store/connections/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  refreshAppStoreApps: (id: number) => apiJson<AppStoreConnectionDetail>(`/app-store/connections/${id}/refresh`, { method: "POST" }),
+  setAppStoreAppEnabled: (id: number, appId: number, isEnabled: boolean) => apiJson<AppStoreApp>(`/app-store/connections/${id}/apps/${appId}`, { method: "PUT", body: JSON.stringify({ isEnabled }) }),
+  deleteAppStoreConnection: (id: number, confirmToken: string) => apiJson<{ success: boolean }>(`/app-store/connections/${id}`, { method: "DELETE", body: JSON.stringify({ confirmToken }) }),
   // Accounts
   getAccounts: () => apiJson<AccountsResponse>("/accounts"),
   getAccount: (id: number) => apiJson<AccountWithStats>(`/accounts/${id}`),

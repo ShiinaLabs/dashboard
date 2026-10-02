@@ -1,4 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { exportPKCS8, generateKeyPair } from "jose";
+import * as appStoreService from "../lib/services/app-store";
+import * as appStoreRepo from "../lib/repositories/app-store";
+import { AppStoreConnectClient, AppStoreApiError } from "../lib/infra/app-store/AppStoreConnectClient";
+import { initCrypto, decrypt } from "../lib/crypto";
 import { getTestDatabaseConfig, resetTestDb, getTestPool, closeTestPool } from "./setup";
 import { closeDb, getDb, initPgPool } from "../lib/db/connection";
 import { github_repos } from "@/db/schema";
@@ -1638,5 +1643,123 @@ describe("github L2 telemetry", () => {
     );
     // Partial data is still persisted rather than discarded with the failure.
     expect(written.rows).toEqual([{ count: 9, uniques: 4 }]);
+  });
+});
+
+// Share this suite's isolated database lifecycle with the other repository tests.
+describe("independent App Store Connect foundation", () => {
+  let viewer: { id: number; role: string };
+  let otherViewer: { id: number; role: string };
+  let privateKey: string;
+  const input = () => ({ name: "ASC test team", issuerId: "00000000-0000-4000-8000-000000000001", keyId: "ABC1234567", privateKey, vendorNumber: null });
+  const apps = [{ apple_id: "123", name: "Example", bundle_id: "example.app", sku: "example-sku" }];
+
+  beforeAll(async () => {
+    initCrypto("ab".repeat(32));
+    const owner = await usersQ.insertUser({ username: "asc_owner", password_hash: "hash", role: "user" });
+    const other = await usersQ.insertUser({ username: "asc_other", password_hash: "hash", role: "user" });
+    viewer = { id: owner.id, role: "user" };
+    otherViewer = { id: other.id, role: "user" };
+    privateKey = await exportPKCS8((await generateKeyPair("ES256", { extractable: true })).privateKey);
+  });
+
+  it("validates before creation, encrypts the private key and returns only metadata", async () => {
+    const spy = vi.spyOn(AppStoreConnectClient.prototype, "listApps").mockResolvedValue(apps);
+    try {
+      const created = await appStoreService.createConnection(viewer, { ...input(), owner_id: otherViewer.id });
+      expect(created).toMatchObject({ owner_id: viewer.id, private_key_configured: true, vendor_number: null });
+      expect(JSON.stringify(created)).not.toContain("PRIVATE KEY");
+      expect(created).not.toHaveProperty("private_key_encrypted");
+      const stored = (await appStoreRepo.getConnection(created.id))!;
+      expect(stored.private_key_encrypted).toMatch(/^v1:/);
+      expect(decrypt(stored.private_key_encrypted)).toBe(privateKey);
+      const detail = await appStoreService.getConnectionDetail(created.id, viewer);
+      expect(detail.apps).toMatchObject([{ apple_id: "123", is_enabled: false }]);
+      expect(detail.recentSyncRuns).toMatchObject([{ kind: "metadata", status: "success" }]);
+      expect(await appStoreService.listConnections(otherViewer)).toEqual([]);
+      expect(await appStoreService.listConnections({ id: 0, role: "admin" })).toEqual(expect.arrayContaining([created]));
+    } finally { spy.mockRestore(); }
+  });
+
+  it("does not create a connection when Apple rejects the credential or input is invalid", async () => {
+    const before = await appStoreService.listConnections(viewer);
+    const spy = vi.spyOn(AppStoreConnectClient.prototype, "listApps").mockRejectedValue(new AppStoreApiError(403, "FORBIDDEN_ERROR", "Apple API (403): missing permission"));
+    try {
+      await expect(appStoreService.createConnection(viewer, input())).rejects.toMatchObject({ status: 403 });
+      await expect(appStoreService.createConnection(viewer, { ...input(), privateKey: "invalid" })).rejects.toMatchObject({ code: "invalid_private_key" });
+      await expect(appStoreService.createConnection(viewer, { ...input(), issuerId: "" })).rejects.toMatchObject({ code: "invalid_input" });
+      expect(await appStoreService.listConnections(viewer)).toEqual(before);
+    } finally { spy.mockRestore(); }
+  });
+
+  it("preserves app selection across discovery, stores metadata updates and restricts ownership", async () => {
+    const spy = vi.spyOn(AppStoreConnectClient.prototype, "listApps").mockResolvedValue(apps);
+    try {
+      const connection = await appStoreService.createConnection(viewer, input());
+      const app = (await appStoreService.getConnectionDetail(connection.id, viewer)).apps[0];
+      await expect(appStoreService.getConnectionDetail(connection.id, otherViewer)).rejects.toMatchObject({ code: "forbidden" });
+      await expect(appStoreService.refreshApps(connection.id, otherViewer)).rejects.toMatchObject({ code: "forbidden" });
+      await expect(appStoreService.updateConnection(connection.id, otherViewer, { isActive: false })).rejects.toMatchObject({ code: "forbidden" });
+      await expect(appStoreService.deleteConnection(connection.id, otherViewer)).rejects.toMatchObject({ code: "forbidden" });
+      await expect(appStoreService.setAppEnabled(connection.id, app.id, otherViewer, { isEnabled: true })).rejects.toMatchObject({ code: "forbidden" });
+      await appStoreService.setAppEnabled(connection.id, app.id, viewer, { isEnabled: true });
+      spy.mockResolvedValue([{ ...apps[0], name: "Renamed" }, { ...apps[0], apple_id: "456" }]);
+      const refreshed = await appStoreService.refreshApps(connection.id, viewer);
+      expect(refreshed.apps).toHaveLength(2);
+      expect(refreshed.apps.find((row) => row.apple_id === "123")).toMatchObject({ id: app.id, name: "Renamed", is_enabled: true });
+      expect(refreshed.apps.find((row) => row.apple_id === "456")).toMatchObject({ is_enabled: false });
+      const another = await appStoreService.createConnection(viewer, input());
+      await expect(appStoreService.setAppEnabled(another.id, app.id, viewer, { isEnabled: false })).rejects.toMatchObject({ code: "not_found" });
+    } finally { spy.mockRestore(); }
+  });
+
+  it("keeps working data and credentials intact after a failed refresh or credential edit", async () => {
+    const spy = vi.spyOn(AppStoreConnectClient.prototype, "listApps").mockResolvedValue(apps);
+    try {
+      const connection = await appStoreService.createConnection(viewer, input());
+      const before = await appStoreRepo.getConnection(connection.id);
+      spy.mockRejectedValue(new AppStoreApiError(401, "NOT_AUTHORIZED", "Apple API (401): revoked key"));
+      await expect(appStoreService.refreshApps(connection.id, viewer)).rejects.toMatchObject({ status: 401 });
+      await expect(appStoreService.updateConnection(connection.id, viewer, { keyId: "NEW1234567" })).rejects.toMatchObject({ status: 401 });
+      expect(await appStoreRepo.getConnection(connection.id)).toEqual(before);
+      const detail = await appStoreService.getConnectionDetail(connection.id, viewer);
+      expect(detail.apps).toHaveLength(1);
+      expect(detail.recentSyncRuns.map((run) => run.status)).toEqual(["error", "error", "success"]);
+      expect(detail.recentSyncRuns[0].error_message).toContain("revoked key");
+      spy.mockResolvedValue(apps);
+      const edited = await appStoreService.updateConnection(connection.id, viewer, { name: "Updated team", keyId: "NEW1234567", privateKey, vendorNumber: "12345678" });
+      expect(edited).toMatchObject({ name: "Updated team", key_id: "NEW1234567", vendor_number: "12345678" });
+    } finally { spy.mockRestore(); }
+  });
+
+  it("supports vendor setup and disabling without decrypting a damaged credential", async () => {
+    const row = await appStoreRepo.createWithApps({ owner_id: viewer.id, name: "Damaged credential", issuer_id: input().issuerId, key_id: input().keyId, private_key_encrypted: "v1:invalid" }, [], new Date().toISOString());
+    await appStoreService.updateConnection(row.id, viewer, { vendorNumber: "888", isActive: false });
+    expect((await appStoreService.getConnectionDetail(row.id, viewer)).connection).toMatchObject({ vendor_number: "888", is_active: false });
+    await expect(appStoreService.refreshApps(row.id, viewer)).rejects.toMatchObject({ code: "connection_disabled" });
+    await appStoreService.updateConnection(row.id, viewer, { isActive: true });
+    await expect(appStoreService.refreshApps(row.id, viewer)).rejects.toMatchObject({ code: "credential_unavailable" });
+    await appStoreService.deleteConnection(row.id, viewer);
+    await expect(appStoreService.getConnectionDetail(row.id, viewer)).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("rejects a stale metadata commit after disabling or deleting a connection", async () => {
+    const row = await appStoreRepo.createWithApps({ owner_id: viewer.id, name: "Concurrent sync", issuer_id: input().issuerId, key_id: input().keyId, private_key_encrypted: "configured" }, apps, new Date().toISOString());
+    await appStoreService.updateConnection(row.id, viewer, { isActive: false });
+    await expect(appStoreRepo.saveConnection(row, {}, [{ ...apps[0], name: "Stale" }])).rejects.toBeInstanceOf(appStoreRepo.AppStoreConflictError);
+    expect((await appStoreRepo.getApps(row.id))[0].name).toBe("Example");
+    const latest = (await appStoreRepo.getConnection(row.id))!;
+    await appStoreService.deleteConnection(row.id, viewer);
+    await expect(appStoreRepo.saveConnection(latest, { is_active: true }, apps)).rejects.toBeInstanceOf(appStoreRepo.AppStoreConflictError);
+  });
+
+  it("rolls back connection changes if an app upsert fails", async () => {
+    const row = await appStoreRepo.createWithApps({ owner_id: viewer.id, name: "Atomic sync", issuer_id: input().issuerId, key_id: input().keyId, private_key_encrypted: "configured" }, apps, new Date().toISOString());
+    const run = await appStoreRepo.startRun(row.id);
+    await expect(appStoreRepo.saveConnection(row, { name: "Must roll back" }, [{ ...apps[0], name: null as unknown as string }], run)).rejects.toThrow();
+    expect(await appStoreRepo.getConnection(row.id)).toEqual(row);
+    expect((await appStoreRepo.getApps(row.id))[0].name).toBe("Example");
+    expect((await appStoreRepo.getRecentRuns(row.id))[0].status).toBe("running");
+    await appStoreRepo.failRun(run, "Database import failed");
   });
 });
