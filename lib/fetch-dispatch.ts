@@ -3,7 +3,6 @@ import { updateAccount } from "./services/accounts";
 import { getLogger } from "./logger";
 import { isMockMode, isMockFetcherMode } from "./config";
 import { fetchAccount } from "./fetcher";
-import { fetchGithubAccount } from "./fetchers/github";
 import { fetchGitlabAccount } from "./fetchers/gitlab";
 import { fetchRedditAccount, fetchRedditPublicAccount } from "./fetchers/reddit";
 import type { AccountRow } from "./repositories/accounts";
@@ -260,7 +259,7 @@ async function executeWithNewArch(account: AccountRow, level: string): Promise<F
     const githubClient = new GithubClient();
     client = githubClient;
     const { GithubFetcher } = await import("./infra/fetchers/GithubFetcher");
-    const { listGithubTrackedRepositories } = await import("./repositories/github-sources");
+    const { listGithubTrackedRepositories } = await import("./repositories/github-tracking");
     // The watchlist is the whole input: no source list, no discovery. What the
     // user selected is what gets fetched, at every level.
     const githubFetcher = new GithubFetcher(
@@ -326,7 +325,12 @@ export function selectFetcher(account: AccountRow) {
   if (isMockMode()) {
     return async () => true;
   }
-  if (account.platform === "github") return fetchGithubAccount;
+  if (account.platform === "github") {
+    return async (row: AccountRow) => {
+      const { fetchGithubAccount } = await import("./fetchers/github");
+      return fetchGithubAccount(row);
+    };
+  }
   if (account.platform === "gitlab") return fetchGitlabAccount;
   if (account.platform === "reddit") {
     return account.auth_type === "reddit_public" ? fetchRedditPublicAccount : fetchRedditAccount;

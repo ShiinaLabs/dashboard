@@ -72,11 +72,11 @@ export class GithubFetcher implements FetcherPort {
         // be read. Skip only this one and record it; the caller reports the
         // gap via getLastFetchDiagnostics() instead of losing the whole run.
         logger.warn("GitHub", "Repository %s could not be resolved: %s", repository.fullName, message);
-        const { markGithubTrackingError } = await import("../../repositories/github-sources");
+        const { markGithubTrackingError } = await import("../../repositories/github-tracking");
         await markGithubTrackingError(account.id, repository.repositoryId, message);
       }
       if (accessOk) {
-        const { markGithubTrackingAccessOk } = await import("../../repositories/github-sources");
+        const { markGithubTrackingAccessOk } = await import("../../repositories/github-tracking");
         await markGithubTrackingAccessOk(account.id, repository.repositoryId);
       }
     }

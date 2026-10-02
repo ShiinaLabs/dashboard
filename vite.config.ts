@@ -41,9 +41,4 @@ export default defineConfig({
   define: {
     "process.env.NEXT_PUBLIC_MOCK_DATA": JSON.stringify(process.env.NEXT_PUBLIC_MOCK_DATA),
   },
-  build: {
-    rollupOptions: {
-      maxParallelFileOps: 1,
-    },
-  },
 });

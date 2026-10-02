@@ -1,5 +1,5 @@
-import { GithubClient } from "../infra/fetchers/GithubClient";
-import { PgRepoRepository } from "../infra/drizzle/PgRepoRepository";
+import type { GithubClient } from "../infra/fetchers/GithubClient";
+import type { PgRepoRepository } from "../infra/drizzle/PgRepoRepository";
 import { toRepo } from "../infra/fetchers/GithubMapper";
 import {
   listGithubSources,
@@ -98,9 +98,23 @@ function toCandidate(raw: unknown, listedFrom: string | null): GithubWatchlistCa
 
 export class GithubWatchlistService {
   constructor(
-    private client: GithubClient = new GithubClient(),
-    private repos: PgRepoRepository = new PgRepoRepository(),
+    private client?: GithubClient,
+    private repos?: PgRepoRepository,
   ) {}
+
+  private async getClient(): Promise<GithubClient> {
+    if (this.client) return this.client;
+    const { GithubClient } = await import("../infra/fetchers/GithubClient");
+    this.client = new GithubClient();
+    return this.client;
+  }
+
+  private async createRepoRepository(): Promise<PgRepoRepository> {
+    if (this.repos) return this.repos;
+    const { PgRepoRepository } = await import("../infra/drizzle/PgRepoRepository");
+    this.repos = new PgRepoRepository();
+    return this.repos;
+  }
 
   /**
    * Candidates = the account's own repositories, plus every enabled
@@ -133,7 +147,7 @@ export class GithubWatchlistService {
     };
 
     try {
-      for (const raw of await this.client.fetchOwnedRepos(token)) add(raw, "own");
+      for (const raw of await (await this.getClient()).fetchOwnedRepos(token)) add(raw, "own");
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       warnings.push(`own repositories could not be listed: ${message}`);
@@ -141,7 +155,7 @@ export class GithubWatchlistService {
 
     for (const source of await listGithubSources(account.id)) {
       try {
-        for (const raw of await this.client.fetchOrgRepos(source.login, token)) add(raw, source.login);
+        for (const raw of await (await this.getClient()).fetchOrgRepos(source.login, token)) add(raw, source.login);
         await markGithubSourceOk(account.id, source.login);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -193,7 +207,7 @@ export class GithubWatchlistService {
       const login = normalizeGithubLogin(raw);
       if (!login) throw new Error(`Invalid GitHub organization login: ${String(raw).slice(0, 40)}`);
       if (logins.some((seen) => seen.toLowerCase() === login.toLowerCase())) continue;
-      const probe = await this.client.probeOrg(login, token);
+      const probe = await (await this.getClient()).probeOrg(login, token);
       if (!probe.ok) {
         throw new Error(`${login}: ${probe.message}`);
       }
@@ -211,8 +225,9 @@ export class GithubWatchlistService {
     for (const githubId of wanted) {
       if (knownGithubIds.has(githubId)) continue;
       try {
-        const raw = await this.client.fetchRepositoryById(githubId, token);
-        await this.repos.upsertRepos([toRepo(raw as Record<string, unknown>, account.id) as unknown as Repo]);
+        const raw = await (await this.getClient()).fetchRepositoryById(githubId, token);
+        const repos = this.repos ?? await this.createRepoRepository();
+        await repos.upsertRepos([toRepo(raw as Record<string, unknown>, account.id) as unknown as Repo]);
       } catch (error) {
         errors.push(`${githubId} could not be added: ${error instanceof Error ? error.message : String(error)}`);
       }

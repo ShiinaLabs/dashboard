@@ -1,4 +1,5 @@
 import { fetchWithConfig, withNetworkRetry } from "../../http";
+import { fetchContributions } from "../../fetchers/github-contributions";
 
 type FetchFn = typeof fetchWithConfig;
 
@@ -34,15 +35,7 @@ export class GithubClient {
   }
 
   async fetchContributions(username: string, token?: string, year?: number): Promise<Array<{ date: string; count: number; level: number }>> {
-    const y = year ?? new Date().getFullYear();
-    // Use GitHub contributions via old fetcher's GraphQL or REST fallback; for pure new we delegate to existing service
-    // Keep compatible: import existing fetchContributions logic lazily
-    const mod = await import("../../fetchers/github");
-    // @ts-ignore - reuse internal helper if exported, else return empty
-    if ((mod as unknown as { fetchContributions?: unknown })["fetchContributions"]) {
-      return await (mod as unknown as { fetchContributions: (u:string,t:string|undefined,y:number)=>Promise<Array<{date:string;count:number;level:number}>> }).fetchContributions(username, token, y);
-    }
-    return [];
+    return fetchContributions(username, token, year ?? new Date().getFullYear());
   }
 
   /**

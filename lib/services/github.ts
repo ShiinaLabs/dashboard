@@ -1,6 +1,5 @@
 import * as repository from "@/lib/repositories/github";
 import { getAccountByIdWithCredential } from "@/lib/services/accounts";
-import { GithubClient } from "@/lib/infra/fetchers/GithubClient";
 
 /** Application-level GitHub read use cases. Route adapters retain HTTP parsing and account ownership checks. */
 export const getGithubOverview = (...args: Parameters<typeof repository.getGithubOverview>) => repository.getGithubOverview(...args);
@@ -34,6 +33,7 @@ export async function getGithubAvailableOrgs(accountId: number): Promise<GithubA
   if (!account) return { status: "not-found" };
 
   try {
+    const { GithubClient } = await import("@/lib/infra/fetchers/GithubClient");
     const rawOrgs = await new GithubClient().fetchAuthenticatedOrgs(account.auth_token);
     const orgs = rawOrgs
       .map((raw) => {

@@ -9,4 +9,4 @@ overrides:
   # distributed version so pnpm's minimumReleaseAge policy stays satisfied.
   electron-to-chromium: 1.5.394
 patchedDependencies:
-  '@react-router/dev@7.18.2': patches/@react-router__dev@7.18.2.patch
+  '@react-router/dev@7.18.4': patches/@react-router__dev@7.18.4.patch
