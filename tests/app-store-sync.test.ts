@@ -7,9 +7,10 @@ import { analyticsReportDefinitions, identifyStandardAnalyticsReport } from "../
 import { syncAppStoreAnalytics, syncAppStoreRevenue } from "../lib/services/app-store-sync";
 import { getAppStoreAnalyticsStatus } from "../lib/services/app-store-analytics";
 import { reportRunDisplayStatus } from "../shared/app-store";
+import { latestSalesReportDate } from "../shared/app-store-revenue";
 
 const mocks = vi.hoisted(() => ({
-  client: vi.fn(), authorized: vi.fn(), commit: vi.fn(), finish: vi.fn(), runs: vi.fn(), partitions: vi.fn(), imports: vi.fn(),
+  client: vi.fn(), authorized: vi.fn(), commit: vi.fn(), commitSales: vi.fn(), commitFinance: vi.fn(), finish: vi.fn(), runs: vi.fn(), partitions: vi.fn(), imports: vi.fn(),
   info: vi.fn(), warn: vi.fn(), error: vi.fn(),
 }));
 vi.mock("../lib/config", () => ({ isMockMode: () => false }));
@@ -29,7 +30,7 @@ vi.mock("../lib/repositories/app-store-analytics", () => ({
   requestsForApps: async () => [{ app_id: 2, access_type: "ONGOING", stopped_due_to_inactivity: false }],
   analyticsRuns: mocks.runs,
 }));
-vi.mock("../lib/repositories/app-store-facts", () => ({ commitAnalyticsInstance: mocks.commit, readAnalyticsPartitions: mocks.partitions }));
+vi.mock("../lib/repositories/app-store-facts", () => ({ commitAnalyticsInstance: mocks.commit, commitSalesReport: mocks.commitSales, commitFinanceReport: mocks.commitFinance, readAnalyticsPartitions: mocks.partitions }));
 
 const viewer = { id: 1, role: "admin" };
 function catalog(names: string[]): AnalyticsReport[] {
@@ -53,12 +54,14 @@ function clientWithCatalog(names: string[]) {
   const client = new AppStoreConnectClient({ getToken: async () => "synthetic-token" } as AppStoreTokenProvider, request);
   mocks.client.mockReturnValue(client);
   const instances = vi.spyOn(client, "listAnalyticsReportInstances");
-  return { client, instances };
+  return { client, instances, bytes, segment };
 }
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.authorized.mockResolvedValue({ id: 1, is_active: true, updated_at: "version", vendor_number: null });
   mocks.commit.mockResolvedValue("imported");
+  mocks.commitSales.mockResolvedValue("imported");
+  mocks.commitFinance.mockResolvedValue("imported");
   mocks.finish.mockResolvedValue(undefined);
   mocks.imports.mockResolvedValue([]);
   mocks.runs.mockResolvedValue([]);
@@ -74,15 +77,21 @@ describe("Standard report recognition", () => {
 
 describe("production Analytics sync selection", () => {
   it("takes both acquisition Standard reports through instances, segments and the real mapper", async () => {
-    const { instances } = clientWithCatalog([analyticsReportDefinitions.discovery.standardName, analyticsReportDefinitions.downloads.standardName, "App Store Downloads Detailed"]);
+    const { client, instances } = clientWithCatalog([analyticsReportDefinitions.discovery.standardName, analyticsReportDefinitions.downloads.standardName, "App Store Downloads Detailed"]);
+    const listSegments = vi.spyOn(client, "listAnalyticsReportSegments");
     expect(await syncAppStoreAnalytics(1, viewer)).toMatchObject({ status: "success", imported: 2, waiting: 0, errors: [] });
     expect(instances.mock.calls).toEqual([["report-0"], ["report-1"]]);
+    expect(listSegments).toHaveBeenCalledTimes(2);
     expect(mocks.commit.mock.calls.map((call) => call[2].kind)).toEqual(["discovery", "downloads"]);
     expect(mocks.commit.mock.calls[1][2].rows[0]).toMatchObject({ app_id: 2, counts: "10" });
     const events = mocks.info.mock.calls.map(([, message]) => JSON.parse(message));
     expect(events.find((event) => event.event === "analytics_report_catalog")).toMatchObject({ appId: 2, requestId: "request", accessType: "ONGOING", reports: catalog([analyticsReportDefinitions.discovery.standardName, analyticsReportDefinitions.downloads.standardName, "App Store Downloads Detailed"]).map((report) => report.attributes) });
-    for (const event of ["analytics_report_instances", "analytics_report_segments", "analytics_instance_committed"]) expect(events.some((entry) => entry.event === event)).toBe(true);
-    expect(JSON.stringify(events)).not.toMatch(/https:|synthetic-token|App Apple Identifier|App Store search/);
+    for (const event of ["analytics_report_selected", "analytics_instances_discovered", "analytics_instance_started", "analytics_segments_discovered", "analytics_segment_download_started", "analytics_segment_download_finished", "analytics_instance_parsed", "analytics_instance_mapped", "analytics_instance_commit_started", "analytics_instance_committed", "sync_finished"]) expect(events.some((entry) => entry.event === event)).toBe(true);
+    const ordered = ["sync_started", "analytics_requests_discovered", "analytics_report_catalog", "analytics_report_selected", "analytics_instances_discovered", "analytics_instance_started", "analytics_segments_discovered", "analytics_segment_download_started", "analytics_segment_download_finished", "analytics_instance_parsed", "analytics_instance_mapped", "analytics_instance_commit_started", "analytics_instance_committed", "sync_finished"];
+    const eventNames = events.map((entry) => entry.event);
+    const positions = ordered.map((name) => eventNames.indexOf(name));
+    expect(positions.every((position, index) => position >= 0 && (index === 0 || position > positions[index - 1]))).toBe(true);
+    expect(JSON.stringify(events)).not.toMatch(/https:|synthetic-token|App Store search/);
   });
 
   it.each(["App Store Downloads Detailed", "App Store Downloads SomethingElse", "App Store Downloads"])("diagnoses %s without calling the instance API", async (name) => {
@@ -109,6 +118,79 @@ describe("production Analytics sync selection", () => {
     expect(await syncAppStoreAnalytics(1, viewer)).toMatchObject({ status: "partial", imported: 1 });
   });
 
+  it("persists waiting alongside successful imports with the success-plus-waiting marker", async () => {
+    clientWithCatalog([analyticsReportDefinitions.discovery.standardName]);
+    expect(await syncAppStoreAnalytics(1, viewer)).toMatchObject({ status: "success", imported: 1, waiting: 1 });
+    const call = mocks.finish.mock.calls.at(-1)!;
+    expect(call[1]).toBe("success");
+    expect(call[2]).toMatch(/^report_waiting: /);
+  });
+
+  it("retains safe error and waiting summaries together", async () => {
+    const { client } = clientWithCatalog([analyticsReportDefinitions.discovery.standardName, analyticsReportDefinitions.downloads.standardName]);
+    vi.spyOn(client, "listAnalyticsReportInstances").mockImplementation(async (reportId) => reportId === "report-0" ? [{ id: "instance", type: "analyticsReportInstances", attributes: { granularity: "DAILY", processingDate: "2026-10-02" } }] : []);
+    mocks.commit.mockRejectedValueOnce(new Error("SECRET SQL VALUE"));
+    const result = await syncAppStoreAnalytics(1, viewer);
+    expect(result.status).toBe("error");
+    const call = mocks.finish.mock.calls.at(-1)!;
+    expect(call[1]).toBe("error");
+    expect(call[2]).toContain("error: App Store Discovery and Engagement Standard; report_import_failed");
+    expect(call[2]).toContain("waiting: no_daily_instances");
+    expect(call[2]).not.toContain("SECRET SQL VALUE");
+  });
+
+  it("records a safe finish-stage failure when run history cannot be finalized", async () => {
+    clientWithCatalog([]);
+    mocks.finish.mockRejectedValueOnce(new Error("SECRET database detail"));
+    const result = await syncAppStoreAnalytics(1, viewer);
+    expect(result).toMatchObject({ status: "error", errors: ["report_import_failed"] });
+    const failures = mocks.error.mock.calls.map(([, message]) => JSON.parse(message));
+    expect(failures).toContainEqual(expect.objectContaining({ event: "report_failed", stage: "finish", code: "report_import_failed", diagnostic: "report_import_failed" }));
+    expect(JSON.stringify(failures)).not.toContain("SECRET database detail");
+  });
+
+  it.each(["download_timeout", "checksum_mismatch", "download_expired"])("logs %s at the download stage without exposing signed URLs", async (code) => {
+    const { client } = clientWithCatalog([analyticsReportDefinitions.downloads.standardName]);
+    vi.spyOn(client, "downloadAnalyticsSegment").mockRejectedValue(new Error(`https://signed.example/path?token=secret ${code}`));
+    expect(await syncAppStoreAnalytics(1, viewer)).toMatchObject({ status: "error" });
+    const events = mocks.error.mock.calls.map(([, message]) => JSON.parse(message));
+    expect(events).toEqual(expect.arrayContaining([expect.objectContaining({ event: "report_failed", stage: "download", code: "download_timeout", instanceId: "instance", segmentId: "segment" })]));
+    expect(JSON.stringify(events)).not.toMatch(/signed\.example|token=secret/);
+  });
+
+  it.each([
+    [Buffer.from("not gzip"), "invalid_gzip"],
+    [gzipSync('"unterminated'), "malformed_tsv"],
+    [gzipSync("not a table"), "missing_headers"],
+  ])("logs parse failures at the parse stage (%s)", async (bytes, code) => {
+    const { client } = clientWithCatalog([analyticsReportDefinitions.downloads.standardName]);
+    vi.spyOn(client, "downloadAnalyticsSegment").mockResolvedValue(bytes);
+    vi.spyOn(client, "getAnalyticsReportSegment").mockResolvedValue({ id: "segment", type: "analyticsReportSegments", attributes: { url: "https://synthetic.s3.amazonaws.com/segment", checksum: createHash("md5").update(bytes).digest("hex"), sizeInBytes: bytes.length } });
+    await syncAppStoreAnalytics(1, viewer);
+    const events = mocks.error.mock.calls.map(([, message]) => JSON.parse(message));
+    expect(events).toEqual(expect.arrayContaining([expect.objectContaining({ event: "report_failed", stage: "parse", code, instanceId: "instance", segmentId: "segment" })]));
+    expect(JSON.stringify(events)).not.toContain("not gzip");
+  });
+
+  it("logs map and commit failures with stages while hiding row and SQL values", async () => {
+    const badRow = { Date: "2026-09-29", "App Apple Identifier": "999", "Download Type": "First-time Download", "Source Type": "Search", Territory: "USA", Counts: "0" };
+    const badBytes = gzipSync(Object.keys(badRow).join("\t") + "\n" + Object.values(badRow).join("\t"));
+    const { client } = clientWithCatalog([analyticsReportDefinitions.downloads.standardName]);
+    vi.spyOn(client, "downloadAnalyticsSegment").mockResolvedValueOnce(badBytes);
+    vi.spyOn(client, "getAnalyticsReportSegment").mockResolvedValue({ id: "segment", type: "analyticsReportSegments", attributes: { url: "https://synthetic.s3.amazonaws.com/segment", checksum: createHash("md5").update(badBytes).digest("hex"), sizeInBytes: badBytes.length } });
+    await syncAppStoreAnalytics(1, viewer);
+    const mapFailures = mocks.error.mock.calls.map(([, message]) => JSON.parse(message));
+    expect(mapFailures).toContainEqual(expect.objectContaining({ event: "report_failed", stage: "map", code: "app_identity_mismatch" }));
+    expect(JSON.stringify(mocks.error.mock.calls)).not.toContain("999");
+
+    clientWithCatalog([analyticsReportDefinitions.downloads.standardName]);
+    mocks.commit.mockRejectedValueOnce(new Error("SECRET SQL VALUE"));
+    await syncAppStoreAnalytics(1, viewer);
+    const events = mocks.error.mock.calls.map(([, message]) => JSON.parse(message));
+    expect(events).toEqual(expect.arrayContaining([expect.objectContaining({ event: "report_failed", stage: "commit", code: "report_import_failed", instanceId: "instance" })]));
+    expect(JSON.stringify(events)).not.toContain("SECRET SQL VALUE");
+  });
+
   it("diagnoses the instance and segment waiting stages", async () => {
     const first = clientWithCatalog([analyticsReportDefinitions.downloads.standardName]);
     first.instances.mockResolvedValue([]);
@@ -126,6 +208,52 @@ describe("production Analytics sync selection", () => {
     expect(instances.mock.calls).toEqual([["report-0"], ["report-1"], ["report-2"]]);
     expect(result.sources.analytics.errors).toHaveLength(3);
     expect(result.status).toBe("error");
+  });
+
+  it("skips unchanged instances after the single segment listing without downloading or parsing", async () => {
+    const { client, segment } = clientWithCatalog([analyticsReportDefinitions.downloads.standardName]);
+    mocks.imports.mockResolvedValue([{ apple_instance_id: "instance", apple_report_id: "report-0", apple_segment_id: "segment", checksum: segment.attributes.checksum, status: "imported" }]);
+    const listSegments = vi.spyOn(client, "listAnalyticsReportSegments");
+    const download = vi.spyOn(client, "downloadAnalyticsSegment");
+    expect(await syncAppStoreAnalytics(1, viewer)).toMatchObject({ skipped: 1, imported: 0 });
+    expect(listSegments).toHaveBeenCalledTimes(1);
+    expect(download).not.toHaveBeenCalled();
+    expect(mocks.commit).not.toHaveBeenCalled();
+    const events = mocks.info.mock.calls.map(([, message]) => JSON.parse(message));
+    expect(events).toContainEqual(expect.objectContaining({ event: "analytics_instance_skipped", reason: "segments_unchanged", segmentCount: 1 }));
+    expect(events.some((event) => ["analytics_instance_parsed", "analytics_instance_mapped", "analytics_instance_commit_started"].includes(event.event))).toBe(false);
+  });
+
+  it("logs the complete Sales and Finance report stages using safe metadata only", async () => {
+    const { client } = clientWithCatalog([]);
+    mocks.authorized.mockResolvedValue({ id: 1, is_active: true, updated_at: "version", vendor_number: "12345678" });
+    const reportDate = latestSalesReportDate();
+    const usDate = `${reportDate.slice(5, 7)}/${reportDate.slice(8, 10)}/${reportDate.slice(0, 4)}`;
+    const salesRow = { "Begin Date": usDate, "End Date": usDate, SKU: "sensitive-sku", "Apple Identifier": "123", "Parent Identifier": "", "Product Type Identifier": "1", "Country Code": "JP", Units: "2", "Developer Proceeds": "0.70", "Currency of Proceeds": "USD", "Customer Price": "100", "Customer Currency": "JPY" };
+    const salesBytes = gzipSync(Object.keys(salesRow).join("\t") + "\n" + Object.values(salesRow).join("\t"));
+    const financeBody = "Start Date\tEnd Date\tVendor Identifier\tApple Identifier\tProduct Type Identifier\tCountry of Sale\tQuantity\tExtended Partner Share\tPartner Share Currency\n08/30/2026\t09/26/2026\tprivate-sku\t456\t1\tJP\t2\t1.4\tUSD\nTotal_Rows\t1\nTotal_Amount\t2.80\nTotal_Units\t2\n";
+    const financeBytes = gzipSync(financeBody);
+    vi.spyOn(client, "downloadSalesReport").mockResolvedValue(salesBytes);
+    vi.spyOn(client, "downloadFinanceReport").mockResolvedValue(financeBytes);
+    mocks.commitSales.mockResolvedValue("imported");
+    mocks.commitFinance.mockResolvedValue("imported");
+    const result = await syncAppStoreRevenue(1, viewer, { from: reportDate, to: reportDate, fiscalMonth: "2026-09", regionCode: "ZZ" });
+    expect(result.sources.sales.status).toBe("success");
+    expect(result.sources.finance.status).toBe("success");
+    const events = [...mocks.info.mock.calls, ...mocks.error.mock.calls].map(([, message]) => JSON.parse(message));
+    for (const event of ["sales_report_started", "sales_report_downloaded", "sales_report_parsed", "sales_report_mapped", "sales_report_committed", "finance_report_started", "finance_report_downloaded", "finance_report_parsed", "finance_report_mapped", "finance_report_committed"]) expect(events.some((entry) => entry.event === event)).toBe(true);
+    expect(events.find((entry) => entry.event === "finance_report_parsed")).toMatchObject({ trailerStatus: "validated", rowCount: 1, fiscalMonth: "2026-09", regionCode: "ZZ" });
+    expect(JSON.stringify(events)).not.toMatch(/12345678|sensitive-sku|private-sku|1\.4|100|https:|synthetic-token/);
+  });
+
+  it("keeps an unavailable Finance report as a download-stage failure", async () => {
+    const { client } = clientWithCatalog([]);
+    mocks.authorized.mockResolvedValue({ id: 1, is_active: true, updated_at: "version", vendor_number: "12345678" });
+    vi.spyOn(client, "downloadFinanceReport").mockResolvedValue(null);
+    const result = await syncAppStoreRevenue(1, viewer, { from: "2026-09-29", to: "2026-09-29", fiscalMonth: "2026-09", regionCode: "ZZ" });
+    expect(result.sources.finance).toMatchObject({ status: "error", errors: [expect.stringContaining("finance_unavailable")] });
+    const failures = mocks.error.mock.calls.map(([, message]) => JSON.parse(message));
+    expect(failures).toContainEqual(expect.objectContaining({ event: "report_failed", source: "finance", stage: "download", code: "finance_unavailable" }));
   });
 
   it.each([400, 403, 429])("persists safe Sales/Finance HTTP %i diagnostics while Analytics waits", async (status) => {

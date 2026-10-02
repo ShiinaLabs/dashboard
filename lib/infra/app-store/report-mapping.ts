@@ -78,11 +78,14 @@ const fields: Record<AnalyticsReportKind, Record<string, string>> = {
   subscriptionState: { subscription_name: "Subscription Name", subscription_id: "Subscription Identifier", subscription_group: "Subscription Group", subscription_group_id: "Subscription Group Identifier", state_metric: "State Metric", state_grouping: "State Metric Grouping", territory: "Territory", counts: "Counts" },
   subscriptionEvent: { subscription_name: "Subscription Name", subscription_id: "Subscription Identifier", subscription_group: "Subscription Group", subscription_group_id: "Subscription Group Identifier", event_sub_type: "Event Sub Type", event_grouping: "Event Grouping", offer_type: "Offer Type", territory: "Territory", counts: "Counts" },
 };
+export function analyticsReportRequiredHeaders(kind: AnalyticsReportKind): string[] {
+  return [kind === "subscriptionEvent" ? "Event Date" : "Date", "App Apple Identifier", ...Object.values(fields[kind])];
+}
 const numericFields = new Set(["counts", "unique_counts", "purchases", "proceeds", "sales", "paying_users"]);
 export function mapAnalyticsReport(kind: AnalyticsReportKind, input: AnalyticsTsv, context: { appId: number; appleId: string; instanceId: string; processingDate: string }): MappedAnalytics {
   const table = normalized(input);
+  requireHeaders(table, analyticsReportRequiredHeaders(kind));
   const dateHeader = kind === "subscriptionEvent" ? "Event Date" : "Date";
-  requireHeaders(table, [dateHeader, "App Apple Identifier", ...Object.values(fields[kind])]);
   isoDate(context.processingDate);
   const rows = table.rows.map((row, index) => {
     try {
