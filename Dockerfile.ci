@@ -20,7 +20,9 @@ ENV NODE_OPTIONS=--max-old-space-size=256
 # Production dependencies only (native addons ship prebuilt binaries).
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY patches ./patches
-RUN pnpm install --prod --frozen-lockfile --child-concurrency=1 --network-concurrency=4
+RUN COREPACK_NPM_REGISTRY=https://registry.npmmirror.com \
+  pnpm_config_registry=https://registry.npmmirror.com \
+  pnpm install --prod --frozen-lockfile --child-concurrency=1 --network-concurrency=4
 
 # React Router build artifact + minimal HTTP entry.
 COPY --chown=dashboard:nodejs .ci-build/build ./build
