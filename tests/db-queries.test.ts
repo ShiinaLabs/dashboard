@@ -29,8 +29,8 @@ import {
   listGithubSourceRows,
   setGithubSources,
   upsertGithubSource,
-  markGithubTrackingError,
 } from "../lib/repositories/github-sources";
+import { markGithubTrackingError } from "../lib/repositories/github-tracking";
 import * as usersQ from "../lib/repositories/users";
 import * as accountsQ from "../lib/repositories/accounts";
 import * as twitterQ from "../lib/repositories/twitter";
