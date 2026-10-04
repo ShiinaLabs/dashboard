@@ -39,7 +39,6 @@ export interface OverviewPageData {
   topContent: TopContentResponse;
   fetchHealth: OverviewFetchHealth;
   analyticsPortfolio: AnalyticsPortfolio;
-  aiStatus: { configured: boolean; quota: { used: number; limit: number } };
 }
 
 const pageQuery = /* GraphQL */ `
@@ -63,7 +62,6 @@ const pageQuery = /* GraphQL */ `
       fetchHealth { summary { totalAccounts activeAccounts healthy stale partial failed capabilityGap running } unsupportedAccounts { accountId platform screenName } issues { accountId platform screenName status latestError capabilityGaps { capability message } } issueCount }
       analyticsPortfolio { period { days timezone startDate endDate } previousPeriod { days timezone startDate endDate } summary { trackedSites activeSites views visits } previousSummary { views visits } sites { id name host views visits } }
     } }
-    ai { status { configured quota { used limit } } }
   }
 `;
 
@@ -72,8 +70,8 @@ export function overviewPageQueryKey(variables: { pulseDays: number; contentDays
 }
 
 export async function getOverviewPage(variables: { pulseDays: number; contentDays: number; analyticsRange: AnalyticsRange; timezone: string }, signal?: AbortSignal) {
-  const result = await graphqlRequest<{ overview: { page: Omit<OverviewPageData, "aiStatus"> }; ai: { status: OverviewPageData["aiStatus"] } }, typeof variables>(pageQuery, variables, signal);
-  return { ...result.overview.page, aiStatus: result.ai.status };
+  const result = await graphqlRequest<{ overview: { page: OverviewPageData } }, typeof variables>(pageQuery, variables, signal);
+  return result.overview.page;
 }
 
 const pulseQuery = /* GraphQL */ `query OverviewPulse($days: Int!) { overview { pulse(days: $days) { range { days since until } totals { activity { current previous change } traction { stars { current previous change } forks { current previous change } } } platforms { platform audienceMetric audience { current previous change } activity { current previous change tweets posts comments contributions } } content { tweets { id platform kind title subtitle metricValue secondaryValue url accountId accountName createdAt } redditPosts { id platform kind title subtitle metricValue secondaryValue url accountId accountName createdAt } redditComments { id platform kind title subtitle metricValue secondaryValue url accountId accountName createdAt } } repositories { id platform kind accountId accountName name fullName description stars starChange forks forkChange url route } } } }`;

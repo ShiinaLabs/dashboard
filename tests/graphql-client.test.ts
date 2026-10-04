@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getAnalyticsPage } from "@/lib/client/analytics-graphql";
 import { getAppStoreAnalyticsPage, getRevenuePage } from "@/lib/client/graphql/app-store";
 import { getXAccountPageQuery } from "@/lib/client/graphql/x";
+import { getOverviewPage } from "@/lib/client/graphql/overview";
+import { getAiStatusPage } from "@/lib/client/graphql/settings";
 import { GraphQLRequestError, graphqlRequest } from "@/lib/client/graphql";
 
 describe("GraphQL client helper", () => {
@@ -53,6 +55,28 @@ describe("GraphQL client helper", () => {
     expect(error).toBeInstanceOf(GraphQLRequestError);
     expect(error).toMatchObject({ message: "Unauthorized", status: 401 });
     expect(replace).toHaveBeenCalledWith("/login?from=%2Fanalytics");
+  });
+
+  it("keeps AI status out of the Overview page operation", async () => {
+    const overviewPage = { accounts: [], analyticsPortfolio: {} };
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: { overview: { page: overviewPage } } })));
+
+    await expect(getOverviewPage({ pulseDays: 7, contentDays: 7, analyticsRange: "DAYS_7", timezone: "UTC" })).resolves.toEqual(overviewPage);
+
+    const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
+    expect(body.query).toContain("query OverviewPage(");
+    expect(body.query).not.toContain("ai { status");
+    expect(body.variables).toEqual({ pulseDays: 7, contentDays: 7, analyticsRange: "DAYS_7", timezone: "UTC" });
+  });
+
+  it("loads AI status through its independent page operation", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: { ai: { status: { configured: true, quota: { used: 2, limit: 10 } } } } })));
+
+    await expect(getAiStatusPage()).resolves.toEqual({ configured: true, quota: { used: 2, limit: 10 } });
+
+    const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
+    expect(body.query).toContain("query AiStatus");
+    expect(body.query).toContain("ai { status");
   });
 
   it("loads Analytics options, dashboard, and installation through one page operation", async () => {

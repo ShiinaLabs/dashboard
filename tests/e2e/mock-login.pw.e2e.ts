@@ -71,6 +71,45 @@ test("Overview cold load stays within one application GraphQL operation", async 
   expect(operations).toEqual(["OverviewPage"]);
 });
 
+test("Overview defers platform charts and floating AI chat until requested", async ({ page }) => {
+  const scriptRequests: string[] = [];
+  const graphqlQueries: string[] = [];
+  page.on("request", (request) => {
+    if (request.resourceType() === "script") scriptRequests.push(new URL(request.url()).pathname);
+    if (request.url().endsWith("/api/graphql") && request.method() === "POST") {
+      graphqlQueries.push((request.postDataJSON() as { query?: string }).query ?? "");
+    }
+  });
+
+  await establishMockSession(page);
+  await page.setViewportSize({ width: 1280, height: 700 });
+  await page.goto("/overview");
+  await page.waitForResponse((response) => response.url().endsWith("/api/graphql"));
+  await expect(page.getByRole("tab", { name: "X" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "AI Analysis" })).toBeVisible();
+  await expect.poll(() => graphqlQueries.length).toBe(1);
+  expect(graphqlQueries[0]).toContain("query OverviewPage(");
+  expect(graphqlQueries[0]).not.toContain("ai { status");
+  expect(scriptRequests.some((path) => /CategoricalChart|XSection|RedditSection/.test(path))).toBe(false);
+  expect(scriptRequests.some((path) => /AiChatUI|FloatingAiChatPanel/.test(path))).toBe(false);
+
+  await page.getByRole("region", { name: "Platforms" }).scrollIntoViewIfNeeded();
+  await expect(page.getByText("X (Twitter)", { exact: true })).toBeVisible();
+  await expect.poll(() => scriptRequests.some((path) => /CategoricalChart|XSection/.test(path))).toBe(true);
+  await page.getByRole("tab", { name: "GitHub" }).click();
+  await expect(page.getByText("Pinned Repositories")).toBeVisible();
+  const scriptRequestsAfterGitHub = scriptRequests.length;
+  await page.getByRole("tab", { name: "X" }).click();
+  await expect(page.getByText("X (Twitter)", { exact: true })).toBeVisible();
+  expect(scriptRequests).toHaveLength(scriptRequestsAfterGitHub);
+
+  await page.getByRole("button", { name: "AI Analysis" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(page.getByText(/Ask me anything about your data/)).toBeVisible();
+  await expect.poll(() => graphqlQueries.some((query) => query.includes("query AiStatus"))).toBe(true);
+  expect(scriptRequests.some((path) => /AiChatUI|FloatingAiChatPanel/.test(path))).toBe(true);
+});
+
 test("cold page data stays within one GraphQL operation across dashboard routes", async ({ page }) => {
   await establishMockSession(page);
   await page.goto("/overview");

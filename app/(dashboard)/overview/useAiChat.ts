@@ -1,16 +1,16 @@
-import { useState, useRef, useCallback, useSyncExternalStore } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { getAiStatusPage } from "@/lib/client/graphql/settings";
-import { getOverviewPage, overviewPageQueryKey } from "@/lib/client/graphql/overview";
-import { getTimezone } from "@/lib/client/datetime";
+
+const statusQueryKey = ["ai-status"] as const;
 
 export interface Message {
   role: "user" | "assistant";
   content: string;
 }
 
-export function useAiChat({ overviewPage = false, enabled = false }: { overviewPage?: boolean; enabled?: boolean } = {}) {
+export function useAiChat({ enabled = true }: { enabled?: boolean } = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -19,15 +19,10 @@ export function useAiChat({ overviewPage = false, enabled = false }: { overviewP
   const inputRef = useRef<HTMLInputElement>(null);
 
   const queryClient = useQueryClient();
-  const timezone = useSyncExternalStore(() => () => {}, getTimezone, () => null);
-  const pageVariables = { pulseDays: 7, contentDays: 7, analyticsRange: "DAYS_7" as const, timezone: timezone ?? "UTC" };
-  const statusQueryKey = overviewPage ? overviewPageQueryKey(pageVariables) : ["ai-status"];
   const { data: status } = useQuery({
     queryKey: statusQueryKey,
-    queryFn: ({ signal }) => overviewPage
-      ? getOverviewPage(pageVariables, signal).then((page) => page.aiStatus)
-      : getAiStatusPage(signal),
-    enabled: overviewPage ? Boolean(timezone) : enabled,
+    queryFn: ({ signal }) => getAiStatusPage(signal),
+    enabled,
     staleTime: 60_000,
   });
 
@@ -89,7 +84,7 @@ export function useAiChat({ overviewPage = false, enabled = false }: { overviewP
       inputRef.current?.focus();
       queryClient.invalidateQueries({ queryKey: statusQueryKey });
     }
-  }, [input, isStreaming, messages, queryClient, statusQueryKey]);
+  }, [input, isStreaming, messages, queryClient]);
 
   const clearMessages = useCallback(() => {
     setMessages([]);

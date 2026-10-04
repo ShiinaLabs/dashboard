@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { ArrowUpRight, Layers3, MessageSquareText, Star, Users } from "lucide-react";
@@ -11,14 +11,19 @@ import { GithubIcon, GitlabIcon, RedditIcon, XIcon } from "@/components/BrandIco
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 import { isSupportedPlatform } from "@/lib/platforms";
 import { FetchHealthSection } from "./FetchHealthSection";
-import { GitHubSection } from "./GitHubSection";
-import { GitLabSection } from "./GitLabSection";
 import { PulseSection } from "./PulseSection";
-import { RedditSection } from "./RedditSection";
 import { TopContentSection } from "./TopContentSection";
-import { XSection } from "./XSection";
 import { useOverviewData } from "./useOverviewData";
 import { WebAnalyticsSection } from "./WebAnalyticsSection";
+
+const XSection = lazy(() => import("./XSection").then((module) => ({ default: module.XSection })));
+const GitHubSection = lazy(() => import("./GitHubSection").then((module) => ({ default: module.GitHubSection })));
+const GitLabSection = lazy(() => import("./GitLabSection").then((module) => ({ default: module.GitLabSection })));
+const RedditSection = lazy(() => import("./RedditSection").then((module) => ({ default: module.RedditSection })));
+
+function PlatformSectionSkeleton() {
+  return <div className="space-y-3" aria-label="Loading platform details"><Skeleton className="h-24 w-full" /><div className="grid gap-3 lg:grid-cols-2"><Skeleton className="h-48 w-full" /><Skeleton className="h-48 w-full" /></div></div>;
+}
 
 const titleKey = "nav.overview" satisfies PageTitleKey;
 export const meta = pageMeta(titleKey);
@@ -27,7 +32,26 @@ export const handle = { titleKey } satisfies TitleHandle;
 export default function Overview() {
   const { t } = useTranslation();
   const data = useOverviewData();
+  const platformSectionRef = useRef<HTMLDivElement>(null);
+  const [platformsNearViewport, setPlatformsNearViewport] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState("");
+
+  useEffect(() => {
+    const element = platformSectionRef.current;
+    if (!element || platformsNearViewport) return;
+    if (typeof IntersectionObserver === "undefined") {
+      const timeout = window.setTimeout(() => setPlatformsNearViewport(true), 0);
+      return () => window.clearTimeout(timeout);
+    }
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setPlatformsNearViewport(true);
+        observer.disconnect();
+      }
+    }, { rootMargin: "600px 0px" });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [data.isLoading, platformsNearViewport]);
   const {
     stats, timeline, topLiked, allAccounts,
     xAccounts, ghAccounts, glAccounts, redditAccounts,
@@ -106,27 +130,29 @@ export default function Overview() {
       </section>
 
       {platformTabs.length > 0 && (
-        <section className="space-y-4" aria-label={t("common.platforms")}>
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold tracking-tight">{t("common.platforms")}</h2>
-            <p className="text-sm text-muted-foreground">{t("overview.platformsDescription")}</p>
-          </div>
-          <Tabs value={activePlatform} onValueChange={setSelectedPlatform}>
-            <div className="w-full overflow-x-auto pb-1">
-              <TabsList className="w-max min-w-full justify-start sm:min-w-0">
-                {platformTabs.map((platform) => (
-                  <TabsTrigger key={platform.value} value={platform.value} className="gap-2 px-3">
-                    {platform.icon}<span>{platform.label}</span>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+        <div ref={platformSectionRef}>
+          <section className="space-y-4" aria-label={t("common.platforms")}>
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold tracking-tight">{t("common.platforms")}</h2>
+              <p className="text-sm text-muted-foreground">{t("overview.platformsDescription")}</p>
             </div>
-            {xAccounts.length > 0 && <TabsContent value="x" className="mt-4"><XSection stats={stats} timeline={timeline} topLiked={topLiked} xAccounts={xAccounts} /></TabsContent>}
-            {ghAccounts.length > 0 && <TabsContent value="github" className="mt-4"><GitHubSection ghRepoCount={ghItemCount} ghPinned={ghPinned} ghTotalStars={ghTotalStars} ghTotalForks={ghTotalForks} ghFollowers={ghFollowers} ghAccounts={ghAccounts} /></TabsContent>}
-            {glAccounts.length > 0 && <TabsContent value="gitlab" className="mt-4"><GitLabSection glProjectCount={glItemCount} glPinned={glPinned} glTotalStars={glTotalStars} glTotalForks={glTotalForks} glFollowers={glFollowers} glAccounts={glAccounts} /></TabsContent>}
-            {redditAccounts.length > 0 && <TabsContent value="reddit" className="mt-4"><RedditSection postKarma={redditPostKarma} commentKarma={redditCommentKarma} totalPosts={redditTotalPosts} totalComments={redditTotalComments} karmaTimeline={redditKarmaTimeline} dailyActivity={redditDailyActivity} mergedSubreddits={mergedSubreddits} /></TabsContent>}
-          </Tabs>
-        </section>
+            <Tabs value={activePlatform} onValueChange={setSelectedPlatform}>
+              <div className="w-full overflow-x-auto pb-1">
+                <TabsList className="w-max min-w-full justify-start sm:min-w-0">
+                  {platformTabs.map((platform) => (
+                    <TabsTrigger key={platform.value} value={platform.value} className="gap-2 px-3">
+                      {platform.icon}<span>{platform.label}</span>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
+              {xAccounts.length > 0 && <TabsContent value="x" className="mt-4">{activePlatform === "x" && platformsNearViewport ? <Suspense fallback={<PlatformSectionSkeleton />}><XSection stats={stats} timeline={timeline} topLiked={topLiked} xAccounts={xAccounts} /></Suspense> : activePlatform === "x" ? <PlatformSectionSkeleton /> : null}</TabsContent>}
+              {ghAccounts.length > 0 && <TabsContent value="github" className="mt-4">{activePlatform === "github" && platformsNearViewport ? <Suspense fallback={<PlatformSectionSkeleton />}><GitHubSection ghRepoCount={ghItemCount} ghPinned={ghPinned} ghTotalStars={ghTotalStars} ghTotalForks={ghTotalForks} ghFollowers={ghFollowers} ghAccounts={ghAccounts} /></Suspense> : activePlatform === "github" ? <PlatformSectionSkeleton /> : null}</TabsContent>}
+              {glAccounts.length > 0 && <TabsContent value="gitlab" className="mt-4">{activePlatform === "gitlab" && platformsNearViewport ? <Suspense fallback={<PlatformSectionSkeleton />}><GitLabSection glProjectCount={glItemCount} glPinned={glPinned} glTotalStars={glTotalStars} glTotalForks={glTotalForks} glFollowers={glFollowers} glAccounts={glAccounts} /></Suspense> : activePlatform === "gitlab" ? <PlatformSectionSkeleton /> : null}</TabsContent>}
+              {redditAccounts.length > 0 && <TabsContent value="reddit" className="mt-4">{activePlatform === "reddit" && platformsNearViewport ? <Suspense fallback={<PlatformSectionSkeleton />}><RedditSection postKarma={redditPostKarma} commentKarma={redditCommentKarma} totalPosts={redditTotalPosts} totalComments={redditTotalComments} karmaTimeline={redditKarmaTimeline} dailyActivity={redditDailyActivity} mergedSubreddits={mergedSubreddits} /></Suspense> : activePlatform === "reddit" ? <PlatformSectionSkeleton /> : null}</TabsContent>}
+            </Tabs>
+          </section>
+        </div>
       )}
 
       {monitoredAccounts.length === 0 && (
