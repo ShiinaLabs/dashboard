@@ -29,9 +29,20 @@ const assets = await Promise.all(files.map(async (file) => {
 }));
 const sorted = [...assets].sort((a, b) => b.rawBytes - a.rawBytes);
 const totals = Object.fromEntries(["js", "css"].map((type) => [type, assets.filter((asset) => asset.type === type).reduce((sum, asset) => ({ rawBytes: sum.rawBytes + asset.rawBytes, gzipBytes: sum.gzipBytes + asset.gzipBytes, brotliBytes: sum.brotliBytes + asset.brotliBytes }), { rawBytes: 0, gzipBytes: 0, brotliBytes: 0 })]));
+function getCommitSha() {
+  const ciCommitSha = process.env.BUILD_COMMIT_SHA || process.env.CI_COMMIT_SHA || process.env.GITHUB_SHA;
+  if (ciCommitSha) return ciCommitSha;
+
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch {
+    // Bundle measurement must also work in source archives and minimal build images without Git.
+    return null;
+  }
+}
 const report = {
   generatedAt: new Date().toISOString(),
-  commit: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+  commit: getCommitSha(),
   nodeVersion: process.version,
   totals,
   largest: sorted.slice(0, 20),
