@@ -80,9 +80,11 @@ test:
     - pnpm test
     - pnpm run build
     - pnpm install --prod --frozen-lockfile --offline
-    - mkdir -p .ci-runtime/build
-    - cp -a build/. .ci-runtime/build/
+    - node --input-type=module -e "await import('@react-router/node')"
+    - mkdir -p .ci-runtime/app-build
+    - cp -a build/. .ci-runtime/app-build/
     - tar -czf .ci-runtime/node_modules.tar.gz node_modules
+    - du -sh node_modules .ci-runtime/node_modules.tar.gz .ci-runtime/app-build
   artifacts:
     paths:
       - .ci-runtime/

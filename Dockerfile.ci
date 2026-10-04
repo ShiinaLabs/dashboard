@@ -17,7 +17,8 @@ ENV NODE_OPTIONS=--max-old-space-size=256
 # The test job prepares production dependencies and the React Router build.
 # ADD extracts the archive while preserving pnpm's relative symlinks into .pnpm.
 ADD --chown=dashboard:nodejs .ci-runtime/node_modules.tar.gz /app/
-COPY --chown=dashboard:nodejs .ci-runtime/build ./build
+COPY --chown=dashboard:nodejs .ci-runtime/app-build ./build
+COPY --chown=dashboard:nodejs package.json ./
 COPY --chown=dashboard:nodejs public/a/t.js ./build/client/a/t.js
 COPY --chown=dashboard:nodejs server ./server
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
