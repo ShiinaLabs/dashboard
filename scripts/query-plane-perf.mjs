@@ -5,6 +5,7 @@ import { dirname, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { createHash } from "node:crypto";
 import { brotliCompressSync, gzipSync } from "node:zlib";
+import { getRouteMeasurement } from "./query-plane-route-contract.mjs";
 
 const baseUrl = process.env.BASE_URL;
 const storageStatePath = process.env.PLAYWRIGHT_STORAGE_STATE;
@@ -93,6 +94,8 @@ try {
       const payloads = [];
       const payloadReads = [];
       let firstApplicationDataMs = null;
+      let usefulContentMs = null;
+      const measurement = getRouteMeasurement(path);
       const start = performance.now();
       const cdpRequests = new Map();
       session.on("Network.requestWillBeSent", ({ requestId, request, type }) => {
@@ -137,10 +140,13 @@ try {
         }
       });
 
-      const dataResponse = page.waitForResponse(
-        (response) => new URL(response.url()).pathname === "/api/graphql",
-        { timeout: Number(process.env.PERF_DATA_TIMEOUT_MS || (profile === "weak" ? 45_000 : 20_000)) },
-      ).catch(() => null);
+      const applicationData = measurement.usefulContentSelector
+        ? page.locator(measurement.usefulContentSelector).waitFor({ state: "visible", timeout: Number(process.env.PERF_DATA_TIMEOUT_MS || (profile === "weak" ? 45_000 : 20_000)) })
+          .then(() => { usefulContentMs = performance.now() - start; }).catch(() => null)
+        : page.waitForEvent("requestfinished", {
+          predicate: (request) => new URL(request.url()).pathname === "/api/graphql",
+          timeout: Number(process.env.PERF_DATA_TIMEOUT_MS || (profile === "weak" ? 45_000 : 20_000)),
+        }).then(() => { usefulContentMs = firstApplicationDataMs ?? performance.now() - start; }).catch(() => null);
       const shellVisible = page.locator("[data-app-shell]").waitFor({ state: "visible", timeout: Number(process.env.PERF_SHELL_TIMEOUT_MS || 20_000) })
         .then(() => performance.now() - start).catch(() => null);
       let navigationError = null;
@@ -149,7 +155,7 @@ try {
       } catch (error) {
         navigationError = error instanceof Error ? error.message : String(error);
       }
-      await dataResponse;
+      await applicationData;
       const dclMs = await page.evaluate(() => performance.getEntriesByType("navigation").at(-1)?.domContentLoadedEventEnd ?? null).catch(() => null);
       const shellMs = await shellVisible;
       await page.waitForTimeout(Number(process.env.PERF_SETTLE_MS || 250));
@@ -178,7 +184,8 @@ try {
         totalTransferredBytes: pageNetwork.reduce((sum, entry) => sum + entry.encodedBytes, 0),
         domContentLoadedMs: dclMs,
         firstMeaningfulAppShellMs: shellMs,
-        usefulContentMs: firstApplicationDataMs,
+        usefulContentMs,
+        expectedApplicationRequests: measurement.expectedApplicationRequests,
         largestRequest: largestRequest && { path: largestRequest.path, resourceType: largestRequest.resourceType, bytes: largestRequest.encodedBytes },
         clientAssets: pageNetwork
           .filter((entry) => entry.resourceType === "Script" || entry.resourceType === "Stylesheet")

@@ -1,0 +1,533 @@
+{
+  "schemaVersion": 1,
+  "environment": {
+    "baseUrl": "http://localhost:5180",
+    "commit": "830dd6c017ff94e84a936858371576b77db31955",
+    "workingTreeDiffSha256": "bf1cc29ca635cad7ed0a096bbcd216303357620d893f602e14240ad6e0c3e8a4",
+    "nodeVersion": "v22.23.2",
+    "browser": "Chromium 153.0.8010.12",
+    "capturedAt": "2026-10-04T17:25:47.322Z",
+    "fixtureEnv": {},
+    "profileConfig": {
+      "normal": {
+        "latency": 0,
+        "downloadThroughput": -1,
+        "uploadThroughput": -1
+      },
+      "high-latency": {
+        "latency": 300,
+        "downloadThroughput": -1,
+        "uploadThroughput": -1
+      },
+      "weak": {
+        "latency": 300,
+        "downloadThroughput": 131072,
+        "uploadThroughput": 32768
+      }
+    },
+    "mockServer": true
+  },
+  "skippedPages": [],
+  "results": [
+    {
+      "profile": "normal",
+      "requestedPath": "/overview",
+      "route": "/overview",
+      "applicationRequestCount": 0,
+      "graphqlRequestCount": 0,
+      "graphqlOperations": [],
+      "payloads": [],
+      "apiBytes": 0,
+      "graphqlBytes": 0,
+      "restJsonBytes": 0,
+      "htmlBytes": 164895,
+      "jsBytes": 838717,
+      "cssBytes": 97607,
+      "totalTransferredBytes": 1124706,
+      "domContentLoadedMs": 54.80000001192093,
+      "firstMeaningfulAppShellMs": 77.29583400000001,
+      "usefulContentMs": 76.61675000000002,
+      "expectedApplicationRequests": 0,
+      "largestRequest": {
+        "path": "/assets/entry.client-DJBx34wZ.js",
+        "resourceType": "Script",
+        "bytes": 183437
+      },
+      "clientAssets": [
+        {
+          "path": "/assets/jsx-runtime-DWPLNcIU.js",
+          "resourceType": "Script",
+          "bytes": 1257
+        },
+        {
+          "path": "/assets/react-dom-CYlSRbaL.js",
+          "resourceType": "Script",
+          "bytes": 4375
+        },
+        {
+          "path": "/assets/query-CFdPrsEN.js",
+          "resourceType": "Script",
+          "bytes": 15530
+        },
+        {
+          "path": "/assets/root-BAodwiqN.js",
+          "resourceType": "Script",
+          "bytes": 93980
+        },
+        {
+          "path": "/assets/root-C4KQnxFs.css",
+          "resourceType": "Stylesheet",
+          "bytes": 97607
+        },
+        {
+          "path": "/assets/chunk-OB3PAWPO-CxmOZYe9.js",
+          "resourceType": "Script",
+          "bytes": 133009
+        },
+        {
+          "path": "/assets/useTranslation-BtCdbZux.js",
+          "resourceType": "Script",
+          "bytes": 6417
+        },
+        {
+          "path": "/assets/mutation-Bj61jT70.js",
+          "resourceType": "Script",
+          "bytes": 4200
+        },
+        {
+          "path": "/assets/themes-C7YlBkq2.js",
+          "resourceType": "Script",
+          "bytes": 7305
+        },
+        {
+          "path": "/assets/dist-P0c7f6kK.js",
+          "resourceType": "Script",
+          "bytes": 34385
+        },
+        {
+          "path": "/assets/page-titles-BJiJpAKs.js",
+          "resourceType": "Script",
+          "bytes": 36039
+        },
+        {
+          "path": "/assets/entry.client-DJBx34wZ.js",
+          "resourceType": "Script",
+          "bytes": 183437
+        },
+        {
+          "path": "/assets/datetime-DHQWgIcy.js",
+          "resourceType": "Script",
+          "bytes": 1989
+        },
+        {
+          "path": "/assets/document-title-YtWWV0jl.js",
+          "resourceType": "Script",
+          "bytes": 1528
+        },
+        {
+          "path": "/assets/layout-D6bUIGqY.js",
+          "resourceType": "Script",
+          "bytes": 48465
+        },
+        {
+          "path": "/assets/audio-lines-6gBJs0F0.js",
+          "resourceType": "Script",
+          "bytes": 1126
+        },
+        {
+          "path": "/assets/bot-D1sZ7Ifx.js",
+          "resourceType": "Script",
+          "bytes": 1149
+        },
+        {
+          "path": "/assets/users-DwSxhyht.js",
+          "resourceType": "Script",
+          "bytes": 1127
+        },
+        {
+          "path": "/assets/dist-Bcgh7zf5.js",
+          "resourceType": "Script",
+          "bytes": 27906
+        },
+        {
+          "path": "/assets/button-B4vkF6uY.js",
+          "resourceType": "Script",
+          "bytes": 2462
+        },
+        {
+          "path": "/assets/input-Ce-BqLmo.js",
+          "resourceType": "Script",
+          "bytes": 1738
+        },
+        {
+          "path": "/assets/api-CFC-7Gxg.js",
+          "resourceType": "Script",
+          "bytes": 3504
+        },
+        {
+          "path": "/assets/useIsMobile-CwDE1qLu.js",
+          "resourceType": "Script",
+          "bytes": 1153
+        },
+        {
+          "path": "/assets/sheet-o0dgqkzs.js",
+          "resourceType": "Script",
+          "bytes": 3170
+        },
+        {
+          "path": "/assets/skeleton-bARkRK67.js",
+          "resourceType": "Script",
+          "bytes": 1078
+        },
+        {
+          "path": "/assets/es2015-Bm74dGTS.js",
+          "resourceType": "Script",
+          "bytes": 31847
+        },
+        {
+          "path": "/assets/api-transport-BQs6gTNy.js",
+          "resourceType": "Script",
+          "bytes": 75902
+        },
+        {
+          "path": "/assets/Skeleton-DUEKQ6_E.js",
+          "resourceType": "Script",
+          "bytes": 1356
+        },
+        {
+          "path": "/assets/BrandIcons-LMYSFnFB.js",
+          "resourceType": "Script",
+          "bytes": 3938
+        },
+        {
+          "path": "/assets/card-DFe8Tldz.js",
+          "resourceType": "Script",
+          "bytes": 2590
+        },
+        {
+          "path": "/assets/dist-CjzbNivi.js",
+          "resourceType": "Script",
+          "bytes": 8204
+        },
+        {
+          "path": "/assets/dist-DnZkh4Pb.js",
+          "resourceType": "Script",
+          "bytes": 5755
+        },
+        {
+          "path": "/assets/dist-B5r92b6H.js",
+          "resourceType": "Script",
+          "bytes": 5061
+        },
+        {
+          "path": "/assets/activity-OG1t91vb.js",
+          "resourceType": "Script",
+          "bytes": 1054
+        },
+        {
+          "path": "/assets/arrow-up-right-BV2rGJ19.js",
+          "resourceType": "Script",
+          "bytes": 987
+        },
+        {
+          "path": "/assets/clock-jnvCh0Jj.js",
+          "resourceType": "Script",
+          "bytes": 989
+        },
+        {
+          "path": "/assets/analytics-comparison-Jliq07WA.js",
+          "resourceType": "Script",
+          "bytes": 1730
+        },
+        {
+          "path": "/assets/useQuery-YAOurVtM.js",
+          "resourceType": "Script",
+          "bytes": 9692
+        },
+        {
+          "path": "/assets/page-C6zIk3am.js",
+          "resourceType": "Script",
+          "bytes": 35014
+        },
+        {
+          "path": "/assets/star-Mh7uwF81.js",
+          "resourceType": "Script",
+          "bytes": 1570
+        },
+        {
+          "path": "/assets/notifications-BGO7GxS_.js",
+          "resourceType": "Script",
+          "bytes": 1382
+        },
+        {
+          "path": "/assets/message-square-CIaCFiA8.js",
+          "resourceType": "Script",
+          "bytes": 1053
+        },
+        {
+          "path": "/assets/MetricGrid-gu9Lnwjn.js",
+          "resourceType": "Script",
+          "bytes": 3066
+        },
+        {
+          "path": "/assets/tabs-C7eMj02s.js",
+          "resourceType": "Script",
+          "bytes": 4644
+        },
+        {
+          "path": "/assets/trending-up-D2HyPQhw.js",
+          "resourceType": "Script",
+          "bytes": 995
+        },
+        {
+          "path": "/assets/SectionShell-B43abv_9.js",
+          "resourceType": "Script",
+          "bytes": 1804
+        },
+        {
+          "path": "/assets/graphql-vR8xu9bL.js",
+          "resourceType": "Script",
+          "bytes": 1574
+        },
+        {
+          "path": "/assets/layout-primitives-CFkjm8xp.js",
+          "resourceType": "Script",
+          "bytes": 3448
+        },
+        {
+          "path": "/assets/TimeRangeSelector-flo6-2Uq.js",
+          "resourceType": "Script",
+          "bytes": 1399
+        },
+        {
+          "path": "/assets/check-DWVcSvnT.js",
+          "resourceType": "Script",
+          "bytes": 944
+        },
+        {
+          "path": "/assets/form-controls-CYujmnea.js",
+          "resourceType": "Script",
+          "bytes": 12782
+        },
+        {
+          "path": "/assets/label-DNTeEENA.js",
+          "resourceType": "Script",
+          "bytes": 1649
+        },
+        {
+          "path": "/assets/alert-Uk8PCek7.js",
+          "resourceType": "Script",
+          "bytes": 1959
+        }
+      ],
+      "criticalRequestChain": [],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "high-latency",
+      "requestedPath": "/overview",
+      "route": "/overview",
+      "applicationRequestCount": 0,
+      "graphqlRequestCount": 0,
+      "graphqlOperations": [],
+      "payloads": [],
+      "apiBytes": 0,
+      "graphqlBytes": 0,
+      "restJsonBytes": 0,
+      "htmlBytes": 164895,
+      "jsBytes": 650093,
+      "cssBytes": 97607,
+      "totalTransferredBytes": 912595,
+      "domContentLoadedMs": 950.9000000059605,
+      "firstMeaningfulAppShellMs": 345.9328330000001,
+      "usefulContentMs": 1103.872958,
+      "expectedApplicationRequests": 0,
+      "largestRequest": {
+        "path": "/assets/entry.client-DJBx34wZ.js",
+        "resourceType": "Script",
+        "bytes": 183437
+      },
+      "clientAssets": [
+        {
+          "path": "/assets/jsx-runtime-DWPLNcIU.js",
+          "resourceType": "Script",
+          "bytes": 1257
+        },
+        {
+          "path": "/assets/react-dom-CYlSRbaL.js",
+          "resourceType": "Script",
+          "bytes": 4375
+        },
+        {
+          "path": "/assets/query-CFdPrsEN.js",
+          "resourceType": "Script",
+          "bytes": 15530
+        },
+        {
+          "path": "/assets/root-BAodwiqN.js",
+          "resourceType": "Script",
+          "bytes": 93980
+        },
+        {
+          "path": "/assets/chunk-OB3PAWPO-CxmOZYe9.js",
+          "resourceType": "Script",
+          "bytes": 133009
+        },
+        {
+          "path": "/assets/entry.client-DJBx34wZ.js",
+          "resourceType": "Script",
+          "bytes": 183437
+        },
+        {
+          "path": "/assets/root-C4KQnxFs.css",
+          "resourceType": "Stylesheet",
+          "bytes": 97607
+        },
+        {
+          "path": "/assets/mutation-Bj61jT70.js",
+          "resourceType": "Script",
+          "bytes": 4200
+        },
+        {
+          "path": "/assets/useTranslation-BtCdbZux.js",
+          "resourceType": "Script",
+          "bytes": 6417
+        },
+        {
+          "path": "/assets/themes-C7YlBkq2.js",
+          "resourceType": "Script",
+          "bytes": 7305
+        },
+        {
+          "path": "/assets/page-titles-BJiJpAKs.js",
+          "resourceType": "Script",
+          "bytes": 36039
+        },
+        {
+          "path": "/assets/dist-P0c7f6kK.js",
+          "resourceType": "Script",
+          "bytes": 34385
+        },
+        {
+          "path": "/assets/audio-lines-6gBJs0F0.js",
+          "resourceType": "Script",
+          "bytes": 1126
+        },
+        {
+          "path": "/assets/datetime-DHQWgIcy.js",
+          "resourceType": "Script",
+          "bytes": 1989
+        },
+        {
+          "path": "/assets/bot-D1sZ7Ifx.js",
+          "resourceType": "Script",
+          "bytes": 1149
+        },
+        {
+          "path": "/assets/document-title-YtWWV0jl.js",
+          "resourceType": "Script",
+          "bytes": 1528
+        },
+        {
+          "path": "/assets/layout-D6bUIGqY.js",
+          "resourceType": "Script",
+          "bytes": 48465
+        },
+        {
+          "path": "/assets/api-transport-BQs6gTNy.js",
+          "resourceType": "Script",
+          "bytes": 75902
+        }
+      ],
+      "criticalRequestChain": [],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "weak",
+      "requestedPath": "/overview",
+      "route": "/overview",
+      "applicationRequestCount": 0,
+      "graphqlRequestCount": 0,
+      "graphqlOperations": [],
+      "payloads": [],
+      "apiBytes": 0,
+      "graphqlBytes": 0,
+      "restJsonBytes": 0,
+      "htmlBytes": 164895,
+      "jsBytes": 170966,
+      "cssBytes": 97607,
+      "totalTransferredBytes": 433468,
+      "domContentLoadedMs": 5629.899999976158,
+      "firstMeaningfulAppShellMs": 408.7427080000002,
+      "usefulContentMs": 5654.2570000000005,
+      "expectedApplicationRequests": 0,
+      "largestRequest": {
+        "path": "/overview",
+        "resourceType": "Document",
+        "bytes": 164895
+      },
+      "clientAssets": [
+        {
+          "path": "/assets/jsx-runtime-DWPLNcIU.js",
+          "resourceType": "Script",
+          "bytes": 1257
+        },
+        {
+          "path": "/assets/react-dom-CYlSRbaL.js",
+          "resourceType": "Script",
+          "bytes": 4375
+        },
+        {
+          "path": "/assets/query-CFdPrsEN.js",
+          "resourceType": "Script",
+          "bytes": 15530
+        },
+        {
+          "path": "/assets/mutation-Bj61jT70.js",
+          "resourceType": "Script",
+          "bytes": 4200
+        },
+        {
+          "path": "/assets/useTranslation-BtCdbZux.js",
+          "resourceType": "Script",
+          "bytes": 6417
+        },
+        {
+          "path": "/assets/themes-C7YlBkq2.js",
+          "resourceType": "Script",
+          "bytes": 7305
+        },
+        {
+          "path": "/assets/root-BAodwiqN.js",
+          "resourceType": "Script",
+          "bytes": 93980
+        },
+        {
+          "path": "/assets/root-C4KQnxFs.css",
+          "resourceType": "Stylesheet",
+          "bytes": 97607
+        },
+        {
+          "path": "/assets/dist-P0c7f6kK.js",
+          "resourceType": "Script",
+          "bytes": 34385
+        },
+        {
+          "path": "/assets/datetime-DHQWgIcy.js",
+          "resourceType": "Script",
+          "bytes": 1989
+        },
+        {
+          "path": "/assets/document-title-YtWWV0jl.js",
+          "resourceType": "Script",
+          "bytes": 1528
+        }
+      ],
+      "criticalRequestChain": [],
+      "error": null,
+      "skipReason": null
+    }
+  ]
+}

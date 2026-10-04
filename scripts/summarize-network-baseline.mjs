@@ -1,4 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
+import { getRouteMeasurement } from "./query-plane-route-contract.mjs";
 
 const beforePath = process.env.PERF_BEFORE || "performance/network-baseline.before.json";
 const afterPath = process.env.PERF_AFTER || "performance/network-baseline.after.json";
@@ -36,7 +37,11 @@ const results = keys.map((entryKey) => {
   };
 });
 const afterRows = [...newResults.values()];
-const requestViolations = afterRows.filter((row) => !row.skipReason && row.applicationRequestCount !== 1);
+const requestViolations = afterRows.filter((row) => {
+  if (row.skipReason) return false;
+  const expected = getRouteMeasurement(row.route ?? row.requestedPath).expectedApplicationRequests;
+  return row.applicationRequestCount !== expected;
+});
 const priorRows = new Map((priorSummary?.results ?? []).map((row) => [key(row), row.after]));
 const regressionViolations = [];
 for (const [entryKey, current] of newResults) {
@@ -54,7 +59,11 @@ const summary = {
   environment: after.environment,
   beforeCommit: before.environment.commit,
   comparisonMethod: "Cold direct navigation; fresh browser context per page; unauthenticated session bootstrap excluded from application request count.",
-  pageOperationBudget: { expectedApplicationRequests: 1, violations: requestViolations.map(({ profile, requestedPath, applicationRequestCount }) => ({ profile, requestedPath, applicationRequestCount })) },
+  pageOperationBudget: {
+    defaultExpectedApplicationRequests: 1,
+    routeOverrides: { "/overview": 0 },
+    violations: requestViolations.map((row) => ({ profile: row.profile, requestedPath: row.requestedPath, expectedApplicationRequests: getRouteMeasurement(row.route ?? row.requestedPath).expectedApplicationRequests, applicationRequestCount: row.applicationRequestCount })),
+  },
   relativeByteBudget: { source: priorSummary ? outputPath : "first measured baseline", regressions: regressionViolations },
   routeCount: new Set(afterRows.map((row) => row.requestedPath)).size,
   profiles: [...new Set(afterRows.map((row) => row.profile))],

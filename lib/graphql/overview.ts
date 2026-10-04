@@ -1,4 +1,5 @@
 import { getOverviewReadModel } from "@/lib/services/overview";
+import { projectOverviewFetchHealth, projectOverviewGithub, projectOverviewGitlab, projectOverviewReddit } from "@/lib/services/overview-projection";
 import { getPulse } from "@/lib/services/pulse";
 import { getTopContent } from "@/lib/services/top-content";
 import { getFetchHealth } from "@/lib/services/fetch-health";
@@ -76,15 +77,6 @@ export const overviewTypeDefs = /* GraphQL */ `
 
 type AnalyticsRange = "DAYS_7" | "DAYS_30" | "DAYS_90";
 function rangeDays(range: AnalyticsRange) { return range === "DAYS_90" ? 90 : range === "DAYS_30" ? 30 : 7; }
-function healthProjection(health: Awaited<ReturnType<typeof getFetchHealth>>) {
-  return {
-    summary: health.summary,
-    unsupportedAccounts: health.unsupportedAccounts,
-    issues: health.issues.slice(0, 5),
-    issueCount: health.issues.length,
-  };
-}
-
 export const overviewResolvers = {
   Query: { overview: () => ({}) },
   OverviewQuery: {
@@ -95,27 +87,15 @@ export const overviewResolvers = {
       const accounts = await getAccounts(getOwnerId(context.user));
       return getTopContent(accounts.filter((account) => account.is_active === 1), args.days);
     },
-    fetchHealth: async (_parent: unknown, _args: unknown, context: GraphQLContext) => healthProjection(await getFetchHealth(getOwnerId(context.user))),
+    fetchHealth: async (_parent: unknown, _args: unknown, context: GraphQLContext) => projectOverviewFetchHealth(await getFetchHealth(getOwnerId(context.user))),
     analyticsPortfolio: (_parent: unknown, args: { range: AnalyticsRange; timezone: string }, context: GraphQLContext) =>
       getAnalyticsPortfolio(context.user, args.timezone, rangeDays(args.range)),
   },
   OverviewPage: {
-    github: (parent: Awaited<ReturnType<typeof getOverviewReadModel>>) => ({
-      followers: parent.platforms.github.followers,
-      itemCount: parent.platforms.github.repositoryCount,
-      stars: parent.platforms.github.stars,
-      forks: parent.platforms.github.forks,
-      pinned: parent.platforms.github.pinnedRepositories,
-    }),
-    gitlab: (parent: Awaited<ReturnType<typeof getOverviewReadModel>>) => ({
-      followers: parent.platforms.gitlab.followers,
-      itemCount: parent.platforms.gitlab.projectCount,
-      stars: parent.platforms.gitlab.stars,
-      forks: parent.platforms.gitlab.forks,
-      pinned: parent.platforms.gitlab.pinnedProjects,
-    }),
-    reddit: (parent: Awaited<ReturnType<typeof getOverviewReadModel>>) => parent.platforms.reddit,
-    fetchHealth: (parent: Awaited<ReturnType<typeof getOverviewReadModel>>) => healthProjection(parent.fetchHealth),
+    github: (parent: Awaited<ReturnType<typeof getOverviewReadModel>>) => projectOverviewGithub(parent),
+    gitlab: (parent: Awaited<ReturnType<typeof getOverviewReadModel>>) => projectOverviewGitlab(parent),
+    reddit: (parent: Awaited<ReturnType<typeof getOverviewReadModel>>) => projectOverviewReddit(parent),
+    fetchHealth: (parent: Awaited<ReturnType<typeof getOverviewReadModel>>) => projectOverviewFetchHealth(parent.fetchHealth),
   },
   OverviewPinnedItem: {
     external_id: (parent: { external_id?: number; repo_id?: number; project_id?: number }) => parent.external_id ?? parent.repo_id ?? parent.project_id ?? 0,

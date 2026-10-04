@@ -1,5 +1,11 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Await, Link, redirect, useLoaderData } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
+import { requireSession } from "@/lib/auth-helpers";
+import { getRequestTimezone } from "@/lib/timezone.server";
+import { getOverviewReadModel } from "@/lib/services/overview";
+import { projectOverviewReadModel } from "@/lib/services/overview-projection";
+import type { OverviewPageData } from "@/lib/client/graphql/overview";
 import { useTranslation } from "react-i18next";
 import { ArrowUpRight, Layers3, MessageSquareText, Star, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -29,9 +35,51 @@ const titleKey = "nav.overview" satisfies PageTitleKey;
 export const meta = pageMeta(titleKey);
 export const handle = { titleKey } satisfies TitleHandle;
 
-export default function Overview() {
+const initialParams = { pulseDays: 7, contentDays: 7, analyticsRange: "DAYS_7" as const };
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const authenticated = await requireSession(request);
+  if (!authenticated) {
+    const url = new URL(request.url);
+    const from = `${url.pathname}${url.search}`;
+    throw redirect(`/login?from=${encodeURIComponent(from)}`);
+  }
+
+  const overviewData = getOverviewReadModel(authenticated.user, {
+    ...initialParams,
+    timezone: getRequestTimezone(request),
+  }).then((readModel) => projectOverviewReadModel(readModel) as unknown as OverviewPageData);
+  void overviewData.catch(() => {});
+  return { overviewData };
+}
+
+function OverviewSkeleton() {
   const { t } = useTranslation();
-  const data = useOverviewData();
+  return (
+    <div className="space-y-8" aria-label={t("overview.heading")}>
+      <div className="space-y-2"><Skeleton className="h-8 w-40" /><Skeleton className="h-4 w-72 max-w-full" /></div>
+      <MetricGrid>{Array.from({ length: 4 }, (_, index) => <MetricCardSkeleton key={index} />)}</MetricGrid>
+      <div className="grid gap-4 xl:grid-cols-2"><ChartCardSkeleton /><ChartCardSkeleton /></div>
+      <ChartCardSkeleton />
+    </div>
+  );
+}
+
+export default function Overview() {
+  const { overviewData } = useLoaderData<typeof loader>();
+  return <Suspense fallback={<OverviewSkeleton />}><Await resolve={overviewData} errorElement={<OverviewLoadError />}>
+    {(data) => <OverviewContent data={data as unknown as OverviewPageData} />}
+  </Await></Suspense>;
+}
+
+function OverviewLoadError() {
+  const { t } = useTranslation();
+  return <p role="alert" className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">{t("overview.health.unavailable")}</p>;
+}
+
+function OverviewContent({ data: pageData }: { data: OverviewPageData }) {
+  const { t } = useTranslation();
+  const data = useOverviewData(pageData);
   const platformSectionRef = useRef<HTMLDivElement>(null);
   const [platformsNearViewport, setPlatformsNearViewport] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState("");
@@ -51,7 +99,7 @@ export default function Overview() {
     }, { rootMargin: "600px 0px" });
     observer.observe(element);
     return () => observer.disconnect();
-  }, [data.isLoading, platformsNearViewport]);
+  }, [platformsNearViewport]);
   const {
     stats, timeline, topLiked, allAccounts,
     xAccounts, ghAccounts, glAccounts, redditAccounts,
@@ -59,20 +107,9 @@ export default function Overview() {
     glItemCount, glPinned, glTotalStars, glTotalForks, glFollowers,
     redditPostKarma, redditCommentKarma, redditTotalPosts, redditTotalComments,
     redditKarmaTimeline, redditDailyActivity, mergedSubreddits,
-    pulse, topContent, fetchHealth, analyticsPortfolio, isLoading, isError,
+    pulse, topContent, fetchHealth, analyticsPortfolio, isError,
   } = data;
   const monitoredAccounts = allAccounts.filter((account) => isSupportedPlatform(account.platform));
-
-  if (isLoading) {
-    return (
-      <div className="space-y-8" aria-label={t("overview.heading")}>
-        <div className="space-y-2"><Skeleton className="h-8 w-40" /><Skeleton className="h-4 w-72 max-w-full" /></div>
-        <MetricGrid>{Array.from({ length: 4 }, (_, index) => <MetricCardSkeleton key={index} />)}</MetricGrid>
-        <div className="grid gap-4 xl:grid-cols-2"><ChartCardSkeleton /><ChartCardSkeleton /></div>
-        <ChartCardSkeleton />
-      </div>
-    );
-  }
 
   if (isError || !pulse || !topContent || !fetchHealth || !analyticsPortfolio) {
     return <p role="alert" className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">{t("overview.health.unavailable")}</p>;
@@ -92,7 +129,7 @@ export default function Overview() {
   const redditKarma = redditPostKarma + redditCommentKarma;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" data-overview-ready="true">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1.5">
           <h1 className="text-2xl font-semibold tracking-tight">{t("overview.heading")}</h1>

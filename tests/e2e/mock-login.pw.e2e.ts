@@ -44,6 +44,7 @@ test("authenticated route HTML contains the useful app shell before browser Java
   const html = await response.text();
   expect(html).toContain("data-app-shell");
   expect(html).toContain("<main");
+  expect(html).toContain("data-overview-ready=\"true\"");
   expect(html).toMatch(/Overview|OverviewPage|aria-label="Overview"/);
   const assetPath = html.match(/(?:src|href)="([^"]+\.js)/)?.[1];
   expect(assetPath).toBeTruthy();
@@ -71,20 +72,42 @@ test("Overview cold load uses server auth bootstrap and migrates timezone withou
   expect(authRequests).toEqual([]);
 });
 
-test("Overview cold load stays within one application GraphQL operation", async ({ page }) => {
-  const operations: string[] = [];
+test("Overview cold load and delayed client navigation use server data without browser application requests", async ({ page }) => {
+  const applicationRequests: string[] = [];
+  const routerDataRequests: string[] = [];
+  const hydrationErrors: string[] = [];
   page.on("request", (request) => {
-    if (!request.url().endsWith("/api/graphql") || request.method() !== "POST") return;
-    const body = request.postDataJSON() as { operationName?: string; query?: string };
-    const operationName = body.operationName ?? body.query?.match(/\bquery\s+([A-Za-z0-9_]+)/)?.[1];
-    if (operationName) operations.push(operationName);
+    if (new URL(request.url()).pathname.endsWith(".data")) routerDataRequests.push(request.url());
+  });
+  page.on("console", (message) => {
+    if (message.type() === "error" && /hydration|did not match|server html/i.test(message.text())) hydrationErrors.push(message.text());
+  });
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.startsWith("/api/") && path !== "/api/auth/me") applicationRequests.push(path);
   });
   await establishMockSession(page);
   await page.goto("/overview");
-  await page.waitForResponse((response) => response.url().endsWith("/api/graphql"));
+  await expect(page.locator('[data-overview-ready="true"]')).toBeVisible();
   await expect(page.getByRole("region", { name: "Overview" })).toBeVisible();
-  await expect.poll(() => operations.length).toBe(1);
-  expect(operations).toEqual(["OverviewPage"]);
+  await page.waitForTimeout(100);
+  expect(applicationRequests).toEqual([]);
+  expect(hydrationErrors).toEqual([]);
+
+  await page.goto("/accounts");
+  await expect(page.getByRole("heading", { name: "Connections" })).toBeVisible();
+  applicationRequests.length = 0;
+  await page.route("**/overview.data**", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    await route.continue();
+  });
+  routerDataRequests.length = 0;
+  await page.getByRole("link", { name: "Overview" }).click();
+  await expect(page.locator("main [data-slot='skeleton']").first()).toBeVisible();
+  await expect(page.locator('[data-overview-ready="true"]')).toBeVisible();
+  await page.waitForTimeout(100);
+  expect(applicationRequests).toEqual([]);
+  expect(routerDataRequests).toHaveLength(1);
 });
 
 test("Overview defers platform charts and floating AI chat until requested", async ({ page }) => {
@@ -100,12 +123,10 @@ test("Overview defers platform charts and floating AI chat until requested", asy
   await establishMockSession(page);
   await page.setViewportSize({ width: 1280, height: 700 });
   await page.goto("/overview");
-  await page.waitForResponse((response) => response.url().endsWith("/api/graphql"));
+  await expect(page.locator('[data-overview-ready="true"]')).toBeVisible();
   await expect(page.getByRole("tab", { name: "X" })).toBeVisible();
   await expect(page.getByRole("button", { name: "AI Analysis" })).toBeVisible();
-  await expect.poll(() => graphqlQueries.length).toBe(1);
-  expect(graphqlQueries[0]).toContain("query OverviewPage(");
-  expect(graphqlQueries[0]).not.toContain("ai { status");
+  await expect.poll(() => graphqlQueries.length).toBe(0);
   expect(scriptRequests.some((path) => /CategoricalChart|XSection|RedditSection/.test(path))).toBe(false);
   expect(scriptRequests.some((path) => /AiChatUI|FloatingAiChatPanel/.test(path))).toBe(false);
 
@@ -129,7 +150,7 @@ test("Overview defers platform charts and floating AI chat until requested", asy
 test("cold page data stays within one GraphQL operation across dashboard routes", async ({ page }) => {
   await establishMockSession(page);
   await page.goto("/overview");
-  await page.waitForResponse((response) => response.url().endsWith("/api/graphql"));
+  await expect(page.locator('[data-overview-ready="true"]')).toBeVisible();
   const paths = [
     "/analytics", "/app-store", "/revenue", "/accounts", "/github/2", "/github/2/repos/1001",
     "/gitlab/3", "/gitlab/3/projects/2001", "/reddit/4", "/x/1", "/settings", "/admin",
@@ -154,7 +175,7 @@ test("cold page data stays within one GraphQL operation across dashboard routes"
   }
 });
 
-test("Overview shows portfolio analytics from one ranged GraphQL request", async ({ page }) => {
+test("Overview renders portfolio from SSR and keeps range changes targeted", async ({ page }) => {
   const portfolioRanges: string[] = [];
   page.on("requestfinished", (request) => {
     if (!request.url().endsWith("/api/graphql") || request.method() !== "POST") return;
@@ -194,7 +215,7 @@ test("Overview shows portfolio analytics from one ranged GraphQL request", async
     return { metricsBeforeAnalytics: follows(globalMetrics, analytics), analyticsBeforePulse: follows(analytics, pulse) };
   });
   expect(sectionOrder).toEqual({ metricsBeforeAnalytics: true, analyticsBeforePulse: true });
-  expect(portfolioRanges).toEqual(["DAYS_7"]);
+  expect(portfolioRanges).toEqual([]);
 
   for (const [buttonName, range] of [["30D", "DAYS_30"], ["90D", "DAYS_90"]]) {
     const response = page.waitForResponse((candidate) => {
@@ -206,7 +227,7 @@ test("Overview shows portfolio analytics from one ranged GraphQL request", async
     expect((await response).ok()).toBeTruthy();
     await expect(section).toBeVisible();
   }
-  expect(portfolioRanges).toEqual(["DAYS_7", "DAYS_30", "DAYS_90"]);
+  expect(portfolioRanges).toEqual(["DAYS_30", "DAYS_90"]);
 });
 
 test("targeted portfolio range errors stay inside Web Analytics while other overview sections remain visible", async ({ page }) => {
@@ -231,9 +252,10 @@ test("targeted portfolio range errors stay inside Web Analytics while other over
 test("Portfolio empty and no-traffic states keep setup and site summaries useful", async ({ page }) => {
   await logIn(page);
   await page.route("**/api/graphql", async (route) => {
+    if (!route.request().postData()?.includes("query OverviewAnalyticsPortfolio(")) return route.continue();
     const response = await route.fetch();
     const payload = await response.json();
-    const portfolio = payload.data?.overview?.page?.analyticsPortfolio;
+    const portfolio = payload.data?.overview?.analyticsPortfolio;
     if (portfolio) {
       portfolio.summary = { trackedSites: 0, activeSites: 0, views: 0, visits: 0 };
       portfolio.previousSummary = { views: 0, visits: 0 };
@@ -243,15 +265,17 @@ test("Portfolio empty and no-traffic states keep setup and site summaries useful
   });
   await page.goto("/overview");
   const section = page.getByRole("region", { name: "Web Analytics" });
+  await section.getByRole("button", { name: "30D" }).click();
   await expect(section.getByText("No websites are being tracked yet.")).toBeVisible();
   await expect(section.getByRole("link", { name: "Set up Web Analytics" })).toHaveAttribute("href", "/analytics");
   await expect(section.getByText("Tracked Sites", { exact: true })).toHaveCount(0);
 
   await page.unroute("**/api/graphql");
   await page.route("**/api/graphql", async (route) => {
+    if (!route.request().postData()?.includes("query OverviewAnalyticsPortfolio(")) return route.continue();
     const response = await route.fetch();
     const payload = await response.json();
-    const portfolio = payload.data?.overview?.page?.analyticsPortfolio;
+    const portfolio = payload.data?.overview?.analyticsPortfolio;
     if (portfolio) {
       portfolio.summary = { trackedSites: 1, activeSites: 0, views: 0, visits: 0 };
       portfolio.previousSummary = { views: 0, visits: 0 };
@@ -259,7 +283,9 @@ test("Portfolio empty and no-traffic states keep setup and site summaries useful
     }
     await route.fulfill({ response, body: JSON.stringify(payload) });
   });
-  await page.reload();
+  const targetedResponse = page.waitForResponse((response) => response.url().endsWith("/api/graphql") && response.request().postData()?.includes("OverviewAnalyticsPortfolio") === true);
+  await page.getByRole("region", { name: "Web Analytics" }).getByRole("button", { name: "90D" }).click();
+  await targetedResponse;
   await expect(section.getByText("No traffic recorded in this period.")).toBeVisible();
   await expect(section.getByText("Quiet Site", { exact: true })).toBeVisible();
   await expect(section.getByText("quiet.example", { exact: true })).toBeVisible();
@@ -282,9 +308,10 @@ test("Portfolio rows remain responsive without horizontal overflow", async ({ pa
 test("Top Sites limits rows to five and reports the remaining site count", async ({ page }) => {
   await logIn(page);
   await page.route("**/api/graphql", async (route) => {
+    if (!route.request().postData()?.includes("query OverviewAnalyticsPortfolio(")) return route.continue();
     const response = await route.fetch();
     const payload = await response.json();
-    const portfolio = payload.data?.overview?.page?.analyticsPortfolio;
+    const portfolio = payload.data?.overview?.analyticsPortfolio;
     if (portfolio) {
       portfolio.summary = { trackedSites: 7, activeSites: 7, views: 28, visits: 14 };
       portfolio.previousSummary = { views: 24, visits: 12 };
@@ -300,6 +327,9 @@ test("Top Sites limits rows to five and reports the remaining site count", async
   });
   await page.goto("/overview");
   const section = page.getByRole("region", { name: "Web Analytics" });
+  const rangeResponse = page.waitForResponse((response) => response.url().endsWith("/api/graphql") && response.request().postData()?.includes("OverviewAnalyticsPortfolio") === true);
+  await section.getByRole("button", { name: "30D" }).click();
+  await rangeResponse;
   await expect(section.getByRole("listitem")).toHaveCount(5);
   await expect(section.getByText("+ 2 more sites", { exact: true })).toBeVisible();
   await expect(section.getByText("Site 6", { exact: true })).toHaveCount(0);

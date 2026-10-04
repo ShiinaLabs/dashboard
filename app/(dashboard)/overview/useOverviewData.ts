@@ -1,21 +1,7 @@
-import { useSyncExternalStore } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { getOverviewPage, overviewPageQueryKey } from "@/lib/client/graphql/overview";
-import { getTimezone } from "@/lib/client/datetime";
 import type { Account } from "@/lib/api";
+import type { OverviewPageData } from "@/lib/client/graphql/overview";
 
-const subscribeTimezone = () => () => {};
-const getServerTimezone = () => null;
-
-export function useOverviewData() {
-  const timezone = useSyncExternalStore(subscribeTimezone, getTimezone, getServerTimezone);
-  const query = useQuery({
-    queryKey: overviewPageQueryKey({ pulseDays: 7, contentDays: 7, analyticsRange: "DAYS_7", timezone: timezone ?? "UTC" }),
-    queryFn: ({ signal }) => getOverviewPage({ pulseDays: 7, contentDays: 7, analyticsRange: "DAYS_7", timezone: timezone! }, signal),
-    enabled: Boolean(timezone),
-    staleTime: 60_000,
-  });
-  const page = query.data;
+export function useOverviewData(page: OverviewPageData) {
   const allAccounts = page?.accounts ?? [];
   const xAccounts = allAccounts.filter((account: Account) => account.platform === "twitter");
   const ghAccounts = allAccounts.filter((account: Account) => account.platform === "github");
@@ -55,7 +41,7 @@ export function useOverviewData() {
     topContent: page?.topContent,
     fetchHealth: page?.fetchHealth,
     analyticsPortfolio: page?.analyticsPortfolio,
-    isLoading: query.isPending,
-    isError: query.isError,
+    isLoading: false,
+    isError: false,
   };
 }
