@@ -72,6 +72,21 @@ export async function getAccountDetails(id: number) {
   return { ...account, stats: stats || null, recentFetchRuns };
 }
 
+export async function getVisibleAccountDetails(id: number, viewer: { id: number; role: string }) {
+  const account = await getAccountById(id);
+  if (!account) return undefined;
+  if (account.owner_id !== viewer.id && viewer.role !== "admin") {
+    const error = new Error("Forbidden");
+    error.name = "AccountForbiddenError";
+    throw error;
+  }
+  const [stats, recentFetchRuns] = await Promise.all([
+    getLatestUserStats(account.id),
+    getRecentFetchRuns(account.id),
+  ]);
+  return { ...account, stats: stats || null, recentFetchRuns };
+}
+
 export async function getActiveAccounts() {
   const rows = await accountsRepo.getActiveAccounts();
   return rows.map((row) => toMetadata(row as AccountRow));

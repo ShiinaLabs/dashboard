@@ -95,16 +95,17 @@ test("Business groups Web Analytics and the header resolves the existing route",
 
 test("App Store Analytics tabs, app/date/territory filters and missing campaign data", async ({ page }) => {
   const filters: URLSearchParams[] = [];
-  await page.route("**/api/app-store/analytics/apps", (route) => route.fulfill({ json: { apps: [{ id: 1, name: "Sample App" }, { id: 2, name: "Second App" }] } }));
-  await page.route(/\/api\/app-store\/analytics\?/, (route) => {
-    const query = new URL(route.request().url()).searchParams;
+  await page.route("**/api/graphql", (route) => {
+    const body = route.request().postDataJSON() as { query: string; variables: Record<string, unknown> };
+    if (!body.query.includes("query AppStoreAnalyticsPage")) return route.fallback();
+    const query = new URLSearchParams(Object.entries(body.variables).map(([key, value]) => [key, String(value)]));
     filters.push(query);
     const metrics = { impressions: 100, views: 30, firstTimeDownloads: 0, downloads: 10, conversion: null };
-    return route.fulfill({ json: {
+    return route.fulfill({ json: { data: { appStore: { enabledApps: [{ id: 1, name: "Sample App" }, { id: 2, name: "Second App" }], analytics: {
       overview: metrics, updatedAt: "2026-10-02T00:00:00Z", completeThrough: "2026-09-29", trend: [{ date: query.get("to"), ...metrics }],
       acquisition: [{ source: "App Store Search", ...metrics }, { source: "Web Referrer", impressions: null, views: null, firstTimeDownloads: null, downloads: null, conversion: null }],
       campaigns: [], territories: ["USA", "JPN"],
-    } });
+    } } } } });
   });
   await openConnections(page);
   await page.getByRole("button", { name: "Business", exact: true }).click();
@@ -148,15 +149,18 @@ test("App Store Analytics tabs, app/date/territory filters and missing campaign 
 
 
 test("Business Revenue has four tabs and retains separate currencies, nulls and final fiscal periods", async ({ page }) => {
-  await page.route("**/api/app-store/analytics/apps", (route) => route.fulfill({ json: { apps: [{ id: 1, name: "Synthetic App" }] } }));
   const amounts = [{ currency: "USD", proceeds: "1.4", sales: "2" }, { currency: "JPY", proceeds: "100", sales: "200" }];
-  await page.route(/\/api\/app-store\/revenue\?/, (route) => route.fulfill({ json: {
+  await page.route("**/api/graphql", (route) => {
+    const body = route.request().postDataJSON() as { query: string };
+    if (!body.query.includes("query RevenuePage")) return route.fallback();
+    return route.fulfill({ json: { data: { appStore: { enabledApps: [{ id: 1, name: "Synthetic App" }], revenue: {
     updatedAt: "2026-09-29", completeThrough: "2026-09-27", overview: { amounts, units: "2", payingUsers: null },
     trend: amounts.map((a) => ({ ...a, date: "2026-09-29" })), byApp: amounts.map((a) => ({ ...a, app: "Synthetic App" })), byTerritory: [],
     sales: { rows: [], amounts, units: "2", trend: [], byApp: [], byTerritory: [] },
     subscriptions: { active: null, starts: null, conversions: null, renewals: null, voluntaryChurn: null, involuntaryChurn: null, trend: [], bySubscription: [] },
     settlements: [{ fiscalMonth: "2026-09", region: "ZZ", currency: "USD", startDate: "2026-08-30", endDate: "2026-09-26", earned: "1.4", units: "2" }], territories: ["USA", "JP"],
-  } }));
+  } } } } });
+  });
   await openConnections(page);
   await page.getByRole("button", { name: "Business", exact: true }).click();
   for (const name of ["Web Analytics", "App Store Analytics", "Revenue"]) await expect(page.getByRole("link", { name, exact: true })).toBeVisible();

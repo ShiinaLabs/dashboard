@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { api } from "@/lib/api";
+import { getRevenuePage } from "@/lib/client/graphql/app-store";
 import { formatRevenueDecimal } from "@/lib/client/revenue-format";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 import { Button } from "@/components/ui/button";
@@ -67,17 +67,16 @@ export default function RevenuePage() {
   const [appId, setAppId] = useState("all"), [territory, setTerritory] = useState("all"), [range, setRange] = useState(7), [month, setMonth] = useState("");
   const [today] = useState(() => new Date().toISOString().slice(0, 10));
   const from = new Date(Date.parse(today) - (range - 1) * 86400000).toISOString().slice(0, 10);
-  const apps = useQuery({ queryKey: ["app-store-analytics", "apps"], queryFn: api.getEnabledAppStoreAnalyticsApps });
-  const query = useQuery({ queryKey: ["app-store-revenue", appId, from, today, territory, month], queryFn: () => api.getAppStoreRevenueDashboard({ from, to: today, appId: appId === "all" ? undefined : Number(appId), territory: territory === "all" ? undefined : territory, fiscalMonth: month || undefined }), enabled: apps.isSuccess });
-  const data = query.data;
+  const query = useQuery({ queryKey: ["revenue-page", appId, from, today, territory, month], queryFn: ({ signal }) => getRevenuePage({ from, to: today, appId: appId === "all" ? undefined : Number(appId), territory: territory === "all" ? undefined : territory, fiscalMonth: month || undefined }, signal), staleTime: 5 * 60_000 });
+  const data = query.data?.revenue;
   return <div className="space-y-6"><div className="space-y-2"><h1 className="text-2xl font-semibold tracking-tight">{t(titleKey)}</h1><p className="text-sm text-muted-foreground">{t("revenue.description")}</p></div>
-    <div className="flex flex-wrap items-center gap-3"><Select value={appId} onValueChange={(v) => { setAppId(v); setTerritory("all"); }}><SelectTrigger aria-label={t("appStoreAnalytics.app")} className="w-full sm:w-56"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">{t("appStoreAnalytics.allApps")}</SelectItem>{(apps.data?.apps ?? []).map((a) => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)}</SelectContent></Select>
+    <div className="flex flex-wrap items-center gap-3"><Select value={appId} onValueChange={(v) => { setAppId(v); setTerritory("all"); }}><SelectTrigger aria-label={t("appStoreAnalytics.app")} className="w-full sm:w-56"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">{t("appStoreAnalytics.allApps")}</SelectItem>{(query.data?.enabledApps ?? []).map((a) => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)}</SelectContent></Select>
       <div role="group" aria-label={t("appStoreAnalytics.dateRange")} className="flex gap-1 rounded-lg border p-1">{[7, 30, 90].map((days) => <Button key={days} size="sm" variant={range === days ? "secondary" : "ghost"} aria-pressed={range === days} onClick={() => setRange(days)}>{days}D</Button>)}</div>
       <Select value={territory} onValueChange={setTerritory}><SelectTrigger aria-label={t("appStoreAnalytics.territory")} className="w-full sm:w-48"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">{t("appStoreAnalytics.allTerritories")}</SelectItem>{[...new Set([...(data?.territories ?? []), ...(territory === "all" ? [] : [territory])])].map((code) => <SelectItem key={code} value={code}>{code}</SelectItem>)}</SelectContent></Select>
     </div>
     <dl className="flex gap-6 text-xs text-muted-foreground"><div className="flex gap-2"><dt>{t("appStoreAnalytics.updated")}</dt><dd>{data?.updatedAt ?? "—"}</dd></div><div className="flex gap-2"><dt>{t("appStoreAnalytics.completeThrough")}</dt><dd>{data?.completeThrough ?? "—"}</dd></div></dl>
-    {(apps.isError || query.isError) && <p role="alert" className="text-sm text-destructive">{apps.error?.message ?? query.error?.message}</p>}
-    {(apps.isLoading || query.isLoading) && <p role="status">{t("common.loading")}</p>}
+    {query.isError && <p role="alert" className="text-sm text-destructive">{query.error.message}</p>}
+    {query.isLoading && <p role="status">{t("common.loading")}</p>}
     <p className="text-xs text-muted-foreground">{t("revenue.syncLocation")} <Link to="/accounts" className="underline">{t("nav.connections")}</Link></p>
     <Tabs defaultValue="overview"><TabsList className="h-auto max-w-full flex-wrap justify-start">{["overview", "sales", "subscriptions", "settlements"].map((tab) => <TabsTrigger key={tab} value={tab}>{t(`revenue.${tab}`)}</TabsTrigger>)}</TabsList>
       <TabsContent value="overview" className="space-y-5 pt-4"><section aria-labelledby="estimated-purchases-heading" className="space-y-4"><div><h2 id="estimated-purchases-heading" className="font-medium">{t("revenue.estimated")}</h2><p className="text-xs text-muted-foreground">{t("revenue.analyticsSource")}</p></div><AmountCards amounts={data?.overview.amounts ?? []} /><div className="grid gap-3 sm:grid-cols-2"><Card><CardContent className="p-5"><p className="text-xs text-muted-foreground">{t("revenue.payingUsers")}</p><p className="mt-2 text-2xl font-semibold">{decimalValue(data?.overview.payingUsers)}</p><p className="mt-2 text-xs text-muted-foreground">{t("revenue.payingUsersHelp")}</p></CardContent></Card></div><RevenueDetails trend={data?.trend ?? []} byApp={data?.byApp ?? []} byTerritory={data?.byTerritory ?? []} from={from} to={today} completeThrough={data?.completeThrough ?? null} /></section><section aria-labelledby="sales-activity-heading" className="space-y-3 border-t pt-5"><div><h2 id="sales-activity-heading" className="font-medium">{t("revenue.salesActivity")}</h2><p className="text-xs text-muted-foreground">{t("revenue.salesSource")}</p></div><Card><CardContent className="p-5"><p className="text-xs text-muted-foreground">{t("revenue.salesUnitsAllTypes")}</p><p className="mt-2 text-2xl font-semibold">{decimalValue(data?.overview.units)}</p></CardContent></Card></section></TabsContent>

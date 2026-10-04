@@ -61,6 +61,16 @@ describe("GraphQL dependency boundary", () => {
     expect(client).not.toMatch(/\bfetch\s*\(/);
   });
 
+  it("keeps settings and admin reads service-backed and admin-scoped", async () => {
+    const settings = await readFile("lib/graphql/settings.ts", "utf8");
+    expect(settings).toContain("context.user.role !== \"admin\"");
+    expect(settings).toContain("getAiSettings()");
+    expect(settings).toContain("getUsers()");
+    expect(settings).toContain("getAiStatus(context.user.id)");
+    expect(settings).not.toContain("apiKeyConfigured: true");
+    expect(settings).not.toMatch(/repositories\/|@\/db\/schema|drizzle-orm/);
+  });
+
   it("keeps GraphQL resolvers on services and the acquisition client on graphqlRequest", async () => {
     const service = await readFile("lib/services/analytics.ts", "utf8");
     const acquisitionClient = await readFile("lib/client/analytics-graphql.ts", "utf8");

@@ -1,6 +1,6 @@
 # API Boundary Inventory
 
-This inventory mirrors the 59 API route registrations in `app/routes.ts`: 58 concrete route files plus the `/api/*` catch-all. REST browser contracts stay in `lib/api.ts`; the GraphQL browser helper is `lib/client/graphql.ts`. Both use the shared `lib/client/api-transport.ts` for HTTP details. The default API root is `/api`. `VITE_API_BASE_URL` is a build-time transport seam for an alternate API root; this step does not enable cross-origin cookie deployment.
+This inventory mirrors API route registrations in `app/routes.ts`. REST command contracts stay in `lib/api.ts`; page reads are migrating to domain operations through `lib/client/graphql.ts`. Both use the shared `lib/client/api-transport.ts` for HTTP details and cancellation. The default API root is `/api`. `VITE_API_BASE_URL` is a build-time transport seam for an alternate API root; this does not enable cross-origin cookie deployment. App Store report GET routes (`/app-store/analytics`, `/app-store/analytics/apps`, `/app-store/revenue`) were removed after their page callers moved to GraphQL.
 
 Unless listed as public below, endpoints require the existing `dash_session` session. Endpoints that target account data additionally enforce the authorization checks present in their route adapter. Admin-only endpoints are marked **admin**.
 
@@ -16,8 +16,8 @@ Unless listed as public below, endpoints require the existing `dash_session` ses
 | `/api/analytics/sites/:id` | PUT | session + owner (admin global) | `renameAnalyticsSite` | `analytics.renameAnalyticsSite` | Updates only the site name and `updated_at`; host and site key are immutable |
 | `/api/analytics/sites/:id/traffic` | GET | session + owner (admin global) | `getAnalyticsTraffic` | `analytics.getAnalyticsTrafficForSite` | Site ownership is checked before the PostgreSQL traffic query; one viewer-timezone 7-calendar-day read model returns overview, zero-filled timeline, Top 10 pages and non-country dimensions, and all country groups, counted by views |
 | `/api/analytics/sites/:id/installation` | GET | session + owner (admin global) | `getAnalyticsInstallation` | `analytics.getAnalyticsInstallationForSite` | Site ownership checked before returning the tracker snippet; missing public origin is a service configuration error |
-| `/api/graphql` | GET, POST | session | `graphqlRequest` (`lib/client/graphql.ts`) | Analytics query resolvers → `analytics.getAnalyticsSites`, `analytics.getAnalyticsTrafficForSite`, `analytics.getAnalyticsAcquisitionForSite`, `analytics.getAnalyticsDashboardForSite`, `analytics.getAnalyticsPortfolio`, `analytics.getAnalyticsGlobalDashboard` | Authenticated HTTP adapter; query-only, service-backed; dashboard and portfolio read models support 7/30/90 local calendar days. Portfolio and global dashboard aggregate visible sites in one PostgreSQL statement and return per-site rows alongside totals; see [GraphQL Query Layer](GRAPHQL.md) |
-| `/api/ai/chat` | GET, POST | session | `getAiStatus`, `streamAiChat` | `ai-analysis.getAiStatus`, `runAgentStream` | AI config/quota/model integration; POST streams a `Response` |
+| `/api/graphql` | GET, POST | session | `graphqlRequest` (`lib/client/graphql.ts`) | Analytics, App Store, Settings, Admin, AI, and X query resolvers → domain read services | Authenticated HTTP adapter; query-only, service-backed. Page operations combine Analytics site options + dashboard/installation, App Store app options + report, and X account + timeline + selected content tab. See [GraphQL Query Layer](GRAPHQL.md) |
+| `/api/ai/chat` | POST | session | `streamAiChat` | `ai-analysis.runAgentStream` | AI chat streaming response |
 | `/api/auth/change-password` | POST | session | `changePassword` | Existing auth handler | Auth/password implementation; cookie/session semantics unchanged |
 | `/api/auth/login` | POST | public | `login` | Existing auth handler | Auth implementation; rate limit and session cookie |
 | `/api/auth/logout` | POST | session | `logout` | Existing auth handler | Auth implementation; clears session cookie |
@@ -59,7 +59,7 @@ Unless listed as public below, endpoints require the existing `dash_session` ses
 | `/api/reddit/posts/:accountId` | GET | session + owner | `getRedditPosts` | `reddit.getRedditPosts` | Reddit repository |
 | `/api/reddit/subreddits/:accountId` | GET | session + owner | `getRedditSubreddits` | `reddit.getRedditSubredditDistribution` | Reddit repository |
 | `/api/reddit/timeline/:accountId` | GET | session + owner | `getRedditTimeline` | `reddit.getRedditTimeline` | Reddit repository |
-| `/api/settings` | GET, PUT | admin | `getSettings`, `updateSettings` | `settings.getAiSettings`, `updateAiSettings` | Settings repository; masks stored API key |
+| `/api/settings` | PUT | admin | `updateSettings` | `settings.updateAiSettings` | Settings repository; only accepts updates, reads use GraphQL and return a masked key |
 | `/api/stats/calendar` | GET | session | `getCalendar` | `twitter.getCalendarData` + `accounts.getAccounts` | Twitter repository |
 | `/api/stats/overview` | GET | session | `getOverview` | `twitter.getOverviewStats` | Twitter repository |
 | `/api/stats/timeline` | GET | session | `getTimeline` | `twitter.getTimeline` | Twitter repository |
@@ -67,7 +67,7 @@ Unless listed as public below, endpoints require the existing `dash_session` ses
 | `/api/top-content` | GET | session | `getTopContent` | `accounts.getAccounts`, `top-content.getTopContent` | Cross-platform content repositories |
 | `/api/tweets` | GET | session | `getTweets` | `twitter.getTweets` | Twitter repository |
 | `/api/tweets/:id` | GET | session | `getTweet` | `twitter.getTweetById` | Twitter repository |
-| `/api/users` | GET, POST | admin | `getUsers`, `createUser` | `users.getUsers`, `createUser` | Users repository; password hashing on create |
+| `/api/users` | POST | admin | `createUser` | `users.createUser` | Users repository; password hashing on create; list reads use GraphQL |
 | `/api/users/:id` | DELETE | admin | `deleteUser` | `users.deleteUser` | Users repository; confirmation token validation |
 | `/api/*` | matched methods | varies | — | — | Catch-all API adapter for unregistered paths; returns not found |
 

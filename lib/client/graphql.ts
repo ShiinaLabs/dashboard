@@ -24,10 +24,12 @@ export class GraphQLRequestError extends Error {
 export async function graphqlRequest<TData, TVariables extends Record<string, unknown> = Record<string, never>>(
   query: string,
   variables?: TVariables,
+  signal?: AbortSignal,
 ): Promise<TData> {
   const response = await apiRequest("/graphql", {
     method: "POST",
     body: JSON.stringify(variables === undefined ? { query } : { query, variables }),
+    signal,
   });
   const result = await response.json().catch(() => null) as GraphQLResponse<TData> | null;
 

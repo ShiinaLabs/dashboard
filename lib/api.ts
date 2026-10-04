@@ -1,8 +1,7 @@
-import type { RevenueDashboard } from "@/shared/app-store-revenue";
 import type { ReportSyncResult } from "@/lib/services/app-store-sync";
 import { apiJson, apiRequest } from "@/lib/client/api-transport";
 import type { AppStoreConnection, AppStoreConnectionDetail, AppStoreConnectionInput, AppStoreConnectionUpdate, AppStoreApp } from "@/shared/app-store";
-import type { AppStoreAnalyticsStatus, AppStoreAnalyticsAppOption, AppStoreAnalyticsDashboard } from "@/shared/app-store-analytics";
+import type { AppStoreAnalyticsStatus } from "@/shared/app-store-analytics";
 import type { AppStoreHealth } from "@/shared/app-store-health";
 export { ApiError } from "@/lib/client/api-transport";
 
@@ -110,20 +109,6 @@ export const api = {
   backfillAppStoreRevenue: (id: number, input: { from: string; to: string; fiscalMonthFrom: string; fiscalMonthTo: string; regionCode: "ZZ" }) => apiJson<{ status: ReportSyncResult["status"]; sources: Record<"analytics" | "sales" | "finance", ReportSyncResult> }>(`/app-store/connections/${id}/backfill`, { method: "POST", body: JSON.stringify({ kind: "revenue", ...input }) }),
   syncAppStoreAnalytics: (id: number) => apiJson<ReportSyncResult>(`/app-store/connections/${id}/analytics/sync`, { method: "POST" }),
   syncAppStoreRevenue: (id: number, input: { from: string; to: string; fiscalMonth: string; regionCode: "ZZ" }) => apiJson<{ status: ReportSyncResult["status"]; sources: Record<"analytics" | "sales" | "finance", ReportSyncResult> }>(`/app-store/connections/${id}/revenue/sync`, { method: "POST", body: JSON.stringify(input) }),
-  getAppStoreRevenueDashboard: (filter: { from: string; to: string; appId?: number; territory?: string; fiscalMonth?: string }) => {
-    const query = new URLSearchParams({ from: filter.from, to: filter.to });
-    if (filter.appId !== undefined) query.set("appId", String(filter.appId));
-    if (filter.territory) query.set("territory", filter.territory);
-    if (filter.fiscalMonth) query.set("fiscalMonth", filter.fiscalMonth);
-    return apiJson<RevenueDashboard>(`/app-store/revenue?${query}`);
-  },
-  getEnabledAppStoreAnalyticsApps: () => apiJson<{ apps: AppStoreAnalyticsAppOption[] }>("/app-store/analytics/apps"),
-  getAppStoreAnalyticsDashboard: (filter: { from: string; to: string; appId?: number; territory?: string }) => {
-    const query = new URLSearchParams({ from: filter.from, to: filter.to });
-    if (filter.appId !== undefined) query.set("appId", String(filter.appId));
-    if (filter.territory) query.set("territory", filter.territory);
-    return apiJson<AppStoreAnalyticsDashboard>(`/app-store/analytics?${query}`);
-  },
   getAppStoreAnalyticsStatus: (id: number) => apiJson<AppStoreAnalyticsStatus>(`/app-store/connections/${id}/analytics`),
   setupAppStoreAnalytics: (id: number) => apiJson<AppStoreAnalyticsStatus>(`/app-store/connections/${id}/analytics`, { method: "POST" }),
   getAppStoreConnections: () => apiJson<{ connections: AppStoreConnection[] }>("/app-store/connections"),
@@ -236,7 +221,6 @@ export const api = {
     apiJson<{ ok: boolean }>("/auth/change-password", { method: "POST", body: JSON.stringify({ currentPassword, newPassword }) }),
 
   // Users (admin only)
-  getUsers: () => apiJson<{ users: { id: number; username: string; role: string; created_at: string }[] }>("/users"),
   createUser: (data: { username: string; password: string; role?: string }) =>
     apiJson("/users", { method: "POST", body: JSON.stringify(data) }),
   deleteUser: (id: number, confirmToken: string) =>
@@ -253,10 +237,8 @@ export const api = {
   getAnalyticsInstallation: (siteId: number) => apiJson<AnalyticsInstallation>(`/analytics/sites/${siteId}/installation`),
 
   // AI and Settings
-  getAiStatus: () => apiJson<{ configured: boolean; quota: { used: number; limit: number } }>("/ai/chat"),
   streamAiChat: (messages: { role: "user" | "assistant"; content: string }[]) =>
     apiRequest("/ai/chat", { method: "POST", body: JSON.stringify({ messages }) }),
-  getSettings: () => apiJson<{ ai: { baseUrl: string; apiKey: string; model: string } }>("/settings"),
   updateSettings: (data: { baseUrl?: string; apiKey?: string; model?: string }) =>
     apiJson<{ ok: boolean }>("/settings", { method: "PUT", body: JSON.stringify(data) }),
 

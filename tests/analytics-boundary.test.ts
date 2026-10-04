@@ -22,14 +22,11 @@ describe("Web Analytics boundaries", () => {
     expect(service).not.toMatch(/cloudflare-analytics|Analytics Engine/);
   });
 
-  it("loads one ranged dashboard GraphQL read model and keeps sites and installation on REST", () => {
+  it("loads sites, the selected dashboard, and installation in one page GraphQL operation", () => {
     const page = readFileSync("app/(dashboard)/analytics/page.tsx", "utf8");
     const client = readFileSync("lib/api.ts", "utf8");
-    expect(page).toContain("api.getAnalyticsSites");
-    expect(page).toContain("api.getAnalyticsInstallation(selectedSite!.id)");
-    expect(page).toContain("getAnalyticsDashboard(selectedSite!.id, selectedRange, timezone!)");
-    expect(page).toContain('["analytics", "dashboard", selectedSiteId, selectedRange, timezone]');
-    expect(page).toContain('["analytics", "global-dashboard", selectedRange, timezone]');
+    expect(page).toContain("getAnalyticsPage({");
+    expect(page).toContain('["analytics-page", selectedSiteId, selectedRange, timezone]');
     expect(page).toContain('useState<"all" | number>("all")');
     expect(page).not.toContain("?? sites[0]");
     expect(page).toContain('selectedSiteId === "all"');
@@ -41,12 +38,13 @@ describe("Web Analytics boundaries", () => {
     expect(page).not.toMatch(/\bfetch\s*\(/);
     expect(page).not.toMatch(/fetch\s*\(\s*[`"']\/api\/graphql/);
     expect(client).toContain('"/analytics/sites"');
-    expect(client).toContain("/analytics/sites/${siteId}/traffic?timezone=${encodeURIComponent(timezone)}");
-    expect(client).toContain("/analytics/sites/${siteId}/installation");
     expect(client).toContain("AnalyticsTrafficDimensions");
     expect(client).toContain("operatingSystems: AnalyticsOperatingSystemDimension[]");
     const graphqlClient = readFileSync("lib/client/analytics-graphql.ts", "utf8");
     expect(graphqlClient).toContain("graphqlRequest<");
+    expect(graphqlClient).toContain("export async function getAnalyticsPage(");
+    expect(graphqlClient).toContain("sites { id name siteKey host createdAt updatedAt }");
+    expect(graphqlClient).toContain("installation(siteId: $siteId) @include(if: $showSite)");
     expect(graphqlClient).toContain("export async function getAnalyticsDashboard");
     expect(graphqlClient).toContain("previousOverview { views visits visitorDays }");
     expect(graphqlClient).toContain("timeline { date views visitors visits }");

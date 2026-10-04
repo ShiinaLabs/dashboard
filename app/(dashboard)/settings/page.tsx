@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useTheme } from "@/components/useTheme";
 import { themes, type Theme, type ThemeSettings } from "@/lib/client/themes";
 import { api } from "@/lib/api";
+import { getSettingsPage } from "@/lib/client/graphql/settings";
 import { getTimezone, setTimezone as saveTimezone } from "@/lib/client/datetime";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -221,7 +222,7 @@ function AiSettingsSection() {
   const [saved, setSaved] = useState(false);
   const { data: settings, isLoading } = useQuery({
     queryKey: ["settings"],
-    queryFn: api.getSettings,
+    queryFn: ({ signal }) => getSettingsPage(signal),
   });
 
   const mutation = useMutation({

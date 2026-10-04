@@ -9,5 +9,7 @@ export default defineConfig({
   },
   test: {
     setupFiles: ["./tests/logger-setup.ts"],
+    include: ["tests/**/*.test.{ts,tsx}"],
+    exclude: ["**/node_modules/**", "**/.claude/worktrees/**", "**/dist/**", "**/build/**"],
   },
 });

@@ -6,6 +6,12 @@ All endpoints except the public list below require a valid `dash_session` cookie
 
 Public API paths: `POST /auth/login`, `GET /auth/me`, `GET /reddit/callback`, `GET /bing-wallpaper`, `GET /health`.
 
+## GraphQL page reads
+
+Authenticated browser page reads use `POST /graphql` through `lib/client/graphql.ts`. Current page operations are documented in [GraphQL Query Layer](GRAPHQL.md): Analytics combines site options with the global or selected-site dashboard and installation; App Store Analytics and Revenue combine enabled apps with their report; X account detail combines account, timeline, and the selected content tab. Settings, Admin user listing, and AI status use their domain query fields. The shared transport carries credentials, unauthorized handling, and `AbortSignal` cancellation. REST reads are still present for pages and platform domains that have not yet migrated. REST mutations, sync/backfill, auth/session, streaming, collectors, health, and confirmation endpoints remain supported.
+
+Settings and user-list reads also use GraphQL. Their former `GET /settings` and `GET /users` handlers were removed; `PUT /settings`, `POST /users`, and streaming `POST /ai/chat` remain REST commands.
+
 ## Auth
 
 | Method | Path | Description |
@@ -19,7 +25,6 @@ Public API paths: `POST /auth/login`, `GET /auth/me`, `GET /reddit/callback`, `G
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/users` | List all users (no password hashes) |
 | POST | `/users` | Create user `{ username, password, role? }` |
 | DELETE | `/users/:id` | Soft-delete user + all their accounts (requires `{ confirmToken }`) |
 

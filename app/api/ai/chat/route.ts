@@ -1,6 +1,6 @@
 import { json } from "@/lib/api-server";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { runAgentStream, getAiStatus, type ChatMessage } from "@/lib/services/ai-analysis";
+import type { ActionFunctionArgs } from "react-router";
+import { runAgentStream, type ChatMessage } from "@/lib/services/ai-analysis";
 import { aiConfig, isMockMode } from "@/lib/config";
 import { requireSession } from "@/lib/auth-helpers";
 
@@ -103,19 +103,6 @@ async function POST(req: Request) {
     }
     return json({ error: msg }, { status: 500 });
   }
-}
-
-async function GET(req: Request) {
-  const auth = await requireSession(req);
-  if (!auth) return json({ error: "Unauthorized" }, { status: 401 });
-
-  const status = await getAiStatus(auth.user.id);
-  return json(status);
-}
-
-export async function loader({ request }: LoaderFunctionArgs) {
-  if (request.method === "GET") return GET(request);
-  return json({ error: "Method not allowed" }, { status: 405 });
 }
 
 export async function action({ request }: ActionFunctionArgs) {

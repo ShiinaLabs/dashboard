@@ -638,13 +638,17 @@ test("timezone selector filters and selects options with the keyboard", async ({
 test("admin role selection is sent from controlled state, not FormData", async ({ page }) => {
   await logIn(page);
   let createPayload: { username?: string; password?: string; role?: string } | undefined;
-  await page.route("**/api/users", async (route) => {
-    if (route.request().method() === "POST") {
-      createPayload = route.request().postDataJSON();
-      await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+  await page.route("**/api/graphql", async (route) => {
+    const body = route.request().postDataJSON() as { query: string };
+    if (body.query.includes("query AdminUsersPage")) {
+      await route.fulfill({ json: { data: { admin: { users: [] } } } });
       return;
     }
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ users: [] }) });
+    await route.fallback();
+  });
+  await page.route("**/api/users", async (route) => {
+    createPayload = route.request().postDataJSON();
+    await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ ok: true }) });
   });
   await page.goto("/admin");
   await page.getByLabel("Username").fill("new-member");

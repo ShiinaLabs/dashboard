@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { getAiStatusPage } from "@/lib/client/graphql/settings";
 
 export interface Message {
   role: "user" | "assistant";
@@ -18,7 +19,7 @@ export function useAiChat() {
   const queryClient = useQueryClient();
   const { data: status } = useQuery({
     queryKey: ["ai-status"],
-    queryFn: api.getAiStatus,
+    queryFn: ({ signal }) => getAiStatusPage(signal),
     refetchInterval: isStreaming ? 2000 : false,
   });
 

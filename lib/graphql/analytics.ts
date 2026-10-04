@@ -7,6 +7,7 @@ import {
   getAnalyticsGlobalDashboard,
   getAnalyticsPortfolio,
   getAnalyticsSites,
+  getAnalyticsInstallationForSite,
   getAnalyticsTrafficForSite,
   type AnalyticsSite,
 } from "@/lib/services/analytics";
@@ -19,6 +20,7 @@ export const analyticsTypeDefs = /* GraphQL */ `
 
   type AnalyticsQuery {
     sites: [AnalyticsSite!]!
+    installation(siteId: Int!): AnalyticsInstallation!
     traffic(siteId: Int!, timezone: String = "UTC"): AnalyticsTraffic!
     acquisition(siteId: Int!, timezone: String = "UTC"): AnalyticsAcquisition!
     dashboard(siteId: Int!, range: AnalyticsRange = DAYS_7, timezone: String = "UTC"): AnalyticsDashboard!
@@ -36,6 +38,8 @@ export const analyticsTypeDefs = /* GraphQL */ `
     createdAt: String!
     updatedAt: String!
   }
+
+  type AnalyticsInstallation { trackerUrl: String! snippet: String! }
 
   type AnalyticsPeriod {
     days: Int!
@@ -289,6 +293,8 @@ function mapAnalyticsError(error: unknown) {
         return createGraphQLError("Not found", { extensions: { code: "NOT_FOUND" } });
       case "forbidden":
         return createGraphQLError("Forbidden", { extensions: { code: "FORBIDDEN" } });
+      case "public_origin_not_configured":
+        return createGraphQLError("Analytics public URL is not configured", { extensions: { code: "INTERNAL_SERVER_ERROR" } });
       default:
         break;
     }
@@ -313,6 +319,8 @@ export const analyticsResolvers = {
       const sites = await mapServiceError(() => getAnalyticsSites(getOwnerId(context.user)));
       return sites.map(toGraphQLSite);
     },
+    installation: async (_parent: unknown, args: { siteId: number }, context: GraphQLContext) =>
+      mapServiceError(() => getAnalyticsInstallationForSite(args.siteId, { id: context.user.id, role: context.user.role })),
     traffic: async (
       _parent: unknown,
       args: { siteId: number; timezone: string },

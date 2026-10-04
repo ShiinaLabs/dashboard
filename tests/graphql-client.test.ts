@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getAnalyticsAcquisition, getAnalyticsDashboard, getAnalyticsGlobalDashboard, getAnalyticsPortfolio } from "@/lib/client/analytics-graphql";
+import { getAppStoreAnalyticsPage, getRevenuePage } from "@/lib/client/graphql/app-store";
+import { getXAccountPageQuery } from "@/lib/client/graphql/x";
 import { GraphQLRequestError, graphqlRequest } from "@/lib/client/graphql";
 
 describe("GraphQL client helper", () => {
@@ -23,6 +25,13 @@ describe("GraphQL client helper", () => {
     expect(init?.method).toBe("POST");
     expect(init?.credentials).toBe("include");
     expect(JSON.parse(String(init?.body))).toMatchObject({ variables });
+  });
+
+  it("propagates AbortSignal to the shared fetch transport", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: { ok: true } })));
+    const controller = new AbortController();
+    await graphqlRequest<{ ok: boolean }>("query { ok }", undefined, controller.signal);
+    expect(vi.mocked(fetch).mock.calls[0][1]?.signal).toBe(controller.signal);
   });
 
   it("preserves GraphQL error messages and extensions codes", async () => {
@@ -132,5 +141,40 @@ describe("GraphQL client helper", () => {
     expect(body.query).not.toContain("topPages");
     expect(body.query).not.toContain("entryPages");
     expect(body.query).not.toContain("visitorDays");
+  });
+
+  it("loads App Store apps and analytics in one selected-field operation", async () => {
+    const analytics = { updatedAt: null, completeThrough: null, overview: {}, trend: [], acquisition: [], campaigns: [], territories: [] };
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: { appStore: { enabledApps: [{ id: 3, name: "App" }], analytics } } })));
+    await expect(getAppStoreAnalyticsPage({ from: "2026-09-01", to: "2026-09-07", appId: 3 })).resolves.toMatchObject({ enabledApps: [{ id: 3 }], analytics });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
+    expect(body.variables).toEqual({ from: "2026-09-01", to: "2026-09-07", appId: 3 });
+    expect(body.query).toContain("enabledApps { id name }");
+    expect(body.query).toContain("analytics(from: $from, to: $to, appId: $appId, territory: $territory)");
+  });
+
+  it("loads Revenue apps and report in one operation", async () => {
+    const revenue = { updatedAt: null, completeThrough: null, overview: {}, trend: [], byApp: [], byTerritory: [], sales: {}, subscriptions: {}, settlements: [], territories: [] };
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: { appStore: { enabledApps: [], revenue } } })));
+    await getRevenuePage({ from: "2026-09-01", to: "2026-09-07", fiscalMonth: "2026-08" });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
+    expect(body.variables.fiscalMonth).toBe("2026-08");
+    expect(body.query).toContain("revenue(from: $from, to: $to, appId: $appId, territory: $territory, fiscalMonth: $fiscalMonth)");
+  });
+
+  it("requests one X page operation with only the active content kind and visible tweet fields", async () => {
+    const page = { account: {}, timeline: { dailyTweets: [], followerGrowth: [] }, content: { data: [], total: 0, page: 1, limit: 50, totalPages: 0 } };
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: { x: { accountPage: page } } })));
+    const controller = new AbortController();
+    await getXAccountPageQuery({ accountId: 12, days: 30, kind: "TWEETS" }, controller.signal);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
+    expect(body.variables).toEqual({ accountId: 12, days: 30, kind: "TWEETS" });
+    expect(vi.mocked(fetch).mock.calls[0][1]?.signal).toBe(controller.signal);
+    expect(body.query).toContain("accountPage(accountId: $accountId, days: $days, kind: $kind)");
+    expect(body.query).toContain("data { id full_text created_at favorite_count retweet_count reply_count view_count }");
+    expect(body.query).not.toContain("media_urls");
   });
 });

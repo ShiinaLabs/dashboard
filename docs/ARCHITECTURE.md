@@ -34,6 +34,8 @@ Node process
 
 Single-process deployment is intentional and supported. This is a first-class architecture and may remain the production model indefinitely.
 
+Browser query reads are moving toward page-oriented GraphQL operations over existing service/read-model interfaces. Analytics, App Store Analytics, and Revenue combine their first-page reads into one operation; X account detail loads account, timeline, and the currently selected tab in one operation. Settings, Admin user listing, and AI status are also GraphQL reads. REST remains the command, authentication, streaming, collector, and infrastructure interface; unfinished platform reads still use REST during this incremental migration. GraphQL resolvers call application services and do not access repositories or database code directly.
+
 Serverless, Edge, and Function runtimes are future deployment options, not current architecture targets. Do not prepare for them by removing Node APIs, replacing `pg` or Argon2, externalizing the scheduler, introducing queues or cron services, or changing cryptography. Portability is desirable only when it does not add current operational or code complexity without present value.
 
 ## App Store Connect Boundary

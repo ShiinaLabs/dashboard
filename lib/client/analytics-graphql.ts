@@ -76,6 +76,47 @@ export interface AnalyticsGlobalDashboard {
   };
 }
 
+export interface AnalyticsPageResult {
+  sites: Array<{ id: number; name: string; site_key: string; host: string; created_at: string; updated_at: string }>;
+  globalDashboard: AnalyticsGlobalDashboard | null;
+  dashboard: AnalyticsDashboard | null;
+  installation: { trackerUrl: string; snippet: string } | null;
+}
+
+const analyticsPageQuery = /* GraphQL */ `
+  query AnalyticsPage($range: AnalyticsRange!, $timezone: String!, $siteId: Int!, $showGlobal: Boolean!, $showSite: Boolean!) {
+    analytics {
+      sites { id name siteKey host createdAt updatedAt }
+      globalDashboard(range: $range, timezone: $timezone) @include(if: $showGlobal) {
+        period { days timezone startDate endDate }
+        previousPeriod { days timezone startDate endDate }
+        overview { trackedSites activeSites views visits }
+        previousOverview { views visits }
+        timeline { date views visits }
+        sites { id name host views visits }
+        dimensions { countries { country views } browsers { browser views } operatingSystems { os views } devices { device views } }
+        acquisition { totalVisits referrers { referrer visits } campaigns { siteId siteName siteHost source medium campaign visits } }
+      }
+      dashboard(siteId: $siteId, range: $range, timezone: $timezone) @include(if: $showSite) {
+        period { days timezone startDate endDate }
+        previousPeriod { days timezone startDate endDate }
+        overview { views visits visitorDays }
+        previousOverview { views visits visitorDays }
+        timeline { date views visitors visits }
+        topPages { path views }
+        dimensions { countries { country views } browsers { browser views } operatingSystems { os views } devices { device views } }
+        acquisition { totalVisits referrers { referrer visits } entryPages { path visits } campaigns { source medium campaign visits } }
+      }
+      installation(siteId: $siteId) @include(if: $showSite) { trackerUrl snippet }
+    }
+  }
+`;
+
+export async function getAnalyticsPage(variables: { range: AnalyticsRange; timezone: string; siteId: number; showGlobal: boolean; showSite: boolean }, signal?: AbortSignal): Promise<AnalyticsPageResult> {
+  const result = await graphqlRequest<{ analytics: Omit<AnalyticsPageResult, "sites"> & { sites: Array<{ id: number; name: string; siteKey: string; host: string; createdAt: string; updatedAt: string }> } }, typeof variables>(analyticsPageQuery, variables, signal);
+  return { ...result.analytics, sites: result.analytics.sites.map((site) => ({ id: site.id, name: site.name, site_key: site.siteKey, host: site.host, created_at: site.createdAt, updated_at: site.updatedAt })) };
+}
+
 interface AnalyticsAcquisitionSummary {
   totalVisits: number;
   referrers: AnalyticsAcquisitionReferrer[];

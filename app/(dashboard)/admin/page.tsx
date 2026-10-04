@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { getAdminUsersPage } from "@/lib/client/graphql/settings";
 import { Users, Plus, Trash2 } from "lucide-react";
 import { validatePassword } from "@/lib/client/validatePassword";
 import { PasswordHints } from "@/components/ui/PasswordHints";
@@ -35,7 +36,7 @@ export default function Admin() {
 
   const { data: usersData, refetch: refetchUsers } = useQuery({
     queryKey: ["users"],
-    queryFn: () => api.getUsers(),
+    queryFn: ({ signal }) => getAdminUsersPage(signal),
     enabled: authData?.role === "admin",
   });
 

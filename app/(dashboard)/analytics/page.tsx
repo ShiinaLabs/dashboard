@@ -14,9 +14,9 @@ import { AnalyticsWorldMap } from "@/components/domain/analytics/AnalyticsWorldM
 import { ChartCard } from "@/components/domain/shared/ChartCard";
 import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";
-import { ApiError, api } from "@/lib/api";
+import { api } from "@/lib/api";
 import { compareAnalyticsPeriod } from "@/lib/client/analytics-comparison";
-import { getAnalyticsDashboard, getAnalyticsGlobalDashboard, type AnalyticsRange } from "@/lib/client/analytics-graphql";
+import { getAnalyticsPage, type AnalyticsRange } from "@/lib/client/analytics-graphql";
 import { getTimezone } from "@/lib/client/datetime";
 import { calcYAxisWidth } from "@/lib/client/utils";
 import { useIsMobile } from "@/lib/client/useIsMobile";
@@ -53,8 +53,20 @@ export default function WebAnalyticsPage() {
   const [host, setHost] = useState("");
   const [showRenameForm, setShowRenameForm] = useState(false);
   const [siteName, setSiteName] = useState("");
-  const sitesQuery = useQuery({ queryKey: ["analytics", "sites"], queryFn: api.getAnalyticsSites });
-  const sites = sitesQuery.data?.sites ?? [];
+  const pageQuery = useQuery({
+    queryKey: ["analytics-page", selectedSiteId, selectedRange, timezone],
+    queryFn: ({ signal }) => getAnalyticsPage({
+      range: selectedRange,
+      timezone: timezone!,
+      siteId: typeof selectedSiteId === "number" ? selectedSiteId : 0,
+      showGlobal: selectedSiteId === "all",
+      showSite: typeof selectedSiteId === "number",
+    }, signal),
+    enabled: Boolean(timezone),
+    staleTime: 5 * 60_000,
+  });
+  const sitesQuery = pageQuery;
+  const sites = pageQuery.data?.sites ?? [];
   const selectedSite = typeof selectedSiteId === "number"
     ? sites.find((site) => site.id === selectedSiteId)
     : undefined;
@@ -64,38 +76,22 @@ export default function WebAnalyticsPage() {
       setSelectedSiteId(site.id);
       setShowForm(false);
       setName(""); setHost("");
-      await queryClient.invalidateQueries({ queryKey: ["analytics", "sites"] });
+      await queryClient.invalidateQueries({ queryKey: ["analytics-page"] });
     },
   });
   const renameSite = useMutation({
     mutationFn: () => api.renameAnalyticsSite(selectedSite!.id, { name: siteName }),
     onSuccess: async () => {
       setShowRenameForm(false);
-      await queryClient.invalidateQueries({ queryKey: ["analytics"] });
+      await queryClient.invalidateQueries({ queryKey: ["analytics-page"] });
     },
   });
-  const globalDashboardQuery = useQuery({
-    queryKey: ["analytics", "global-dashboard", selectedRange, timezone],
-    queryFn: () => getAnalyticsGlobalDashboard(selectedRange, timezone!),
-    enabled: sites.length > 0 && selectedSiteId === "all" && Boolean(timezone),
-    staleTime: 5 * 60 * 1000,
-  });
-  const dashboardQuery = useQuery({
-    queryKey: ["analytics", "dashboard", selectedSiteId, selectedRange, timezone],
-    queryFn: () => getAnalyticsDashboard(selectedSite!.id, selectedRange, timezone!),
-    enabled: typeof selectedSiteId === "number" && Boolean(selectedSite && timezone),
-    staleTime: 5 * 60 * 1000,
-  });
-  const dashboard = dashboardQuery.data;
-  const globalDashboard = globalDashboardQuery.data;
+  const dashboard = pageQuery.data?.dashboard ?? undefined;
+  const globalDashboard = pageQuery.data?.globalDashboard ?? undefined;
   const acquisition = dashboard?.acquisition;
-  const installationQuery = useQuery({
-    queryKey: ["analytics", "installation", selectedSite?.id],
-    queryFn: () => api.getAnalyticsInstallation(selectedSite!.id),
-    enabled: typeof selectedSiteId === "number" && Boolean(selectedSite),
-  });
-  const publicOriginNotConfigured = installationQuery.error instanceof ApiError
-    && installationQuery.error.message === "Analytics public URL is not configured";
+  const installation = pageQuery.data?.installation ?? undefined;
+  const publicOriginNotConfigured = pageQuery.error instanceof Error
+    && pageQuery.error.message === "Analytics public URL is not configured";
   const totalViews = dashboard?.overview.views ?? 0;
   const dimensionCardLabels = {
     totalValue: totalViews,
@@ -193,7 +189,7 @@ export default function WebAnalyticsPage() {
 
   async function copyTrackingCode() {
     try {
-      await navigator.clipboard.writeText(installationQuery.data!.snippet);
+      await navigator.clipboard.writeText(installation!.snippet);
       notifications.show({ message: t("analytics.copySuccess"), color: "green" });
     } catch {
       notifications.show({ message: t("analytics.copyError"), color: "red" });
@@ -254,7 +250,7 @@ export default function WebAnalyticsPage() {
       </form> : null}
 
       {selectedSiteId === "all" && sites.length > 0 ? <>
-        {globalDashboardQuery.isError ? <Alert variant="destructive">
+        {pageQuery.isError ? <Alert variant="destructive">
           <AlertTitle>{t("analytics.loadErrorTitle")}</AlertTitle>
           <AlertDescription>{t("analytics.dashboardUnavailable")}</AlertDescription>
         </Alert> : <>
@@ -345,7 +341,7 @@ export default function WebAnalyticsPage() {
       </> : null}
 
       {selectedSite ? <>
-        {dashboardQuery.isError ? <Alert variant="destructive">
+        {pageQuery.isError ? <Alert variant="destructive">
           <AlertTitle>{t("analytics.loadErrorTitle")}</AlertTitle>
           <AlertDescription>{t("analytics.dashboardUnavailable")}</AlertDescription>
         </Alert> : <>
@@ -529,14 +525,14 @@ export default function WebAnalyticsPage() {
             <h2 id="analytics-tracking-setup" className="text-lg font-semibold">{t("analytics.trackingSetup")}</h2>
             {dashboard ? <p className="mt-1 text-sm text-muted-foreground">{dashboard.overview.views ? t("analytics.receivingData") : t("analytics.noData")}</p> : null}
           </div>
-          {installationQuery.isPending ? <p className="text-sm text-muted-foreground">{t("analytics.installationLoading")}</p> : null}
-          {installationQuery.isError ? <Alert variant={publicOriginNotConfigured ? "default" : "destructive"}>
+          {pageQuery.isPending ? <p className="text-sm text-muted-foreground">{t("analytics.installationLoading")}</p> : null}
+          {pageQuery.isError ? <Alert variant={publicOriginNotConfigured ? "default" : "destructive"}>
             <AlertTitle>{publicOriginNotConfigured ? t("analytics.publicOriginNotConfigured") : t("analytics.loadErrorTitle")}</AlertTitle>
             <AlertDescription>{publicOriginNotConfigured ? t("analytics.publicOriginNotConfiguredDescription") : t("analytics.installationLoadError")}</AlertDescription>
           </Alert> : null}
-          {installationQuery.data ? <div className="space-y-3">
+          {installation ? <div className="space-y-3">
             <p className="text-sm font-medium">{t("analytics.trackingCode")}</p>
-            <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs"><code>{installationQuery.data.snippet}</code></pre>
+            <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs"><code>{installation.snippet}</code></pre>
             <Button variant="outline" onClick={copyTrackingCode}>{t("analytics.copyCode")}</Button>
           </div> : null}
         </section>

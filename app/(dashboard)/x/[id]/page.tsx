@@ -4,7 +4,8 @@ import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Text } from "@/components/ui/layout-primitives";
-import { api, type TimelineData, type PaginatedTweets, type Tweet } from "@/lib/api";
+import { api } from "@/lib/api";
+import { getXAccountPageQuery, type XDetailTweet } from "@/lib/client/graphql/x";
 import { formatDateTime, formatDate } from "@/lib/client/datetime";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -47,7 +48,7 @@ function ChartEmptyCard({ title, message, height }: { title: string; message: st
   );
 }
 
-function TweetListItem({ tweet, screenName }: { tweet: Tweet; screenName: string }) {
+function TweetListItem({ tweet, screenName }: { tweet: XDetailTweet; screenName: string }) {
   return (
     <a
       href={`https://x.com/${screenName}/status/${tweet.id}`}
@@ -80,31 +81,18 @@ export default function XDetail() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [days, setDays] = useState(30);
 
-  const { data: account, isLoading } = useQuery({
-    queryKey: ["account", accountId],
-    queryFn: () => api.getAccount(accountId),
-    enabled: !!accountId,
+  const { data: page, isLoading } = useQuery({
+    queryKey: ["x-account-page", accountId, days, tab],
+    queryFn: ({ signal }) => getXAccountPageQuery({ accountId, days, kind: tab === "tweets" ? "TWEETS" : "REPLIES" }, signal),
+    enabled: Number.isSafeInteger(accountId) && accountId > 0,
+    staleTime: 5 * 60_000,
   });
+  const account = page?.account;
+  const timeline = page?.timeline;
+  const tweets = tab === "tweets" ? page?.content : undefined;
+  const replies = tab === "replies" ? page?.content : undefined;
 
   useEntityTitle(account ? `@${account.screen_name}` : null);
-
-  const { data: tweets } = useQuery<PaginatedTweets>({
-    queryKey: ["tweets", accountId],
-    queryFn: () => api.getTweets(1, 50, "created_at", "desc", undefined, [accountId], 0),
-    enabled: !!accountId,
-  });
-
-  const { data: replies } = useQuery<PaginatedTweets>({
-    queryKey: ["replies", accountId],
-    queryFn: () => api.getTweets(1, 50, "created_at", "desc", undefined, [accountId], 1),
-    enabled: !!accountId,
-  });
-
-  const { data: timeline } = useQuery<TimelineData>({
-    queryKey: ["timeline", accountId, days],
-    queryFn: () => api.getTimeline(days, accountId),
-    enabled: !!accountId,
-  });
 
   const deleteMutation = useMutation({
     mutationFn: ({ token }: { token: string }) => api.deleteAccount(accountId, token),
@@ -267,10 +255,10 @@ export default function XDetail() {
             aria-labelledby={tab === "tweets" ? "tab-tweets" : "tab-replies"}
           >
             <div className="detail-list">
-              {tab === "tweets" && tweets && tweets.data.length > 0 && tweets.data.slice(0, 20).map((tweet: Tweet) => (
+              {tab === "tweets" && tweets && tweets.data.length > 0 && tweets.data.slice(0, 20).map((tweet) => (
                 <TweetListItem key={tweet.id} tweet={tweet} screenName={account.screen_name} />
               ))}
-              {tab === "replies" && replies && replies.data.length > 0 && replies.data.slice(0, 20).map((tweet: Tweet) => (
+              {tab === "replies" && replies && replies.data.length > 0 && replies.data.slice(0, 20).map((tweet) => (
                 <TweetListItem key={tweet.id} tweet={tweet} screenName={account.screen_name} />
               ))}
             </div>
