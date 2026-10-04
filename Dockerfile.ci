@@ -2,9 +2,6 @@
 # passes it here as a short-lived artifact. Keep image assembly from rebuilding
 # the same React Router client and server bundles a second time in Kaniko.
 FROM reg.mikumikumi.xyz/mirror/node:22-bookworm-slim AS runner
-ENV PNPM_HOME=/pnpm
-ENV PATH=$PNPM_HOME:$PATH
-RUN corepack enable
 WORKDIR /app
 
 RUN groupadd --system --gid 1001 nodejs \
@@ -17,15 +14,10 @@ ENV PORT=3000
 ENV DATA_DIR=/app/data
 ENV NODE_OPTIONS=--max-old-space-size=256
 
-# Production dependencies only (native addons ship prebuilt binaries).
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY patches ./patches
-RUN COREPACK_NPM_REGISTRY=https://registry.npmmirror.com \
-  pnpm_config_registry=https://registry.npmmirror.com \
-  pnpm install --prod --frozen-lockfile --child-concurrency=1 --network-concurrency=4
-
-# React Router build artifact + minimal HTTP entry.
-COPY --chown=dashboard:nodejs .ci-build/build ./build
+# The test job prepares production dependencies and the React Router build.
+# ADD extracts the archive while preserving pnpm's relative symlinks into .pnpm.
+ADD --chown=dashboard:nodejs .ci-runtime/node_modules.tar.gz /app/
+COPY --chown=dashboard:nodejs .ci-runtime/build ./build
 COPY --chown=dashboard:nodejs public/a/t.js ./build/client/a/t.js
 COPY --chown=dashboard:nodejs server ./server
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh

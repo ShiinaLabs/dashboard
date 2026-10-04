@@ -79,11 +79,13 @@ test:
     - pnpm run typecheck
     - pnpm test
     - pnpm run build
-    - mkdir -p .ci-build/build
-    - cp -a build/. .ci-build/build/
+    - pnpm install --prod --frozen-lockfile --offline
+    - mkdir -p .ci-runtime/build
+    - cp -a build/. .ci-runtime/build/
+    - tar -czf .ci-runtime/node_modules.tar.gz node_modules
   artifacts:
     paths:
-      - .ci-build/build/
+      - .ci-runtime/
     expire_in: 1 day
 
 deploy:
