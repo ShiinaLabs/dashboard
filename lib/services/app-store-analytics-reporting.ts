@@ -30,11 +30,22 @@ export async function getAppStoreAnalyticsDashboard(viewer: Viewer, input: unkno
   if (!apps.length) return emptyDashboard();
   if (isMockMode()) {
     // UI demonstration only. These numbers are not Apple report fixtures.
-    const date = filter.to;
     const multiplier = filter.appId ? 1 : apps.length;
     if (filter.territory && filter.territory !== "USA") return emptyDashboard();
-    const overview = { impressions: 240 * multiplier, views: 65 * multiplier, firstTimeDownloads: 12 * multiplier, downloads: 17 * multiplier, conversion: 5 };
-    return { updatedAt: new Date().toISOString(), completeThrough: new Date(Date.parse(date) - 3 * 86400000).toISOString().slice(0, 10), overview, trend: [{ date, ...overview }], acquisition: [
+    const completeThrough = new Date(Math.max(Date.parse(filter.from), Date.parse(filter.to) - 2 * 86400000)).toISOString().slice(0, 10);
+    const trend: AppStoreAnalyticsDashboard["trend"] = [];
+    for (let time = Date.parse(`${filter.from}T00:00:00Z`); time <= Date.parse(`${completeThrough}T00:00:00Z`); time += 86400000) {
+      const date = new Date(time).toISOString().slice(0, 10), day = Math.floor(time / 86400000);
+      trend.push({ date, impressions: (day % 5 === 0 ? 0 : 120 + day % 80) * multiplier, views: (day % 7 === 0 ? 0 : 24 + day % 22) * multiplier, firstTimeDownloads: (day % 6 === 0 ? 0 : 2 + day % 6) * multiplier, downloads: (day % 6 === 0 ? 0 : 4 + day % 9) * multiplier, conversion: null });
+    }
+    const overview = {
+      impressions: trend.reduce((sum, row) => sum + (row.impressions ?? 0), 0),
+      views: trend.reduce((sum, row) => sum + (row.views ?? 0), 0),
+      firstTimeDownloads: trend.reduce((sum, row) => sum + (row.firstTimeDownloads ?? 0), 0),
+      downloads: trend.reduce((sum, row) => sum + (row.downloads ?? 0), 0),
+      conversion: null,
+    };
+    return { updatedAt: completeThrough, completeThrough, overview, trend, acquisition: [
       { source: "App Store Search", impressions: 180 * multiplier, views: 45 * multiplier, firstTimeDownloads: 9 * multiplier, downloads: 13 * multiplier, conversion: 5 },
       { source: "App Store Browse", impressions: 60 * multiplier, views: 20 * multiplier, firstTimeDownloads: 3 * multiplier, downloads: 4 * multiplier, conversion: 5 },
       ...["App Referrer", "Web Referrer", "Campaign"].map((source) => ({ source, impressions: null, views: null, firstTimeDownloads: null, downloads: null, conversion: null })),

@@ -18,12 +18,12 @@ export class AppStoreSyncBusyError extends Error {
 
 const mockConnections: ConnectionRow[] = [{
   id: 1, owner_id: 1, name: "Demo Team", issuer_id: "00000000-0000-4000-8000-000000000001", key_id: "DEMO123456",
-  private_key_encrypted: "mock-configured", vendor_number: null, is_active: true,
+  private_key_encrypted: "mock-configured", vendor_number: "DEMO-VENDOR", is_active: true,
   created_at: new Date(0).toISOString(), updated_at: new Date(0).toISOString(), deleted_at: null,
 }];
 const mockApps: (typeof app_store_apps.$inferSelect)[] = [{
   id: 1, connection_id: 1, apple_id: "1234567890", name: "Demo App", bundle_id: "example.demo.app", sku: "demo-app",
-  is_enabled: false, created_at: new Date(0).toISOString(), updated_at: new Date(0).toISOString(),
+  is_enabled: true, created_at: new Date(0).toISOString(), updated_at: new Date(0).toISOString(),
 }];
 const mockRuns: RunRow[] = [];
 
