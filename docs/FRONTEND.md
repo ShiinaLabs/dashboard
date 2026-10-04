@@ -15,7 +15,7 @@ React Router 7 (Framework Mode) + React 19 + TypeScript + shadcn/ui + Radix UI +
 | i18n | react-i18next (JSON locale files, browser language detection) |
 | Backend | React Router route handlers under `app/api/` (same process) |
 
-Application reads for Analytics, App Store Analytics, Revenue, Settings, Admin user listing, AI status, and X account detail use GraphQL page operations. X account detail loads the selected content tab and its account/timeline data together; switching tabs uses a separate cached operation. The page queries pass React Query's `AbortSignal` to the shared transport. Other platform pages still use REST read methods pending their page-operation migration. Commands remain REST.
+Authenticated application reads use page-oriented GraphQL operations for Overview, Accounts/platform lists, X, GitHub, GitLab, Reddit, Analytics, App Store Analytics/Revenue/connections, Settings, Admin user listing, and AI status. These page operations are React Query cache units and pass `AbortSignal` to the shared transport. Commands, authentication/session, streaming, collectors, and infrastructure remain REST.
 
 ## Source Layout
 

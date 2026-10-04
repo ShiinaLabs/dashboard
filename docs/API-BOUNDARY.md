@@ -1,84 +1,58 @@
 # API Boundary Inventory
 
-This inventory mirrors API route registrations in `app/routes.ts`. REST command contracts stay in `lib/api.ts`; page reads are migrating to domain operations through `lib/client/graphql.ts`. Both use the shared `lib/client/api-transport.ts` for HTTP details and cancellation. The default API root is `/api`. `VITE_API_BASE_URL` is a build-time transport seam for an alternate API root; this does not enable cross-origin cookie deployment. App Store report GET routes (`/app-store/analytics`, `/app-store/analytics/apps`, `/app-store/revenue`) were removed after their page callers moved to GraphQL.
+The browser uses page-oriented operations at `/api/graphql` for authenticated, side-effect-free UI reads. GraphQL resolvers call viewer-aware services/read models; they do not access repositories or the database. `lib/client/graphql.ts` and domain helpers use the same `lib/client/api-transport.ts` as REST commands, including credentials, unauthorized redirects, and abort signals.
 
-Unless listed as public below, endpoints require the existing `dash_session` session. Endpoints that target account data additionally enforce the authorization checks present in their route adapter. Admin-only endpoints are marked **admin**.
+REST remains for authentication/session, commands and mutations, background fetch/sync/backfill, streaming, public collectors, OAuth callbacks, confirmation tokens, health checks, and redirects. Unless marked public below, application endpoints require the existing session. Account, site, and connection services retain owner/admin visibility checks.
 
-## Endpoint inventory
+## REST endpoints
 
-`Data dependency` describes what the service uses behind the route; routes do not import these dependencies directly. `HTTP adapter` marks transport-specific behavior that remains in the route.
+| Route | Methods | Purpose |
+|---|---|---|
+| `/api/auth/login` | POST | Login and establish session |
+| `/api/auth/logout` | POST | Clear session |
+| `/api/auth/me` | GET | Session bootstrap |
+| `/api/auth/change-password` | POST | Change password |
+| `/api/accounts` | POST | Create account |
+| `/api/accounts/:id` | PUT, DELETE | Update or delete account |
+| `/api/fetch/:id` | POST | Start account fetch |
+| `/api/github/repos/pin` | PUT | Pin repositories |
+| `/api/github/watchlist/:accountId` | PUT | Save GitHub watchlist |
+| `/api/gitlab/projects/pin` | PUT | Pin GitLab projects |
+| `/api/analytics/sites` | POST | Create analytics site |
+| `/api/analytics/sites/:id` | PUT | Rename analytics site |
+| `/api/app-store/connections` | POST | Create connection |
+| `/api/app-store/connections/:id` | PUT, DELETE | Update or delete connection |
+| `/api/app-store/connections/:id/refresh` | POST | Refresh app metadata |
+| `/api/app-store/connections/:id/apps/:appId` | PUT | Enable or disable app |
+| `/api/app-store/connections/:id/analytics` | POST | Set up analytics |
+| `/api/app-store/connections/:id/analytics/sync` | POST | Sync analytics |
+| `/api/app-store/connections/:id/revenue/sync` | POST | Sync revenue sources |
+| `/api/app-store/connections/:id/backfill` | POST | Backfill reports |
+| `/api/settings` | PUT | Update masked AI settings |
+| `/api/users` | POST | Create admin user |
+| `/api/users/:id` | DELETE | Delete admin user |
+| `/api/ai/chat` | POST | AI response stream |
+| `/api/confirm/token` | POST | Issue a confirmation token |
+| `/api/health` | GET | Health check |
+| `/api/bing-wallpaper` | GET | Upstream redirect |
+| `/api/reddit/callback` | GET | OAuth callback |
+| `/api/graphql` | GET, POST | Authenticated GraphQL Query Plane |
+| `/api/*` | — | Catch-all for unknown API paths |
 
-| Route | Method | Auth | Browser client | Service/use case | Data dependency / HTTP adapter |
-|---|---|---|---|---|---|
-| `/api/accounts` | GET, POST | session | `getAccounts`, `createAccount` | `accounts.getAccountsOverview`, `accounts.createAccount` | Accounts + Twitter repositories; account create validation |
-| `/api/accounts/:id` | GET, PUT, DELETE | session + owner | `getAccount`, `updateAccount`, `deleteAccount` | `accounts.getAccountDetails`, `updateAccountFromInput`, `deleteAccount` | Accounts, Twitter stats, fetch health; confirmation token validation |
-| `/api/analytics/sites` | GET, POST | session | `getAnalyticsSites`, `createAnalyticsSite` | `analytics.getAnalyticsSites`, `analytics.createAnalyticsSite` | Owner-scoped sites; POST owner comes from session |
-| `/api/analytics/sites/:id` | PUT | session + owner (admin global) | `renameAnalyticsSite` | `analytics.renameAnalyticsSite` | Updates only the site name and `updated_at`; host and site key are immutable |
-| `/api/analytics/sites/:id/traffic` | GET | session + owner (admin global) | `getAnalyticsTraffic` | `analytics.getAnalyticsTrafficForSite` | Site ownership is checked before the PostgreSQL traffic query; one viewer-timezone 7-calendar-day read model returns overview, zero-filled timeline, Top 10 pages and non-country dimensions, and all country groups, counted by views |
-| `/api/analytics/sites/:id/installation` | GET | session + owner (admin global) | `getAnalyticsInstallation` | `analytics.getAnalyticsInstallationForSite` | Site ownership checked before returning the tracker snippet; missing public origin is a service configuration error |
-| `/api/graphql` | GET, POST | session | `graphqlRequest` (`lib/client/graphql.ts`) | Analytics, App Store, Settings, Admin, AI, and X query resolvers → domain read services | Authenticated HTTP adapter; query-only, service-backed. Page operations combine Analytics site options + dashboard/installation, App Store app options + report, and X account + timeline + selected content tab. See [GraphQL Query Layer](GRAPHQL.md) |
-| `/api/ai/chat` | POST | session | `streamAiChat` | `ai-analysis.runAgentStream` | AI chat streaming response |
-| `/api/auth/change-password` | POST | session | `changePassword` | Existing auth handler | Auth/password implementation; cookie/session semantics unchanged |
-| `/api/auth/login` | POST | public | `login` | Existing auth handler | Auth implementation; rate limit and session cookie |
-| `/api/auth/logout` | POST | session | `logout` | Existing auth handler | Auth implementation; clears session cookie |
-| `/api/auth/me` | GET | public | `checkAuth` | Existing auth handler | Session inspection |
-| `/api/bing-wallpaper` | GET | public | — | — | Special HTTP adapter: upstream request and redirect |
-| `/api/confirm/token` | POST | session | `getConfirmToken` | Existing confirmation helper | In-memory confirmation token; returned by HTTP adapter |
-| `/api/fetch/:id` | POST | session + owner | `triggerFetch` | `manual-fetch.startManualFetch` | Accounts + fetch dispatch; starts background work and returns immediately |
-| `/api/fetch-health` | GET | session | `getFetchHealth` | `fetch-health.getFetchHealth` | Accounts and fetch-run repositories |
-| `/api/github/:accountId/repos/:repoId` | GET | session + owner | — | `github.getGithubRepoSnapshots` | GitHub repository snapshots |
-| `/api/github/:accountId/repos/:repoId/clones` | GET | session + owner | `getGithubTrafficClones` | `github.getGithubTrafficClones` | GitHub traffic repository |
-| `/api/github/:accountId/repos/:repoId/paths` | GET | session + owner | `getGithubPaths` | `github.getGithubPaths` | GitHub traffic repository |
-| `/api/github/:accountId/repos/:repoId/paths/history` | GET | session + owner | `getGithubPathHistory` | `github.getGithubPathHistory` | GitHub traffic repository |
-| `/api/github/:accountId/repos/:repoId/referrers` | GET | session + owner | `getGithubReferrers` | `github.getGithubReferrers` | GitHub traffic repository |
-| `/api/github/:accountId/repos/:repoId/referrers/history` | GET | session + owner | `getGithubReferrerHistory` | `github.getGithubReferrerHistory` | GitHub traffic repository |
-| `/api/github/:accountId/repos/:repoId/releases` | GET | session + owner | `getGithubReleases` | `github.getGithubReleases` | GitHub release repository |
-| `/api/github/:accountId/repos/:repoId/releases/growth` | GET | session + owner | `getGithubReleaseDownloadTimeline` | `github.getGithubReleaseDownloadTimeline` | GitHub release repository |
-| `/api/github/:accountId/repos/:repoId/releases/:releaseId/assets` | GET | session + owner | `getGithubReleaseAssets` | `github.getGithubReleaseAssets` | GitHub release repository |
-| `/api/github/:accountId/repos/:repoId/snapshots` | GET | session + owner | `getGithubRepoSnapshots` | `github.getGithubRepoSnapshots` | GitHub repository snapshots |
-| `/api/github/:accountId/repos/:repoId/views` | GET | session + owner | `getGithubTrafficViews` | `github.getGithubTrafficViews` | GitHub traffic repository |
-| `/api/github/contributions/:accountId` | GET | session + owner | `getGithubContributions` | `github.getGithubContributions` | GitHub repository |
-| `/api/github/overview/:accountId` | GET | session + owner | `getGithubOverview` | `github.getGithubOverview` | GitHub repository |
-| `/api/github/repos/pin` | PUT | session + owner | `setPinnedRepos` | `github.setPinnedRepos` | GitHub watchlist repository |
-| `/api/github/sources/:accountId/available` | GET | session + owner | `getGithubAvailableOrgs` | `github.getGithubAvailableOrgs` | GitHub client and decrypted credential; upstream failure returns `{ orgs: [], unavailable }` |
-| `/api/github/timeline/:accountId` | GET | session + owner | `getGithubTimeline` | `github.getGithubTimeline` | GitHub repository |
-| `/api/github/watchlist/:accountId` | GET, PUT | session + owner | `getGithubWatchlist`, `saveGithubWatchlist` | `github-watchlist.GithubWatchlistService` | GitHub watchlist repository and upstream source integration |
-| `/api/gitlab/:accountId/projects/:projectId` | GET | session + owner | — | `gitlab.getGitlabProjectSnapshots` | GitLab project snapshot repository |
-| `/api/gitlab/:accountId/projects/:projectId/releases` | GET | session + owner | `getGitlabReleases` | `gitlab.getGitlabReleases` | GitLab release repository |
-| `/api/gitlab/:accountId/projects/:projectId/snapshots` | GET | session + owner | `getGitlabProjectSnapshots` | `gitlab.getGitlabProjectSnapshots` | GitLab project snapshot repository |
-| `/api/gitlab/contributions/:accountId` | GET | session + owner | `getGitlabContributions` | `gitlab.getGitlabContributions` | GitLab repository |
-| `/api/gitlab/overview/:accountId` | GET | session + owner | `getGitlabOverview` | `gitlab.getGitlabOverview` | GitLab repository |
-| `/api/gitlab/projects/pin` | PUT | session + owner | `setPinnedGitlabProjects` | `gitlab.setPinnedGitlabProjects` | GitLab watchlist repository |
-| `/api/gitlab/timeline/:accountId` | GET | session + owner | `getGitlabTimeline` | `gitlab.getGitlabTimeline` | GitLab repository |
-| `/api/health` | GET | public | — | — | Special health adapter; no application data access |
-| `/api/pulse` | GET | session | `getPulse` | `accounts.getAccounts`, `pulse.getPulse` | Pulse domain aggregation and platform repositories |
-| `/api/reddit/activity/:accountId` | GET | session + owner | `getRedditActivity` | `reddit.getRedditDailyActivity`, `getRedditDailyCommentActivity` | Reddit repository |
-| `/api/reddit/callback` | GET | public | — | — | Special OAuth callback and redirect to `/accounts` |
-| `/api/reddit/comments/:accountId` | GET | session + owner | `getRedditComments` | `reddit.getRedditComments` | Reddit repository |
-| `/api/reddit/overview/:accountId` | GET | session + owner | `getRedditOverview` | `reddit.getRedditOverview` | Reddit repository |
-| `/api/reddit/posts/:accountId` | GET | session + owner | `getRedditPosts` | `reddit.getRedditPosts` | Reddit repository |
-| `/api/reddit/subreddits/:accountId` | GET | session + owner | `getRedditSubreddits` | `reddit.getRedditSubredditDistribution` | Reddit repository |
-| `/api/reddit/timeline/:accountId` | GET | session + owner | `getRedditTimeline` | `reddit.getRedditTimeline` | Reddit repository |
-| `/api/settings` | PUT | admin | `updateSettings` | `settings.updateAiSettings` | Settings repository; only accepts updates, reads use GraphQL and return a masked key |
-| `/api/stats/calendar` | GET | session | `getCalendar` | `twitter.getCalendarData` + `accounts.getAccounts` | Twitter repository |
-| `/api/stats/overview` | GET | session | `getOverview` | `twitter.getOverviewStats` | Twitter repository |
-| `/api/stats/timeline` | GET | session | `getTimeline` | `twitter.getTimeline` | Twitter repository |
-| `/api/stats/top` | GET | session | `getTopTweets` | `twitter.getTopTweets` + `accounts.getAccounts` | Twitter repository |
-| `/api/top-content` | GET | session | `getTopContent` | `accounts.getAccounts`, `top-content.getTopContent` | Cross-platform content repositories |
-| `/api/tweets` | GET | session | `getTweets` | `twitter.getTweets` | Twitter repository |
-| `/api/tweets/:id` | GET | session | `getTweet` | `twitter.getTweetById` | Twitter repository |
-| `/api/users` | POST | admin | `createUser` | `users.createUser` | Users repository; password hashing on create; list reads use GraphQL |
-| `/api/users/:id` | DELETE | admin | `deleteUser` | `users.deleteUser` | Users repository; confirmation token validation |
-| `/api/*` | matched methods | varies | — | — | Catch-all API adapter for unregistered paths; returns not found |
+## GraphQL page operations
 
-## Boundary rules
+- `overview.page`: visible accounts, X summary, batched GitHub/GitLab/Reddit summaries, Pulse, Top Content, Fetch Health, and Analytics Portfolio.
+- `accounts.list(platform)` and `accounts.detail(id)`: safe account metadata and fetch history; credentials are not part of the schema.
+- `x.accountPage`: account, timeline, and the selected Tweets or Replies tab.
+- `github.accountPage`, `github.repoPage`, and `github.watchlistManager`: bounded account/repository dashboards and combined watchlist-manager reads.
+- `gitlab.accountPage`, `gitlab.projectPage`, and `reddit.accountPage`: page-sized detail read models.
+- `analytics.page`: site choices with either the global dashboard or selected-site dashboard and installation snippet.
+- `appStore.analytics` and `appStore.revenue`: enabled app choices and the selected report in one operation.
+- `appStore.connections` and `appStore.connection(id)`: connection list or detail, apps, recent syncs, health, and analytics status. Private keys are never returned.
+- `settings.ai`, `admin.users`, and `ai.status`: safe settings, admin-only user metadata, and AI quota status.
 
-- Browser pages and components call `lib/api.ts` or the thin `lib/client/graphql.ts` helper; only `lib/client/api-transport.ts` constructs API URLs and invokes `fetch`.
-- `app/api/**` adapts HTTP input/authentication to `lib/services/**`. It does not import repositories, database drivers, fetchers, or `fetch-dispatch`.
-- `/api/graphql` authenticates before executing Yoga, passes only the authenticated user into context, and routes analytics fields through existing application services. REST analytics endpoints remain supported and unchanged; acquisition is visit-entry based and distinct from REST traffic's views-based referrer dimension.
-- `lib/services/**` is the Application / Use Case Layer. It may call repositories and infrastructure and returns application data, never `Response` objects or HTTP status codes.
-- The browser → HTTP → service → repository contract remains in the existing single Node application. This inventory describes dependency boundaries; it does not declare an endpoint API version or runtime migration.
+Range changes use targeted page operations and React Query cache keys. Query helpers pass cancellation through the shared transport. GraphQL is deliberately query-only; all writes stay on REST commands.
 
 ## Public tracking collector
 
-`POST /a/e` and `OPTIONS /a/e` are public browser-tracking routes outside the `/api` namespace. The POST route owns HTTP parsing, body limits, Origin/UA/country headers, and status/CORS responses; `lib/services/analytics-collector.ts` validates registered-site identity and event data before calling repositories. It does not use a dashboard session. The tracker sends only the allow-listed source, medium, and campaign UTM values, never the complete query string; collector persistence blanks them for non-entry page views.
+`POST /a/e` and `OPTIONS /a/e` are public browser-tracking routes outside `/api`. The route owns HTTP parsing, body limits, Origin/UA/country headers, and CORS/status behavior. The collector service validates site identity and event data before repository access. It stores only allow-listed UTM source, medium, and campaign values, never the full query string.

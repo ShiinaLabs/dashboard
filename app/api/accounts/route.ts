@@ -1,15 +1,8 @@
 import { json } from "@/lib/api-server";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { getAccountsOverview, createAccount, assertSafeInstanceUrl } from "@/lib/services/accounts";
+import type { ActionFunctionArgs } from "react-router";
+import { createAccount, assertSafeInstanceUrl } from "@/lib/services/accounts";
 import { isSupportedPlatform } from "@/lib/platforms";
-import { requireSession, getOwnerId } from "@/lib/auth-helpers";
-
-async function GET(req: Request) {
-  const auth = await requireSession(req);
-  if (!auth) return json({ error: "Unauthorized" }, { status: 401 });
-
-  return json(await getAccountsOverview(getOwnerId(auth.user)));
-}
+import { requireSession } from "@/lib/auth-helpers";
 
 async function POST(req: Request) {
   const auth = await requireSession(req);
@@ -47,10 +40,6 @@ async function POST(req: Request) {
   return json(pub, { status: 201 });
 }
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  if (request.method !== "GET") return json({ error: "Method not allowed" }, { status: 405 });
-  return GET(request);
-}
 export async function action({ request }: ActionFunctionArgs) {
   switch (request.method) {
     case "POST": return POST(request);

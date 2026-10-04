@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useState, useRef, useEffect, useMemo, type CSSProperties } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { api, type GithubRepo, type GithubRelease } from "@/lib/api";
+import type { GithubRepo, GithubRelease } from "@/shared/types";
+import { getGithubRepoPage } from "@/lib/client/graphql/github";
 import { formatDate } from "@/lib/client/datetime";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -345,69 +346,26 @@ export default function RepoDetail() {
   const [hiddenAssets, setHiddenAssets] = useState<Set<string>>(new Set());
   const [hiddenReleases, setHiddenReleases] = useState<Set<number> | null>(null);
 
-  const { data: overview } = useQuery({
-    queryKey: ["github", "overview", aid],
-    queryFn: () => api.getGithubOverview(aid),
-    enabled: !!aid,
+  const { data: page } = useQuery({
+    queryKey: ["github-repo-page", aid, rid, days, growthDays],
+    queryFn: ({ signal }) => getGithubRepoPage({ accountId: aid, repoId: rid, days, growthDays }, signal),
+    enabled: Number.isInteger(aid) && aid > 0 && Number.isInteger(rid) && rid > 0,
+    staleTime: 60_000,
   });
-
-  const repo: GithubRepo | undefined = overview?.repos.find((r) => r.repo_id === rid);
+  const repo: GithubRepo | undefined = page?.repo;
 
   useEntityTitle(repo ? repo.full_name : null);
 
-  const { data: snapshots } = useQuery({
-    queryKey: ["github", "snapshots", aid, rid, days],
-    queryFn: () => api.getGithubRepoSnapshots(aid, rid, days),
-    enabled: !!aid && !!rid,
-  });
-
-  const { data: clones } = useQuery({
-    queryKey: ["github", "clones", aid, rid, days],
-    queryFn: () => api.getGithubTrafficClones(aid, rid, days),
-    enabled: !!aid && !!rid,
-  });
-
-  const { data: views } = useQuery({
-    queryKey: ["github", "views", aid, rid, days],
-    queryFn: () => api.getGithubTrafficViews(aid, rid, days),
-    enabled: !!aid && !!rid,
-  });
-
-  const { data: referrers } = useQuery({
-    queryKey: ["github", "referrers", aid, rid],
-    queryFn: () => api.getGithubReferrers(aid, rid),
-    enabled: !!aid && !!rid,
-  });
-
-  const { data: referrerHistory } = useQuery({
-    queryKey: ["github", "referrers", "history", aid, rid, days],
-    queryFn: () => api.getGithubReferrerHistory(aid, rid, days),
-    enabled: !!aid && !!rid,
-  });
-
-  const { data: paths } = useQuery({
-    queryKey: ["github", "paths", aid, rid],
-    queryFn: () => api.getGithubPaths(aid, rid),
-    enabled: !!aid && !!rid,
-  });
-
-  const { data: pathHistory } = useQuery({
-    queryKey: ["github", "paths", "history", aid, rid, days],
-    queryFn: () => api.getGithubPathHistory(aid, rid, days),
-    enabled: !!aid && !!rid,
-  });
-
-  const { data: releases } = useQuery({
-    queryKey: ["github", "releases", aid, rid],
-    queryFn: () => api.getGithubReleases(aid, rid),
-    enabled: !!aid && !!rid,
-  });
-
-  const { data: downloadTimeline, isPending: growthPending } = useQuery({
-    queryKey: ["github", "release-growth", aid, rid, growthDays],
-    queryFn: () => api.getGithubReleaseDownloadTimeline(aid, rid, growthDays),
-    enabled: !!aid && !!rid,
-  });
+  const snapshots = page?.snapshots;
+  const clones = page?.clones;
+  const views = page?.views;
+  const referrers = page?.referrers;
+  const referrerHistory = page?.referrerHistory;
+  const paths = page?.paths;
+  const pathHistory = page?.pathHistory;
+  const releases = page?.releases;
+  const downloadTimeline = page?.downloadTimeline;
+  const growthPending = !page;
 
   const topAssets = useMemo(() => {
     if (!releases) return [];

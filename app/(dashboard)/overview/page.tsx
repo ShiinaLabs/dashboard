@@ -31,18 +31,12 @@ export default function Overview() {
   const {
     stats, timeline, topLiked, allAccounts,
     xAccounts, ghAccounts, glAccounts, redditAccounts,
-    ghOverviews, ghAllRepos, ghPinned, ghTotalStars, ghTotalForks,
-    glOverviews, glAllProjects, glPinned, glTotalStars, glTotalForks,
-    redditOverviews, redditKarmaTimeline, redditDailyActivity, mergedSubreddits,
-    isLoading,
+    ghItemCount, ghPinned, ghTotalStars, ghTotalForks, ghFollowers,
+    glItemCount, glPinned, glTotalStars, glTotalForks, glFollowers,
+    redditPostKarma, redditCommentKarma, redditTotalPosts, redditTotalComments,
+    redditKarmaTimeline, redditDailyActivity, mergedSubreddits,
+    pulse, topContent, fetchHealth, analyticsPortfolio, isLoading, isError,
   } = data;
-
-  const ghFollowers = ghOverviews.reduce((sum, overview) => sum + (overview.data?.stats?.followers ?? 0), 0);
-  const glFollowers = glOverviews.reduce((sum, overview) => sum + (overview.data?.stats?.followers ?? 0), 0);
-  const redditPostKarma = redditOverviews.reduce((sum, overview) => sum + (overview.data?.stats?.post_karma ?? 0), 0);
-  const redditCommentKarma = redditOverviews.reduce((sum, overview) => sum + (overview.data?.stats?.comment_karma ?? 0), 0);
-  const redditTotalPosts = redditOverviews.reduce((sum, overview) => sum + (overview.data?.totalPosts ?? 0), 0);
-  const redditTotalComments = redditOverviews.reduce((sum, overview) => sum + (overview.data?.totalComments ?? 0), 0);
   const monitoredAccounts = allAccounts.filter((account) => isSupportedPlatform(account.platform));
 
   if (isLoading) {
@@ -54,6 +48,10 @@ export default function Overview() {
         <ChartCardSkeleton />
       </div>
     );
+  }
+
+  if (isError || !pulse || !topContent || !fetchHealth || !analyticsPortfolio) {
+    return <p role="alert" className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">{t("overview.health.unavailable")}</p>;
   }
 
   const platformTabs = [
@@ -96,15 +94,15 @@ export default function Overview() {
         </MetricGrid>
       </section>
 
-      <WebAnalyticsSection />
+      <WebAnalyticsSection initialData={analyticsPortfolio} />
 
       <section aria-label={t("overview.pulse.heading")} className="grid min-w-0 gap-4 xl:grid-cols-2 [&>*]:min-w-0">
-        <PulseSection />
-        <FetchHealthSection />
+        <PulseSection initialData={pulse} />
+        <FetchHealthSection data={fetchHealth} />
       </section>
 
       <section aria-label={t("overview.topContent.heading")}>
-        <TopContentSection />
+        <TopContentSection initialData={topContent} />
       </section>
 
       {platformTabs.length > 0 && (
@@ -124,8 +122,8 @@ export default function Overview() {
               </TabsList>
             </div>
             {xAccounts.length > 0 && <TabsContent value="x" className="mt-4"><XSection stats={stats} timeline={timeline} topLiked={topLiked} xAccounts={xAccounts} /></TabsContent>}
-            {ghAccounts.length > 0 && <TabsContent value="github" className="mt-4"><GitHubSection ghAllRepos={ghAllRepos} ghPinned={ghPinned} ghTotalStars={ghTotalStars} ghTotalForks={ghTotalForks} ghFollowers={ghFollowers} ghAccounts={ghAccounts} /></TabsContent>}
-            {glAccounts.length > 0 && <TabsContent value="gitlab" className="mt-4"><GitLabSection glAllProjects={glAllProjects} glPinned={glPinned} glTotalStars={glTotalStars} glTotalForks={glTotalForks} glFollowers={glFollowers} glAccounts={glAccounts} /></TabsContent>}
+            {ghAccounts.length > 0 && <TabsContent value="github" className="mt-4"><GitHubSection ghRepoCount={ghItemCount} ghPinned={ghPinned} ghTotalStars={ghTotalStars} ghTotalForks={ghTotalForks} ghFollowers={ghFollowers} ghAccounts={ghAccounts} /></TabsContent>}
+            {glAccounts.length > 0 && <TabsContent value="gitlab" className="mt-4"><GitLabSection glProjectCount={glItemCount} glPinned={glPinned} glTotalStars={glTotalStars} glTotalForks={glTotalForks} glFollowers={glFollowers} glAccounts={glAccounts} /></TabsContent>}
             {redditAccounts.length > 0 && <TabsContent value="reddit" className="mt-4"><RedditSection postKarma={redditPostKarma} commentKarma={redditCommentKarma} totalPosts={redditTotalPosts} totalComments={redditTotalComments} karmaTimeline={redditKarmaTimeline} dailyActivity={redditDailyActivity} mergedSubreddits={mergedSubreddits} /></TabsContent>}
           </Tabs>
         </section>

@@ -44,9 +44,7 @@ describe("GraphQL dependency boundary", () => {
     expect(route).toContain("yoga.fetch(request");
     expect(schema).toContain('from "./analytics"');
     expect(analytics).toContain('@/lib/services/analytics');
-    expect(analytics).toContain("getAnalyticsTrafficForSite(");
     expect(analytics).toContain("getAnalyticsSites(");
-    expect(analytics).toContain("getAnalyticsAcquisitionForSite(");
     expect(analytics).toContain("getAnalyticsDashboardForSite(");
     expect(analytics).toContain("getAnalyticsPortfolio(");
     expect(analytics).toContain("getAnalyticsGlobalDashboard(");
@@ -71,20 +69,15 @@ describe("GraphQL dependency boundary", () => {
     expect(settings).not.toMatch(/repositories\/|@\/db\/schema|drizzle-orm/);
   });
 
-  it("keeps GraphQL resolvers on services and the acquisition client on graphqlRequest", async () => {
+  it("keeps page read clients on graphqlRequest and services on repositories", async () => {
     const service = await readFile("lib/services/analytics.ts", "utf8");
-    const acquisitionClient = await readFile("lib/client/analytics-graphql.ts", "utf8");
-    const portfolioClient = acquisitionClient;
-    expect(service).toContain("getAnalyticsAcquisitionReport(site.id, timezone)");
-    expect(acquisitionClient).toContain('import { graphqlRequest } from "./graphql"');
-    expect(acquisitionClient).not.toMatch(/\bfetch\s*\(|\bapiRequest\s*\(/);
-    expect(acquisitionClient).toContain("export async function getAnalyticsDashboard(");
-    expect(acquisitionClient).toContain("dashboard(siteId: $siteId, range: $range, timezone: $timezone)");
+    const pageClient = await readFile("lib/client/analytics-graphql.ts", "utf8");
+    expect(pageClient).toContain('import { graphqlRequest } from "./graphql"');
+    expect(pageClient).not.toMatch(/\bfetch\s*\(|\bapiRequest\s*\(/);
+    expect(pageClient).toContain("export async function getAnalyticsPage(");
+    expect(pageClient).toContain("dashboard(siteId: $siteId, range: $range, timezone: $timezone)");
     expect(service).toContain("return getAnalyticsPortfolioReport(ownerId, timezone, days)");
-    expect(portfolioClient).toContain('import { graphqlRequest } from "./graphql"');
-    expect(portfolioClient).toContain("export async function getAnalyticsPortfolio(");
-    expect(portfolioClient).toContain("portfolio(range: $range, timezone: $timezone)");
-    expect(acquisitionClient).toContain("export async function getAnalyticsGlobalDashboard(");
-    expect(acquisitionClient).toContain("globalDashboard(range: $range, timezone: $timezone)");
+    expect(pageClient).toContain("globalDashboard(range: $range, timezone: $timezone)");
+    expect(pageClient).not.toContain("query AnalyticsAcquisition(");
   });
 });

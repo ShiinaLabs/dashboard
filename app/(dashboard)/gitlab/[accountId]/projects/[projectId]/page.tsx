@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { api, type Account } from "@/lib/api";
+import { getGitlabProjectPage } from "@/lib/client/graphql/platform-dashboards";
 import { formatDate } from "@/lib/client/datetime";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChartCard } from "@/components/domain/shared/ChartCard";
@@ -32,40 +32,29 @@ export default function ProjectDetail() {
   const pid = Number(projectId);
   const [days, setDays] = useState(30);
 
-  const { data: overview } = useQuery({
-    queryKey: ["gitlab", "overview", aid],
-    queryFn: () => api.getGitlabOverview(aid),
-    enabled: !!aid,
+  const { data: page, isLoading } = useQuery({
+    queryKey: ["gitlab-project-page", aid, pid, days],
+    queryFn: ({ signal }) => getGitlabProjectPage({ accountId: aid, projectId: pid, days }, signal),
+    enabled: Number.isInteger(aid) && aid > 0 && Number.isInteger(pid) && pid > 0,
+    staleTime: 60_000,
   });
 
-  const { data: accountsData } = useQuery({
-    queryKey: ["accounts"],
-    queryFn: api.getAccounts,
-  });
-
-  const project = overview?.projects.find((p) => p.project_id === pid);
-  const account = accountsData?.accounts.find((a: Account) => a.id === aid);
+  const project = page?.project;
+  const account = page?.account;
   const instanceUrl = account?.instance_url || "https://gitlab.com";
 
   useEntityTitle(project ? project.path_with_namespace : null);
 
-  const { data: snapshots } = useQuery({
-    queryKey: ["gitlab", "snapshots", aid, pid, days],
-    queryFn: () => api.getGitlabProjectSnapshots(aid, pid, days),
-    enabled: !!aid && !!pid,
-  });
-
-  const { data: releases } = useQuery({
-    queryKey: ["gitlab", "releases", aid, pid],
-    queryFn: () => api.getGitlabReleases(aid, pid),
-    enabled: !!aid && !!pid,
-  });
+  const snapshots = page?.snapshots;
+  const releases = page?.releases;
 
   const isMobile = useIsMobile();
   const CHART_H = isMobile ? 200 : 300;
   const MARGIN = { top: 5, right: 5, left: 0, bottom: 5 };
 
-  if (!project) {
+  if (isLoading) return <div className="py-12 text-center text-[var(--muted-foreground)]">{t("common.loading")}</div>;
+
+  if (!project || !account) {
     return (
       <div className="text-center py-12">
         <p className="text-[var(--muted-foreground)]">{t("projectDetail.notFound")}</p>

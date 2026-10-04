@@ -1,13 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { action as graphqlAction, loader as graphqlLoader } from "@/app/api/graphql/route";
-import { loader as restTrafficLoader } from "@/app/api/analytics/sites/[id]/traffic/route";
-import { AnalyticsSiteError } from "@/lib/services/analytics";
 import { getOwnerId, requireSession } from "@/lib/auth-helpers";
 
 const mocks = vi.hoisted(() => ({
   getAnalyticsSites: vi.fn(),
-  getAnalyticsTrafficForSite: vi.fn(),
-  getAnalyticsAcquisitionForSite: vi.fn(),
   getAnalyticsDashboardForSite: vi.fn(),
   getAnalyticsGlobalDashboard: vi.fn(),
   getAnalyticsPortfolio: vi.fn(),
@@ -21,53 +17,6 @@ vi.mock("@/lib/services/analytics", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/services/analytics")>();
   return { ...original, ...mocks };
 });
-
-const traffic = {
-  period: { days: 7, timezone: "Asia/Tokyo" },
-  overview: { views: 18, visitors: 11, visits: 14 },
-  timeline: [{ date: "2026-09-29", views: 18, visitors: 11, visits: 14 }],
-  topPages: [{ path: "/pricing", views: 10 }],
-  dimensions: {
-    referrers: [{ referrer: "", views: 10 }],
-    countries: [{ country: "JP", views: 8 }, { country: "DE", views: 4 }],
-    browsers: [{ browser: "Safari", views: 9 }],
-    operatingSystems: [{ os: "macOS", views: 7 }],
-    devices: [{ device: "Mobile", views: 6 }],
-  },
-};
-
-const trafficQuery = /* GraphQL */ `
-  query AnalyticsTraffic($siteId: Int!, $timezone: String!) {
-    analytics {
-      traffic(siteId: $siteId, timezone: $timezone) {
-        period { days timezone }
-        overview { views visitors visits }
-        timeline { date views visitors visits }
-        topPages { path views }
-        dimensions {
-          referrers { referrer views }
-          countries { country views }
-          browsers { browser views }
-          operatingSystems { os views }
-          devices { device views }
-        }
-      }
-    }
-  }
-`;
-
-const acquisitionQuery = /* GraphQL */ `
-  query AnalyticsAcquisition($siteId: Int!, $timezone: String!) {
-    analytics {
-      acquisition(siteId: $siteId, timezone: $timezone) {
-        period { days timezone }
-        totalVisits
-        referrers { referrer visits }
-        entryPages { path visits }
-      }
-    }
-  }
-`;
 
 const dashboardQuery = /* GraphQL */ `
   query AnalyticsDashboard($siteId: Int!, $range: AnalyticsRange!, $timezone: String!) {
@@ -155,31 +104,6 @@ describe("authenticated GraphQL route", () => {
     expect(mocks.getAnalyticsSites).toHaveBeenLastCalledWith(undefined);
   });
 
-  it("delegates traffic access and timezone validation to the existing service", async () => {
-    authAs(7, "user");
-    mocks.getAnalyticsTrafficForSite.mockResolvedValue(traffic);
-    const response = await routeCall(graphqlAction, request(trafficQuery, { siteId: 12, timezone: "Asia/Tokyo" }));
-    expect(response.status).toBe(200);
-    expect(mocks.getAnalyticsTrafficForSite).toHaveBeenCalledWith(12, { id: 7, role: "user" }, "Asia/Tokyo");
-
-    mocks.getAnalyticsTrafficForSite.mockRejectedValueOnce(new AnalyticsSiteError("invalid_input"));
-    const invalidTimezone = await routeCall(graphqlAction, request(trafficQuery, { siteId: 12, timezone: "Not/AZone" }));
-    const invalidResult = await invalidTimezone.json();
-    expect(invalidResult.errors[0]).toMatchObject({
-      message: "Invalid input",
-      extensions: { code: "BAD_USER_INPUT" },
-    });
-  });
-
-  it("maps foreign-site authorization to FORBIDDEN without duplicating ownership logic", async () => {
-    authAs(7, "user");
-    mocks.getAnalyticsTrafficForSite.mockRejectedValue(new AnalyticsSiteError("forbidden"));
-    const response = await routeCall(graphqlAction, request(trafficQuery, { siteId: 80, timezone: "UTC" }));
-    const result = await response.json();
-    expect(result.errors[0].extensions.code).toBe("FORBIDDEN");
-    expect(mocks.getAnalyticsTrafficForSite).toHaveBeenCalledWith(80, { id: 7, role: "user" }, "UTC");
-  });
-
   it("returns GraphQL errors for invalid syntax and unknown fields", async () => {
     authAs();
     const invalid = await routeCall(graphqlAction, request("query {"));
@@ -187,46 +111,6 @@ describe("authenticated GraphQL route", () => {
     const unknown = await routeCall(graphqlAction, request("{ analytics { doesNotExist } }"));
     expect((await unknown.json()).errors[0].message).toContain("Cannot query field");
     expect(mocks.getAnalyticsSites).not.toHaveBeenCalled();
-  });
-
-  it("returns a GraphQL traffic result identical to the REST service result", async () => {
-    authAs();
-    mocks.getAnalyticsTrafficForSite.mockResolvedValue(traffic);
-
-    const restResponse = await restTrafficLoader({
-      request: new Request("http://localhost/api/analytics/sites/12/traffic?timezone=Asia%2FTokyo"),
-      params: { id: "12" },
-      context: {},
-    } as never);
-    const graphqlResponse = await routeCall(graphqlAction, request(trafficQuery, { siteId: 12, timezone: "Asia/Tokyo" }));
-
-    expect((await graphqlResponse.json()).data.analytics.traffic).toEqual(await restResponse.json());
-  });
-
-  it("returns acquisition totals, referrers, and entry pages through the service", async () => {
-    authAs(7, "user");
-    const acquisition = {
-      period: { days: 7, timezone: "Asia/Tokyo" },
-      totalVisits: 2,
-      referrers: [{ referrer: "", visits: 1 }, { referrer: "google.com", visits: 1 }],
-      entryPages: [{ path: "/", visits: 1 }, { path: "/landing", visits: 1 }],
-    };
-    mocks.getAnalyticsAcquisitionForSite.mockResolvedValueOnce(acquisition);
-    const response = await routeCall(graphqlAction, request(acquisitionQuery, { siteId: 12, timezone: "Asia/Tokyo" }));
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ data: { analytics: { acquisition } } });
-    expect(mocks.getAnalyticsAcquisitionForSite).toHaveBeenCalledWith(12, { id: 7, role: "user" }, "Asia/Tokyo");
-  });
-
-  it("maps acquisition authorization and timezone errors using the existing service errors", async () => {
-    authAs(7, "user");
-    mocks.getAnalyticsAcquisitionForSite.mockRejectedValueOnce(new AnalyticsSiteError("forbidden"));
-    const forbidden = await routeCall(graphqlAction, request(acquisitionQuery, { siteId: 80, timezone: "UTC" }));
-    expect((await forbidden.json()).errors[0].extensions.code).toBe("FORBIDDEN");
-
-    mocks.getAnalyticsAcquisitionForSite.mockRejectedValueOnce(new AnalyticsSiteError("invalid_input"));
-    const invalidTimezone = await routeCall(graphqlAction, request(acquisitionQuery, { siteId: 12, timezone: "Not/AZone" }));
-    expect((await invalidTimezone.json()).errors[0].extensions.code).toBe("BAD_USER_INPUT");
   });
 
   it.each([["DAYS_7", 7], ["DAYS_30", 30], ["DAYS_90", 90]] as const)("maps %s to %i service days", async (range, days) => {

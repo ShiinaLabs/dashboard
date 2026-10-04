@@ -23,6 +23,41 @@ export async function getGitlabOverview(accountId: number) {
   return { stats: latest, projects, allProjects, totalStars, totalForks, totalProjects: allProjects.length, languages, topProjects };
 }
 
+/** Bulk, UI-sized summary for Overview; no project descriptions or topics leave the service. */
+export async function getGitlabOverviewSummary(accountIds: number[]) {
+  if (accountIds.length === 0) return { followers: 0, projectCount: 0, stars: 0, forks: 0, pinnedProjects: [] };
+  if (isMockMode()) {
+    const overview = mock.gitlabOverview;
+    return {
+      followers: Number(overview.stats?.followers ?? 0) * accountIds.length,
+      projectCount: overview.totalProjects * accountIds.length,
+      stars: overview.totalStars * accountIds.length,
+      forks: overview.totalForks * accountIds.length,
+      pinnedProjects: accountIds.flatMap((accountId) => overview.allProjects.filter((project) => project.pinned).map((project) => ({ ...project, account_id: accountId }))).slice(0, 50),
+    };
+  }
+  const db = getDb();
+  const [stats, projects] = await Promise.all([
+    db.execute<{ followers: number }>(sql`SELECT COALESCE(SUM(followers), 0)::int AS followers FROM (
+      SELECT DISTINCT ON (account_id) account_id, followers
+      FROM ${gitlab_stats}
+      WHERE account_id IN (${sql.join(accountIds.map((id) => sql`${id}`), sql`, `)})
+      ORDER BY account_id, recorded_at DESC
+    ) latest`),
+    db.select({ account_id: gitlab_projects.account_id, project_id: gitlab_projects.project_id, id: gitlab_projects.id,
+      name: gitlab_projects.name, language: gitlab_projects.language, stars: gitlab_projects.stars,
+      forks: gitlab_projects.forks, pinned: gitlab_projects.pinned })
+      .from(gitlab_projects).where(inArray(gitlab_projects.account_id, accountIds)).orderBy(desc(gitlab_projects.stars)),
+  ]);
+  return {
+    followers: Number(stats.rows[0]?.followers ?? 0),
+    projectCount: projects.length,
+    stars: projects.reduce((total, project) => total + Number(project.stars ?? 0), 0),
+    forks: projects.reduce((total, project) => total + Number(project.forks ?? 0), 0),
+    pinnedProjects: projects.filter((project) => Boolean(project.pinned)).slice(0, 50),
+  };
+}
+
 export async function getGitlabTimeline(accountId: number, days = 30) {
   if (isMockMode()) return mock.gitlabTimeline;
   const since = new Date(); since.setDate(since.getDate() - days);

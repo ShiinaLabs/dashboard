@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { api, type Account } from "@/lib/api";
+import type { Account } from "@/lib/api";
+import { getAccountsList } from "@/lib/client/graphql/accounts";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Skeleton } from "./Skeleton";
@@ -44,12 +45,12 @@ export default function AccountListPage({
 }: AccountListPageProps) {
   const { t } = useTranslation();
   const { data, isLoading } = useQuery({
-    queryKey: ["accounts"],
-    queryFn: api.getAccounts,
-    refetchInterval: 3 * 60_000,
+    queryKey: ["accounts", "list", platform],
+    queryFn: ({ signal }) => getAccountsList(platform.toUpperCase() as "TWITTER" | "GITHUB" | "GITLAB" | "REDDIT", signal),
+    staleTime: 2 * 60_000,
   });
 
-  const accounts = (data?.accounts || []).filter((a: Account) => a.platform === platform);
+  const accounts = data ?? [];
   const now = useNow();
 
   const staleMap = useMemo(() => {

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, ArrowRight, LoaderCircle } from "lucide-react";
 import { api } from "@/lib/api";
+import { getAppStoreConnectionPageQuery, getAppStoreConnectionsQuery } from "@/lib/client/graphql/app-store";
 import { keyIdFromFilename } from "@/lib/client/app-store-key";
 import { formatDateTime } from "@/lib/client/datetime";
 import { reportRunDisplayStatus, type AppStoreConnection } from "@/shared/app-store";
@@ -23,14 +24,12 @@ export function AppStoreConnections({ adding, onClose, onAdd }: { adding: boolea
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<number | null>(null);
-  const list = useQuery({ queryKey: ["app-store-connections"], queryFn: api.getAppStoreConnections });
+  const list = useQuery({ queryKey: ["app-store-connections"], queryFn: ({ signal }) => getAppStoreConnectionsQuery(signal), staleTime: 60_000 });
   const invalidate = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["app-store-connections"] }),
-      queryClient.invalidateQueries({ queryKey: ["app-store-connection"] }),
-      queryClient.invalidateQueries({ queryKey: ["app-store-analytics-status"] }),
+      queryClient.invalidateQueries({ queryKey: ["app-store-connection-page"] }),
       queryClient.invalidateQueries({ queryKey: ["app-store-analytics"] }),
-      queryClient.invalidateQueries({ queryKey: ["app-store-health"] }),
     ]);
   };
 
@@ -41,7 +40,7 @@ export function AppStoreConnections({ adding, onClose, onAdd }: { adding: boolea
 
   return <section className="space-y-3" aria-label={t("appStore.title")}>
     <p className="text-sm text-muted-foreground">{t("appStore.intro")}</p>
-    {list.data?.connections.length ? list.data.connections.map((connection) =>
+    {list.data?.length ? list.data.map((connection) =>
       <Card key={connection.id}><CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
         <div className="min-w-0 space-y-1"><h2 className="break-words font-semibold">{connection.name}</h2><p className="text-sm text-muted-foreground">{t("appStore.title")} · {connection.key_id}</p></div>
         <div className="flex items-center gap-3">{!connection.is_active && <Badge>{t("badge.inactive")}</Badge>}<Button variant="outline" onClick={() => setSelected(connection.id)}>{t("appStore.manage")}<ArrowRight aria-hidden="true" /></Button></div>
@@ -79,7 +78,7 @@ function ConnectionForm({ connection, onCancel, onSaved }: { connection?: AppSto
       await onSaved(saved);
     } catch (error) {
       setError(errorMessage(error));
-      if (connection) await queryClient.invalidateQueries({ queryKey: ["app-store-connection", connection.id] });
+      if (connection) await queryClient.invalidateQueries({ queryKey: ["app-store-connection-page", connection.id] });
     }
     finally { setBusy(false); }
   };
@@ -115,7 +114,7 @@ function ConnectionForm({ connection, onCancel, onSaved }: { connection?: AppSto
 
 function ConnectionDetail({ id, onBack, onChanged }: { id: number; onBack: () => void; onChanged: () => Promise<void> }) {
   const { t } = useTranslation();
-  const detail = useQuery({ queryKey: ["app-store-connection", id], queryFn: () => api.getAppStoreConnection(id) });
+  const detail = useQuery({ queryKey: ["app-store-connection-page", id], queryFn: ({ signal }) => getAppStoreConnectionPageQuery(id, signal), staleTime: 60_000 });
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -150,8 +149,8 @@ function ConnectionDetail({ id, onBack, onChanged }: { id: number; onBack: () =>
     ].map(([label, value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="break-all font-medium">{value}</dd></div>)}</dl></CardContent></Card>
     <Card><CardContent className="space-y-3 p-5"><h3 className="font-semibold">{t("appStore.apps")}</h3><p className="text-sm text-muted-foreground">{t("appStore.appsHelp")}</p>{apps.length ? apps.map((app) => <div key={app.id} className="flex items-center gap-3 rounded-lg border p-3"><Checkbox id={`asc-app-${app.id}`} checked={app.is_enabled} disabled={busy} onCheckedChange={(value) => run(() => api.setAppStoreAppEnabled(id, app.id, value === true))} /><Label htmlFor={`asc-app-${app.id}`} className="min-w-0 flex-1 cursor-pointer flex-col items-start gap-1"><span className="break-words">{app.name}</span><span className="break-all text-xs font-normal text-muted-foreground">{app.bundle_id} · {app.apple_id}</span></Label></div>) : <p className="text-sm text-muted-foreground">{t("appStore.noApps")}</p>}</CardContent></Card>
     <Card><CardContent className="space-y-3 p-5"><h3 className="font-semibold">{t("appStore.lastSync")}</h3><p className="text-sm">{t("appStore.apps")}: {lastSuccess?.finished_at ? formatDateTime(lastSuccess.finished_at) : "—"}</p>{recentSyncRuns.map((sync) => <div key={sync.id} className="space-y-1 border-t pt-3 text-sm"><div className="flex flex-wrap justify-between gap-2"><span><span className="font-medium">{t(`appStore.syncSource.${sync.kind === "analytics" && sync.scope === "revenue" ? "revenueAnalytics" : sync.kind}`)}</span> · {formatDateTime(sync.started_at)}</span><span>{t(`appStore.syncStatus.${reportRunDisplayStatus(sync)}`)}</span></div>{sync.error_message && <p className={`break-words ${sync.status === "error" || sync.status === "partial" ? "text-destructive" : "text-muted-foreground"}`}>{sync.error_message}</p>}</div>)}</CardContent></Card>
-    <AppStoreHealthPanel connectionId={id} />
-    <AppStoreAnalyticsStatusPanel connectionId={id} isActive={connection.is_active} />
+    <AppStoreHealthPanel data={detail.data.health} />
+    <AppStoreAnalyticsStatusPanel data={detail.data.analyticsStatus} connectionId={id} isActive={connection.is_active} />
     <RevenueSyncPanel connectionId={id} isActive={connection.is_active} vendorNumber={connection.vendor_number} onEdit={() => setEditing(true)} />
     <ConfirmDialog open={deleting} onOpenChange={setDeleting} title={t("common.delete")} description={t("settings.deleteConfirm", { name: connection.name })} target={id} action="delete_app_store_connection" onConfirm={async (token) => { await perform(() => api.deleteAppStoreConnection(id, token)); onBack(); }} />
   </section>;

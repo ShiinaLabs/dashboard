@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
   AlertTriangle,
@@ -7,42 +6,14 @@ import {
   KeyRound,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Text } from "@/components/ui/layout-primitives";
-import { api } from "@/lib/api";
-import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
+import type { OverviewPageData } from "@/lib/client/graphql/overview";
+import { MetricCard } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";
 import { SectionShell } from "@/components/domain/shared/SectionShell";
 import { getPlatformLabelKey } from "@/lib/platforms";
 
-export function FetchHealthSection() {
+export function FetchHealthSection({ data }: { data: OverviewPageData["fetchHealth"] }) {
   const { t } = useTranslation();
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["fetch-health"],
-    queryFn: api.getFetchHealth,
-    refetchInterval: 60_000,
-  });
-
-  if (isLoading) {
-    return (
-      <SectionShell icon={<CheckCircle2 size={16} />} title={t("overview.health.heading")}>
-        <MetricGrid className="sm:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, index) => <MetricCardSkeleton key={index} />)}
-        </MetricGrid>
-      </SectionShell>
-    );
-  }
-
-  if (isError || !data) {
-    return (
-      <SectionShell icon={<CheckCircle2 size={16} />} title={t("overview.health.heading")}>
-        <Card withBorder radius="lg" p={{ base: "md", sm: "lg" }} style={{ background: "var(--card)" }}>
-          <Text size="sm" c="dimmed">
-            {t("overview.health.unavailable")}
-          </Text>
-        </Card>
-      </SectionShell>
-    );
-  }
 
   const cards = [
     {
@@ -93,7 +64,7 @@ export function FetchHealthSection() {
         </div>
       )}
 
-      {data.issues.length > 0 && (
+      {data.issueCount > 0 && (
         <Card
           withBorder
           radius="md"
@@ -102,7 +73,7 @@ export function FetchHealthSection() {
           style={{ background: "var(--card)", color: "var(--card-foreground)" }}
         >
             <div className="grid content-start gap-2 p-4">
-              {data.issues.slice(0, 5).map((issue) => (
+              {data.issues.map((issue) => (
                 <div key={issue.accountId} className="min-w-0 rounded-md p-3 transition-colors hover:bg-[var(--muted)] active:bg-[var(--border)]/50">
                   <div className="flex items-start justify-between gap-3">
                     <p className="min-h-5 min-w-0 truncate text-sm leading-5 font-medium">
@@ -125,9 +96,9 @@ export function FetchHealthSection() {
                 </div>
               ))}
             </div>
-            {data.issues.length > 5 && (
+            {data.issueCount > data.issues.length && (
               <p className="mx-4 mb-4 text-[11px] text-[var(--muted-foreground)]">
-                {t("overview.health.moreIssues", { count: data.issues.length - 5 })}
+                {t("overview.health.moreIssues", { count: data.issueCount - data.issues.length })}
               </p>
             )}
         </Card>

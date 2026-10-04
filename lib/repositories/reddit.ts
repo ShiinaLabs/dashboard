@@ -1,5 +1,5 @@
 // @ts-nocheck — Drizzle ORM types are complex
-import { eq, desc, sql, count, gte, and, type SQL } from "drizzle-orm";
+import { eq, desc, sql, count, gte, and, inArray, type SQL } from "drizzle-orm";
 import { getDb } from "../db/connection";
 import { reddit_stats, reddit_posts, reddit_comments } from "@/db/schema";
 import { isMockMode } from "../config";
@@ -84,6 +84,83 @@ export async function getRedditOverview(accountId: number) {
     created_utc: reddit_posts.created_utc,
   }).from(reddit_posts).where(eq(reddit_posts.account_id, accountId)).orderBy(desc(reddit_posts.score)).limit(10);
   return { stats: latest || undefined, totalPosts: postCount.count, totalComments: commentCount.count, totalScore: scoreSum.s, topPosts };
+}
+
+/** Batched Reddit aggregates for the overview page, scoped to the visible account IDs. */
+export async function getRedditOverviewSummary(accountIds: number[], days = 30) {
+  if (accountIds.length === 0) return {
+    postKarma: 0, commentKarma: 0, totalPosts: 0, totalComments: 0,
+    karmaTimeline: [], dailyActivity: [], subreddits: [],
+  };
+  if (isMockMode()) return {
+    postKarma: Number(mock.redditOverview.stats?.post_karma ?? 0) * accountIds.length,
+    commentKarma: Number(mock.redditOverview.stats?.comment_karma ?? 0) * accountIds.length,
+    totalPosts: mock.redditOverview.totalPosts * accountIds.length,
+    totalComments: mock.redditOverview.totalComments * accountIds.length,
+    karmaTimeline: mock.redditTimeline.map((day) => ({ ...day, post_karma: day.post_karma * accountIds.length, comment_karma: day.comment_karma * accountIds.length })),
+    dailyActivity: mergeMockRedditActivity().map((day) => ({ ...day, posts: day.posts * accountIds.length, comments: day.comments * accountIds.length })),
+    subreddits: mock.redditSubreddits.map((subreddit) => ({ ...subreddit, count: subreddit.count * accountIds.length })),
+  };
+
+  const since = new Date(Date.now() - Math.min(365, Math.max(1, days)) * 86_400_000).toISOString();
+  const sinceEpoch = Math.floor(Date.parse(since) / 1000);
+  const db = getDb();
+  const idList = sql.join(accountIds.map((id) => sql`${id}`), sql`, `);
+  const [karma, postCounts, commentCounts, postDays, commentDays, postSubs, commentSubs] = await Promise.all([
+    db.execute<{ post_karma: number; comment_karma: number }>(sql`SELECT
+      COALESCE(SUM(post_karma), 0)::int AS post_karma,
+      COALESCE(SUM(comment_karma), 0)::int AS comment_karma
+      FROM (SELECT DISTINCT ON (account_id) account_id, post_karma, comment_karma
+        FROM ${reddit_stats} WHERE account_id IN (${idList}) ORDER BY account_id, recorded_at DESC) latest`),
+    db.select({ count: count() }).from(reddit_posts).where(inArray(reddit_posts.account_id, accountIds)),
+    db.select({ count: count() }).from(reddit_comments).where(inArray(reddit_comments.account_id, accountIds)),
+    db.select({ date: sql<string>`TO_CHAR(TO_TIMESTAMP(${reddit_posts.created_utc})::date, 'YYYY-MM-DD')`, count: count() })
+      .from(reddit_posts).where(and(inArray(reddit_posts.account_id, accountIds), gte(reddit_posts.created_utc, sinceEpoch)))
+      .groupBy(sql`TO_TIMESTAMP(${reddit_posts.created_utc})::date`).orderBy(sql`TO_TIMESTAMP(${reddit_posts.created_utc})::date`),
+    db.select({ date: sql<string>`TO_CHAR(TO_TIMESTAMP(${reddit_comments.created_utc})::date, 'YYYY-MM-DD')`, count: count() })
+      .from(reddit_comments).where(and(inArray(reddit_comments.account_id, accountIds), gte(reddit_comments.created_utc, sinceEpoch)))
+      .groupBy(sql`TO_TIMESTAMP(${reddit_comments.created_utc})::date`).orderBy(sql`TO_TIMESTAMP(${reddit_comments.created_utc})::date`),
+    db.select({ subreddit: reddit_posts.subreddit, count: count() }).from(reddit_posts)
+      .where(inArray(reddit_posts.account_id, accountIds)).groupBy(reddit_posts.subreddit),
+    db.select({ subreddit: reddit_comments.subreddit, count: count() }).from(reddit_comments)
+      .where(inArray(reddit_comments.account_id, accountIds)).groupBy(reddit_comments.subreddit),
+  ]);
+  const { rows: timelineRows } = await db.execute<{ date: string; post_karma: number; comment_karma: number }>(
+    sql`SELECT date, SUM(post_karma)::int AS post_karma, SUM(comment_karma)::int AS comment_karma FROM (
+      SELECT DISTINCT ON (account_id, SUBSTRING(recorded_at, 1, 10))
+        account_id, SUBSTRING(recorded_at, 1, 10) AS date, post_karma, comment_karma
+      FROM ${reddit_stats} WHERE account_id IN (${idList}) AND recorded_at >= ${since}
+      ORDER BY account_id, SUBSTRING(recorded_at, 1, 10), recorded_at DESC
+    ) daily GROUP BY date ORDER BY date`);
+  const activity = new Map<string, { posts: number; comments: number }>();
+  for (const row of postDays) activity.set(row.date, { posts: Number(row.count), comments: 0 });
+  for (const row of commentDays) {
+    const value = activity.get(row.date) ?? { posts: 0, comments: 0 };
+    value.comments = Number(row.count);
+    activity.set(row.date, value);
+  }
+  const subredditCounts = new Map<string, number>();
+  for (const row of [...postSubs, ...commentSubs]) subredditCounts.set(row.subreddit, (subredditCounts.get(row.subreddit) ?? 0) + Number(row.count));
+  return {
+    postKarma: Number(karma.rows[0]?.post_karma ?? 0),
+    commentKarma: Number(karma.rows[0]?.comment_karma ?? 0),
+    totalPosts: Number(postCounts[0]?.count ?? 0),
+    totalComments: Number(commentCounts[0]?.count ?? 0),
+    karmaTimeline: timelineRows,
+    dailyActivity: [...activity].sort(([left], [right]) => left.localeCompare(right)).map(([date, value]) => ({ date, ...value })),
+    subreddits: [...subredditCounts].map(([subreddit, value]) => ({ subreddit, count: value })).sort((a, b) => b.count - a.count).slice(0, 10),
+  };
+}
+
+function mergeMockRedditActivity() {
+  const activity = new Map<string, { posts: number; comments: number }>();
+  for (const row of mock.redditActivity.posts) activity.set(row.date, { posts: row.count, comments: 0 });
+  for (const row of mock.redditActivity.comments) {
+    const value = activity.get(row.date) ?? { posts: 0, comments: 0 };
+    value.comments = row.count;
+    activity.set(row.date, value);
+  }
+  return [...activity].sort(([left], [right]) => left.localeCompare(right)).map(([date, value]) => ({ date, ...value }));
 }
 
 export async function getRedditDailyActivity(accountId: number, days = 30) {

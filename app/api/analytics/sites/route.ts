@@ -1,14 +1,7 @@
 import { json } from "@/lib/api-server";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { getOwnerId, requireSession } from "@/lib/auth-helpers";
-import { AnalyticsSiteError, createAnalyticsSite, getAnalyticsSites } from "@/lib/services/analytics";
-
-export async function loader({ request }: LoaderFunctionArgs) {
-  if (request.method !== "GET") return json({ error: "Method not allowed" }, { status: 405 });
-  const auth = await requireSession(request);
-  if (!auth) return json({ error: "Unauthorized" }, { status: 401 });
-  return json({ sites: await getAnalyticsSites(getOwnerId(auth.user)) });
-}
+import type { ActionFunctionArgs } from "react-router";
+import { requireSession } from "@/lib/auth-helpers";
+import { AnalyticsSiteError, createAnalyticsSite } from "@/lib/services/analytics";
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "POST") return json({ error: "Method not allowed" }, { status: 405 });

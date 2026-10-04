@@ -6,9 +6,9 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Text } from "@/components/ui/layout-primitives";
 import { BarChart3, TrendingUp } from "lucide-react";
-import { api } from "@/lib/api";
 import { SectionShell } from "@/components/domain/shared/SectionShell";
-import type { TopContentItem } from "@/shared/types";
+import type { TopContentItem, TopContentResponse } from "@/shared/types";
+import { getOverviewTopContent } from "@/lib/client/graphql/overview";
 import { TimeRangeSelector } from "@/components/TimeRangeSelector";
 import { ChartCardSkeleton } from "@/components/Skeleton";
 import { GithubIcon, GitlabIcon, RedditIcon, XIcon } from "@/components/BrandIcons";
@@ -26,14 +26,18 @@ function PlatformIcon({ platform }: { platform: string }) {
   return <RedditIcon />;
 }
 
-export function TopContentSection() {
+export function TopContentSection({ initialData }: { initialData: TopContentResponse }) {
   const { t } = useTranslation();
   const [days, setDays] = useState(7);
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["top-content", days],
-    queryFn: () => api.getTopContent(days),
-    refetchInterval: 3 * 60_000,
+  const query = useQuery({
+    queryKey: ["overview-top-content", days],
+    queryFn: ({ signal }) => getOverviewTopContent(days, signal),
+    enabled: days !== 7,
+    staleTime: 5 * 60_000,
   });
+  const data = days === 7 ? initialData : query.data;
+  const isLoading = days !== 7 && query.isPending;
+  const isError = days !== 7 && query.isError;
 
   const items = data?.items ?? [];
 

@@ -3,6 +3,7 @@ import { getAccountByIdWithCredential } from "@/lib/services/accounts";
 
 /** Application-level GitHub read use cases. Route adapters retain HTTP parsing and account ownership checks. */
 export const getGithubOverview = (...args: Parameters<typeof repository.getGithubOverview>) => repository.getGithubOverview(...args);
+export const getGithubOverviewSummary = (...args: Parameters<typeof repository.getGithubOverviewSummary>) => repository.getGithubOverviewSummary(...args);
 export const getGithubTimeline = (...args: Parameters<typeof repository.getGithubTimeline>) => repository.getGithubTimeline(...args);
 export const getGithubContributions = (...args: Parameters<typeof repository.getGithubContributions>) => repository.getGithubContributions(...args);
 export const getGithubRepoSnapshots = (...args: Parameters<typeof repository.getGithubRepoSnapshots>) => repository.getGithubRepoSnapshots(...args);

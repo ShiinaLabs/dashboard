@@ -63,6 +63,7 @@ export default function WebAnalyticsPage() {
       showSite: typeof selectedSiteId === "number",
     }, signal),
     enabled: Boolean(timezone),
+    placeholderData: (previousData) => previousData,
     staleTime: 5 * 60_000,
   });
   const sitesQuery = pageQuery;

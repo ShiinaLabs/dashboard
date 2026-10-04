@@ -1,156 +1,77 @@
 # API Reference
 
-Base path: `/api` by default. Browser requests go through `lib/api.ts` and `lib/client/api-transport.ts`; `VITE_API_BASE_URL` can set a build-time API root. Routes are declared in `app/routes.ts` and implemented as React Router route handlers under `app/api/*/route.ts`. See [API Boundary Inventory](API-BOUNDARY.md) for the complete route-to-service map.
+The browser reads authenticated UI data through page-oriented operations at `POST /api/graphql`. The GraphQL schema and page contracts are documented in [GraphQL Query Layer](GRAPHQL.md); the complete REST route inventory is in [API Boundary Inventory](API-BOUNDARY.md).
 
-All endpoints except the public list below require a valid `dash_session` cookie. `app/auth-middleware.server.ts` returns `401` for unauthenticated API calls (or `302` to `/login` for pages).
+REST is reserved for commands/mutations, authentication/session, streaming, synchronization and infrastructure. Unless marked public below, requests require the existing `dash_session` cookie. `app/auth-middleware.server.ts` returns `401` for unauthenticated API calls.
 
-Public API paths: `POST /auth/login`, `GET /auth/me`, `GET /reddit/callback`, `GET /bing-wallpaper`, `GET /health`.
-
-## GraphQL page reads
-
-Authenticated browser page reads use `POST /graphql` through `lib/client/graphql.ts`. Current page operations are documented in [GraphQL Query Layer](GRAPHQL.md): Analytics combines site options with the global or selected-site dashboard and installation; App Store Analytics and Revenue combine enabled apps with their report; X account detail combines account, timeline, and the selected content tab. Settings, Admin user listing, and AI status use their domain query fields. The shared transport carries credentials, unauthorized handling, and `AbortSignal` cancellation. REST reads are still present for pages and platform domains that have not yet migrated. REST mutations, sync/backfill, auth/session, streaming, collectors, health, and confirmation endpoints remain supported.
-
-Settings and user-list reads also use GraphQL. Their former `GET /settings` and `GET /users` handlers were removed; `PUT /settings`, `POST /users`, and streaming `POST /ai/chat` remain REST commands.
-
-## Auth
+## Authentication and session
 
 | Method | Path | Description |
-|--------|------|-------------|
-| POST | `/auth/login` | Authenticate with `{ username, password }`, sets session cookie. `400` invalid body, `401` bad credentials, `429` rate limited (10/min/IP), `500` internal error |
-| GET | `/auth/me` | Check current session → `{ authenticated, username, role }` |
+|---|---|---|
+| POST | `/auth/login` | Authenticate with `{ username, password }`; sets session cookie |
+| GET | `/auth/me` | Session bootstrap: `{ authenticated, username, role }` |
 | POST | `/auth/logout` | Clear session cookie |
-| POST | `/auth/change-password` | Change password `{ currentPassword, newPassword }` (requires session) |
+| POST | `/auth/change-password` | Change password with `{ currentPassword, newPassword }` |
 
-## Users (admin only)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/users` | Create user `{ username, password, role? }` |
-| DELETE | `/users/:id` | Soft-delete user + all their accounts (requires `{ confirmToken }`) |
-
-## Confirmation Tokens
+## Accounts and fetch commands
 
 | Method | Path | Description |
-|--------|------|-------------|
-| POST | `/confirm/token` | Get a 6-character random one-time token (5-minute TTL) |
+|---|---|---|
+| POST | `/accounts` | Create account; accepts platform, screen name, credentials, fetch interval, and optional instance/auth type |
+| PUT | `/accounts/:id` | Update account configuration |
+| DELETE | `/accounts/:id` | Delete account and related data; requires `{ confirmToken }` |
+| POST | `/fetch/:id` | Start an account fetch, optionally with `{ level }` |
+| POST | `/confirm/token` | Issue a one-time confirmation token |
 
-## Health
+Account lists, safe metadata, fetch history, Overview, Pulse, Fetch Health, and Top Content are GraphQL reads. The schema never returns stored account credentials.
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Server health check → `{ status: "ok" }` |
-
-## Bing Wallpaper
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/bing-wallpaper` | Proxies Bing daily wallpaper, returns 302 redirect to image URL |
-
-## Accounts
+## Analytics commands and collector
 
 | Method | Path | Description |
-|--------|------|-------------|
-| GET | `/accounts` | List all accounts + overview stats |
-| GET | `/accounts/:id` | Get account (without auth_token) + latest stats |
-| POST | `/accounts` | Create account `{ screenName, authToken, fetchInterval, platform?, instanceUrl?, authType? }` |
-| PUT | `/accounts/:id` | Update account fields |
-| DELETE | `/accounts/:id` | Delete account + all related data (requires `{ confirmToken }`) |
-| GET | `/accounts/:id` response includes `recentFetchRuns[]` | Latest attempt status, trigger, timing, errors, and capability gaps |
+|---|---|---|
+| POST | `/analytics/sites` | Create `{ name, host }`; the authenticated user is the owner and the server generates the site key |
+| PUT | `/analytics/sites/:id` | Rename site with `{ name }`; ownership is checked, and host/key remain immutable |
+| POST | `/a/e` | Public event collector; validates registered site, configured host, and request Origin |
+| OPTIONS | `/a/e` | Collector CORS preflight |
 
-## Web Analytics
+Analytics site lists, installation snippets, global and selected-site dashboards are GraphQL reads. The browser tracker sends only allow-listed UTM source, medium, and campaign values, never the full query string. UTM values are persisted on entry events only. See [GraphQL Query Layer](GRAPHQL.md) for time range, timezone, and aggregation semantics.
 
-### GraphQL query endpoint
-
-`GET` and `POST /graphql` (under the `/api` base path) provide an authenticated, query-only GraphQL view over analytics sites, compatibility traffic and visit-entry acquisition, and the ranged dashboard read model. `analytics.dashboard` accepts only `DAYS_7`, `DAYS_30`, or `DAYS_90`, and returns the selected local-calendar range plus the preceding equal-length range. Its `overview.visitorDays` sums daily visitor markers; it is not a range-unique visitor count. Dashboard campaign attribution groups explicit `utm_source`, `utm_medium`, and `utm_campaign` values on visit-entry events within the selected range; it does not infer values from referrers. The tracker never sends the full query string and persists these UTM values only on entry events. The endpoint requires the existing session cookie; unauthenticated requests receive `401`. Analytics fields delegate ownership and timezone validation to the existing service. GraphiQL is available only in development, batching is disabled, and mutations/subscriptions are not defined. Existing REST endpoints below remain supported. REST `traffic.dimensions.referrers` remains a views-based dimension; visit-based referrers and entry pages are available through `analytics.acquisition` and the dashboard field. See [GraphQL Query Layer](GRAPHQL.md) for schema and examples.
+## GitHub, GitLab, and Reddit commands
 
 | Method | Path | Description |
-|--------|------|-------------|
-| GET | `/analytics/sites` | List sites owned by the current user; admins see all sites |
-| POST | `/analytics/sites` | Create `{ name, host }`; ownership is assigned from the session and the server generates a globally unique Site ID |
-| GET | `/analytics/sites/:id/traffic?timezone=Asia%2FTokyo` | Get the selected site's current and previous six local calendar days: overview totals, a zero-filled daily timeline, and top 10 paths by views. Timezone defaults to UTC; only its owner or an admin can access it |
-| GET | `/analytics/sites/:id/installation` | Get the tracker URL and escaped installation snippet; only the site's owner or an admin can access it (`503 public_origin_not_configured` when no public origin is configured) |
+|---|---|---|
+| PUT | `/github/repos/pin` | Set pinned repositories with `{ accountId, repoIds }` |
+| PUT | `/github/watchlist/:accountId` | Save watchlist organization and repository selections |
+| PUT | `/gitlab/projects/pin` | Set pinned projects with `{ accountId, projectIds }` |
+| GET | `/reddit/callback` | Public OAuth callback; completes flow and redirects to `/accounts` |
 
-The traffic response contains `period: { days: 7, timezone }`, `overview: { views, visitors, visits }`, seven ascending `timeline` points (`{ date, views, visitors, visits }`), `topPages` entries containing only `{ path, views }`, and `dimensions` arrays: `referrers` (`{ referrer, views }`), `countries` (`{ country, views }`), `browsers` (`{ browser, views }`), `operatingSystems` (`{ os, views }`), and `devices` (`{ device, views }`). `dimensions.countries` returns all country groups in the 7-day period, ranked by views descending and country code ascending for ties. Top Pages and all other dimension arrays return up to 10 groups, ranked by views descending and their raw dimension value ascending for ties. Dimension counts are views only; the empty referrer value is retained for direct traffic. The reporting window is today plus the previous six calendar days in the supplied IANA timezone, with inclusive local midnight start and exclusive next-day midnight end. Invalid timezones return `400`; missing sites return `404`, foreign sites return `403`, and database failures return a generic `503`.
+Platform list, account, repository/project, and Reddit detail reads use the GraphQL Query Plane. Repository/project reads are page-sized, range-limited, and viewer-scoped. Pin and watchlist writes remain REST commands.
 
-The browser tracker posts events to public `POST /a/e` (with `OPTIONS /a/e` for CORS). This endpoint does not use a dashboard session; it validates the registered site key, configured host, and request Origin before storing an event. The tracker sends only the allow-listed `utm_source`, `utm_medium`, and `utm_campaign` values; it does not send the full query string or other query parameters. The collector stores normalized UTM attribution only for `visit = true` entry events.
-
-## Fetch API
+## App Store Connect commands
 
 | Method | Path | Description |
-|--------|------|-------------|
-| POST | `/fetch/:id` | Trigger an immediate fetch for a specific account |
+|---|---|---|
+| POST | `/app-store/connections` | Create a connection |
+| PUT | `/app-store/connections/:id` | Update connection settings |
+| DELETE | `/app-store/connections/:id` | Delete connection; requires `{ confirmToken }` |
+| POST | `/app-store/connections/:id/refresh` | Refresh app metadata |
+| PUT | `/app-store/connections/:id/apps/:appId` | Enable or disable an app |
+| POST | `/app-store/connections/:id/analytics` | Set up analytics |
+| POST | `/app-store/connections/:id/analytics/sync` | Sync analytics |
+| POST | `/app-store/connections/:id/revenue/sync` | Sync revenue sources for the requested date/region |
+| POST | `/app-store/connections/:id/backfill` | Backfill analytics or revenue reports |
 
-## Fetch Health
+Connection lists/details, apps, health, analytics status, Analytics reports, and Revenue reports are GraphQL reads. GraphQL only exposes `privateKeyConfigured`; raw private keys never leave the server.
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/fetch-health` | Supported-account health, summary counts, recent runs, failure streaks, next-due times, capability gaps, and separately reported unsupported accounts |
+## Settings, administration, AI, and infrastructure
 
-## Business Pulse
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| PUT | `/settings` | admin | Update AI settings; API keys remain masked in reads |
+| POST | `/users` | admin | Create user |
+| DELETE | `/users/:id` | admin | Delete user; requires `{ confirmToken }` |
+| POST | `/ai/chat` | session | AI chat streaming response |
+| GET | `/health` | public | Server health check |
+| GET | `/bing-wallpaper` | public | Redirect to upstream daily wallpaper |
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/pulse?days=7\|30\|90` | Cross-platform summary for the selected window (maximum 365 days) |
-
-The response contains the time range, aggregate activity and repository-traction deltas, per-platform follower/karma summaries, top tweets and Reddit content, and repositories/projects with the largest star movement. Audience deltas are calculated only when both current and previous window samples exist for an account; platform-native audience metrics are not added into a single cross-platform total.
-
-## Top Content
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/top-content?days=7\|30\|90` | Unified content leaderboard for the selected window (maximum 365 days) |
-
-Returns tweets, Reddit posts/comments, releases, and repository growth items ranked by each platform's primary native metric (engagement, score, or downloads). Repository items include a growth rate when snapshot baselines exist; content without baseline history reports `growthRate: null`. Metrics are not normalized across platforms.
-
-## X (Twitter)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/stats/overview` | Aggregated tweet stats (totals, today, followers) |
-| GET | `/tweets?page=&limit=&sort=&order=&search=&accountIds=` | Paginated tweets with search/sort/account filter |
-| GET | `/tweets/:id` | Single tweet |
-| GET | `/stats/timeline?days=` | Daily tweet counts + follower growth |
-| GET | `/stats/top?metric=&limit=10` | Top tweets by metric (favorite_count, retweet_count, etc.) |
-| GET | `/stats/calendar?year=` | Tweet calendar heatmap data |
-
-## GitHub
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/github/overview/:accountId` | Profile stats + repos + languages + top repos |
-| GET | `/github/timeline/:accountId` | Follower/repo count over time |
-| GET | `/github/contributions/:accountId?year=` | Contribution calendar |
-| GET | `/github/:accountId/repos/:repoId/snapshots` | Star/fork/open_issues snapshots |
-| GET | `/github/:accountId/repos/:repoId/clones` | Daily clone counts |
-| GET | `/github/:accountId/repos/:repoId/views` | Daily page views |
-| GET | `/github/:accountId/repos/:repoId/referrers` | Top referring sites |
-| GET | `/github/:accountId/repos/:repoId/referrers/history` | Referrer history over time |
-| GET | `/github/:accountId/repos/:repoId/paths` | Popular content paths |
-| GET | `/github/:accountId/repos/:repoId/paths/history` | Path history over time |
-| GET | `/github/:accountId/repos/:repoId/releases` | Releases with download stats |
-| GET | `/github/:accountId/repos/:repoId/releases/:releaseId/assets` | Release asset download counts |
-| GET | `/github/:accountId/repos/:repoId/releases/growth?days=7\|14\|30` | Per-asset download growth rate (downloads/day) over a time window |
-| PUT | `/github/repos/pin` | Set pinned repos `{ accountId, repoIds }` |
-
-## GitLab
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/gitlab/overview/:accountId` | Profile stats + projects |
-| GET | `/gitlab/timeline/:accountId` | Follower/project count over time |
-| GET | `/gitlab/contributions/:accountId?year=` | Contribution calendar |
-| GET | `/gitlab/:accountId/projects/:projectId/snapshots` | Star/fork snapshots |
-| GET | `/gitlab/:accountId/projects/:projectId/releases` | Releases with download stats |
-| PUT | `/gitlab/projects/pin` | Set pinned projects `{ accountId, projectIds }` |
-
-## Reddit
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/reddit/overview/:accountId` | Karma stats + post/comment counts + top posts |
-| GET | `/reddit/timeline/:accountId` | Karma timeline (post + comment karma) |
-| GET | `/reddit/posts/:accountId?page=&limit=&sort=` | Paginated posts |
-| GET | `/reddit/comments/:accountId?page=&limit=` | Paginated comments |
-| GET | `/reddit/activity/:accountId` | Daily post + comment activity counts |
-| GET | `/reddit/subreddits/:accountId` | Subreddit distribution |
-| GET | `/reddit/callback` | Reddit OAuth callback — completes the OAuth flow, then redirects to `/accounts` |
+Settings, admin user metadata, and AI quota/status use GraphQL. AI chat remains a streaming REST response. GraphiQL is enabled only outside production and request batching is disabled.

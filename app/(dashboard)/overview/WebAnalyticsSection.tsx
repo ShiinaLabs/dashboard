@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -10,8 +10,8 @@ import { MetricGrid } from "@/components/domain/shared/MetricGrid";
 import { SectionShell } from "@/components/domain/shared/SectionShell";
 import { TimeRangeSelector } from "@/components/TimeRangeSelector";
 import { compareAnalyticsPeriod } from "@/lib/client/analytics-comparison";
-import { getAnalyticsPortfolio, type AnalyticsRange } from "@/lib/client/analytics-graphql";
-import { getTimezone } from "@/lib/client/datetime";
+import { getOverviewAnalyticsPortfolio } from "@/lib/client/graphql/overview";
+import type { AnalyticsPortfolio, AnalyticsRange } from "@/lib/client/analytics-graphql";
 
 const TIME_OPTIONS = [
   { value: 7, labelKey: "overview.webAnalytics.range7d" },
@@ -25,16 +25,19 @@ function analyticsRange(days: number): AnalyticsRange {
   return "DAYS_7";
 }
 
-export function WebAnalyticsSection() {
+export function WebAnalyticsSection({ initialData }: { initialData: AnalyticsPortfolio }) {
   const { t, i18n } = useTranslation();
   const [days, setDays] = useState(7);
-  const timezone = useSyncExternalStore(() => () => {}, getTimezone, () => null);
   const range = analyticsRange(days);
-  const { data, isPending, isError } = useQuery({
-    queryKey: ["analytics", "portfolio", range, timezone],
-    queryFn: () => getAnalyticsPortfolio(range, timezone!),
-    enabled: Boolean(timezone),
+  const query = useQuery({
+    queryKey: ["overview-analytics-portfolio", range, initialData.period.timezone],
+    queryFn: ({ signal }) => getOverviewAnalyticsPortfolio(range, initialData.period.timezone, signal),
+    enabled: days !== 7,
+    staleTime: 5 * 60_000,
   });
+  const data = days === 7 ? initialData : query.data;
+  const isPending = days !== 7 && query.isPending;
+  const isError = days !== 7 && query.isError;
   const number = new Intl.NumberFormat(i18n.resolvedLanguage ?? i18n.language);
 
   function comparison(current: number, previous: number): string {

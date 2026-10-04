@@ -2,18 +2,15 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 describe("Web Analytics boundaries", () => {
-  it("keeps sites and traffic routes on the service", () => {
-    const listRoute = readFileSync("app/api/analytics/sites/route.ts", "utf8");
-    const trafficRoute = readFileSync("app/api/analytics/sites/[id]/traffic/route.ts", "utf8");
-    const installationRoute = readFileSync("app/api/analytics/sites/[id]/installation/route.ts", "utf8");
+  it("keeps analytics reads on the page query plane and commands on REST", () => {
+    const sitesRoute = readFileSync("app/api/analytics/sites/route.ts", "utf8");
+    const routes = readFileSync("app/routes.ts", "utf8");
     const eventRoute = readFileSync("app/a/e/route.ts", "utf8");
     const service = readFileSync("lib/services/analytics.ts", "utf8");
-    for (const route of [listRoute, trafficRoute, installationRoute]) {
-      expect(route).toContain("@/lib/services/analytics");
-      expect(route).not.toMatch(/repositories\/analytics-sites|cloudflare-analytics|@\/db\/schema/);
-    }
-    expect(trafficRoute).toContain("getAnalyticsTrafficForSite");
-    expect(trafficRoute).not.toMatch(/repositories\/|@\/db\/|drizzle-orm|from ["']pg["']/);
+    expect(sitesRoute).toContain("createAnalyticsSite");
+    expect(sitesRoute).not.toContain("export async function loader");
+    expect(routes).not.toContain('"api/analytics/sites/:id/traffic"');
+    expect(routes).not.toContain('"api/analytics/sites/:id/installation"');
     expect(service).toContain("getAnalyticsTrafficReport");
     expect(service).toContain("../repositories/analytics-sites");
     expect(service).not.toMatch(/from ["']react-router|@\/lib\/api-server|\bRequest\b|\bResponse\b/);
@@ -38,18 +35,15 @@ describe("Web Analytics boundaries", () => {
     expect(page).not.toMatch(/\bfetch\s*\(/);
     expect(page).not.toMatch(/fetch\s*\(\s*[`"']\/api\/graphql/);
     expect(client).toContain('"/analytics/sites"');
-    expect(client).toContain("AnalyticsTrafficDimensions");
-    expect(client).toContain("operatingSystems: AnalyticsOperatingSystemDimension[]");
     const graphqlClient = readFileSync("lib/client/analytics-graphql.ts", "utf8");
     expect(graphqlClient).toContain("graphqlRequest<");
     expect(graphqlClient).toContain("export async function getAnalyticsPage(");
     expect(graphqlClient).toContain("sites { id name siteKey host createdAt updatedAt }");
     expect(graphqlClient).toContain("installation(siteId: $siteId) @include(if: $showSite)");
-    expect(graphqlClient).toContain("export async function getAnalyticsDashboard");
     expect(graphqlClient).toContain("previousOverview { views visits visitorDays }");
     expect(graphqlClient).toContain("timeline { date views visitors visits }");
-    expect(graphqlClient).toContain("export async function getAnalyticsGlobalDashboard(");
     expect(graphqlClient).toContain("globalDashboard(range: $range, timezone: $timezone)");
+    expect(graphqlClient).not.toContain("query AnalyticsAcquisition(");
   });
 
   it("keeps the global dashboard as one owner-scoped SQL read without visitor or path aggregates", () => {

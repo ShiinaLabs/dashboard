@@ -5,7 +5,8 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Group, Stack, Text } from "@/components/ui/layout-primitives";
-import { api, type GitlabOverview, type GitlabContribution, type GitlabProject } from "@/lib/api";
+import { api, type GitlabContribution, type GitlabProject } from "@/lib/api";
+import { getGitlabAccountPage } from "@/lib/client/graphql/platform-dashboards";
 import { formatDateTime } from "@/lib/client/datetime";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -112,7 +113,7 @@ export default function GitLabDetail() {
 
   const handlePinSave = async () => {
     await api.setPinnedGitlabProjects(accountId, [...pinnedIds]);
-    queryClient.invalidateQueries({ queryKey: ["gitlab", "overview", accountId] });
+    queryClient.invalidateQueries({ queryKey: ["gitlab-account-page", accountId] });
     setShowPinDialog(false);
   };
 
@@ -126,26 +127,17 @@ export default function GitLabDetail() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [showPinDialog]);
 
-  const { data: account, isLoading: accountLoading } = useQuery({
-    queryKey: ["account", accountId],
-    queryFn: () => api.getAccount(accountId),
-    enabled: !!accountId,
+  const { data: page, isLoading: accountLoading } = useQuery({
+    queryKey: ["gitlab-account-page", accountId], queryFn: ({ signal }) => getGitlabAccountPage(accountId, signal),
+    enabled: Number.isInteger(accountId) && accountId > 0, staleTime: 60_000,
   });
+  const account = page?.account;
+  const overview = page?.overview;
+  const contributions = page?.contributions;
 
   useEntityTitle(account ? account.screen_name : null);
 
-  const { data: overview, isLoading: overviewLoading } = useQuery<GitlabOverview>({
-    queryKey: ["gitlab", "overview", accountId],
-    queryFn: () => api.getGitlabOverview(accountId!),
-    enabled: !!accountId,
-    refetchInterval: 3 * 60_000,
-  });
-
-  const { data: contributions } = useQuery<GitlabContribution[]>({
-    queryKey: ["gitlab", "contributions", accountId],
-    queryFn: () => api.getGitlabContributions(accountId!),
-    enabled: !!accountId,
-  });
+  const overviewLoading = accountLoading;
 
   const deleteMutation = useMutation({
     mutationFn: ({ token }: { token: string }) => api.deleteAccount(accountId, token),

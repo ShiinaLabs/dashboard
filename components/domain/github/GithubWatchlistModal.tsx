@@ -13,6 +13,7 @@ import type {
   GithubWatchlistSource,
 } from "@/lib/api";
 import { api } from "@/lib/api";
+import { getGithubWatchlistManager } from "@/lib/client/graphql/github";
 
 export interface GithubWatchlistViewProps {
   candidates: GithubWatchlistCandidate[];
@@ -289,29 +290,25 @@ export function GithubWatchlistModal({ accountId, opened, onClose }: { accountId
   const { t } = useTranslation();
   const enabled = opened && Number.isFinite(accountId);
 
-  const watchlist = useQuery({
-    queryKey: ["github", "watchlist", accountId],
-    queryFn: () => api.getGithubWatchlist(accountId),
+  const manager = useQuery({
+    queryKey: ["github-watchlist-manager", accountId],
+    queryFn: ({ signal }) => getGithubWatchlistManager(accountId, signal),
     enabled,
-  });
-  const available = useQuery({
-    queryKey: ["github", "watchlist", accountId, "available"],
-    queryFn: () => api.getGithubAvailableOrgs(accountId),
-    enabled,
+    staleTime: 30_000,
   });
 
   // Mount the dialog only on data fetched during THIS open session, so its
   // initial state reflects the server rather than a stale cache.
-  const ready = enabled && watchlist.data !== undefined && watchlist.isFetchedAfterMount;
+  const ready = enabled && manager.data !== undefined && manager.isFetchedAfterMount;
 
   return (
     <Modal opened={opened} onClose={onClose} title={t("githubWatchlist.title")} size="lg">
       {ready ? (
         <GithubWatchlistDialog
           accountId={accountId}
-          data={watchlist.data}
-          available={available.data ?? null}
-          availableLoading={available.isLoading}
+          data={manager.data.watchlist}
+          available={{ orgs: manager.data.availableOrganizations, unavailable: manager.data.unavailable }}
+          availableLoading={manager.isLoading}
           onClose={onClose}
         />
       ) : (

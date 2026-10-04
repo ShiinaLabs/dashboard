@@ -1,5 +1,5 @@
 import { json } from "@/lib/api-server";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
 import { requireSession, authorizeAccountOwner } from "@/lib/auth-helpers";
 import { getAccountByIdWithCredential } from "@/lib/services/accounts";
 import { GithubWatchlistService } from "@/lib/services/github-watchlist";
@@ -30,16 +30,6 @@ async function resolve(req: Request, params: Record<string, string>) {
   return { account: credential };
 }
 
-async function GET(req: Request, params: Record<string, string>) {
-  const resolved = await resolve(req, params);
-  if (resolved.error) return resolved.error;
-  try {
-    return json(await new GithubWatchlistService().get(resolved.account!));
-  } catch (error) {
-    return json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 });
-  }
-}
-
 async function PUT(req: Request, params: Record<string, string>) {
   const resolved = await resolve(req, params);
   if (resolved.error) return resolved.error;
@@ -58,11 +48,6 @@ async function PUT(req: Request, params: Record<string, string>) {
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
   }
-}
-
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  if (request.method !== "GET") return json({ error: "Method not allowed" }, { status: 405 });
-  return GET(request, params as Record<string, string>);
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {

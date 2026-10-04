@@ -1,22 +1,8 @@
 import { json } from "@/lib/api-server";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { getAccountById, getAccountDetails, updateAccountFromInput, deleteAccount, InvalidAccountInputError } from "@/lib/services/accounts";
+import type { ActionFunctionArgs } from "react-router";
+import { getAccountById, updateAccountFromInput, deleteAccount, InvalidAccountInputError } from "@/lib/services/accounts";
 import { validateConfirmToken } from "@/lib/confirm-helpers";
 import { requireSession, authorizeAccountOwner } from "@/lib/auth-helpers";
-
-async function GET(req: Request, params: Record<string, string>) {
-  const auth = await requireSession(req);
-  if (!auth) return json({ error: "Unauthorized" }, { status: 401 });
-
-  const { id } = params;
-  const { authorized, account } = await authorizeAccountOwner(auth.user, Number(id));
-  if (!account) return json({ error: "Not found" }, { status: 404 });
-  if (!authorized) return json({ error: "Forbidden" }, { status: 403 });
-
-  const details = await getAccountDetails(account.id);
-  if (!details) return json({ error: "Not found" }, { status: 404 });
-  return json(details);
-}
 
 async function PUT(req: Request, params: Record<string, string>) {
   const auth = await requireSession(req);
@@ -65,10 +51,6 @@ async function DELETE(req: Request, params: Record<string, string>) {
   return json({ success: true });
 }
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  if (request.method !== "GET") return json({ error: "Method not allowed" }, { status: 405 });
-  return GET(request, params as Record<string, string>);
-}
 export async function action({ request, params }: ActionFunctionArgs) {
   switch (request.method) {
     case "PUT": return PUT(request, params as Record<string, string>);

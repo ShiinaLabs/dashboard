@@ -24,7 +24,7 @@ const { pulseResponse } = vi.hoisted(() => ({
 }));
 
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: pulseResponse, isLoading: false, isError: false }),
+    useQuery: () => ({ data: undefined, isPending: true, isError: false }),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -40,7 +40,7 @@ describe("PulseSection domain", () => {
   });
 
   it("shows GitHub traction values in previous-to-current order", () => {
-    const html = renderToStaticMarkup(<PulseSection />);
+    const html = renderToStaticMarkup(<PulseSection initialData={pulseResponse} />);
 
     expect(html).not.toContain("187 → 182");
     expect(html).toContain("182 → 187");

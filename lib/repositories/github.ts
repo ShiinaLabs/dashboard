@@ -46,6 +46,66 @@ export async function getGithubOverview(accountId: number) {
   return { stats: latest, repos, allRepos, totalStars, totalForks, totalRepos: allRepos.length, languages, topRepos };
 }
 
+/** Bulk, UI-sized summary for Overview. Deliberately omits repository bodies and topics. */
+export async function getGithubOverviewSummary(accountIds: number[]) {
+  if (accountIds.length === 0) return { followers: 0, repositoryCount: 0, stars: 0, forks: 0, pinnedRepositories: [] };
+  if (isMockMode()) {
+    const overview = mock.githubOverview;
+    return {
+      followers: Number(overview.stats?.followers ?? 0) * accountIds.length,
+      repositoryCount: overview.totalRepos * accountIds.length,
+      stars: overview.totalStars * accountIds.length,
+      forks: overview.totalForks * accountIds.length,
+      pinnedRepositories: accountIds.flatMap((accountId) => overview.allRepos.filter((repo) => repo.pinned).map((repo) => ({ ...repo, account_id: accountId }))).slice(0, 50),
+    };
+  }
+
+  const db = getDb();
+  const [statsResult, repositoryResult] = await Promise.all([
+    db.execute<{ followers: number }>(sql`SELECT COALESCE(SUM(followers), 0)::int AS followers FROM (
+      SELECT DISTINCT ON (account_id) account_id, followers
+      FROM ${github_stats}
+      WHERE account_id IN (${sql.join(accountIds.map((id) => sql`${id}`), sql`, `)})
+      ORDER BY account_id, recorded_at DESC
+    ) latest`),
+    (async () => {
+      try {
+        const [tracked, trackedAccounts] = await Promise.all([
+          db.select({ account_id: github_repository_tracking.account_id, repo_id: github_repos.repo_id, id: github_repos.id,
+            name: github_repos.name, language: github_repos.language, stars: github_repos.stars, forks: github_repos.forks,
+            pinned: github_repository_tracking.pinned })
+            .from(github_repository_tracking)
+            .innerJoin(github_repos, eq(github_repository_tracking.repository_id, github_repos.id))
+            .where(and(inArray(github_repository_tracking.account_id, accountIds), eq(github_repository_tracking.enabled, 1)))
+            .orderBy(desc(github_repos.stars)),
+          db.selectDistinct({ account_id: github_repository_tracking.account_id }).from(github_repository_tracking)
+            .where(inArray(github_repository_tracking.account_id, accountIds)),
+        ]);
+        const trackedIds = new Set(trackedAccounts.map((row) => row.account_id));
+        const legacyIds = accountIds.filter((id) => !trackedIds.has(id));
+        const legacy = legacyIds.length ? await db.select({ account_id: github_repos.account_id, repo_id: github_repos.repo_id,
+          id: github_repos.id, name: github_repos.name, language: github_repos.language, stars: github_repos.stars,
+          forks: github_repos.forks, pinned: github_repos.pinned }).from(github_repos)
+          .where(inArray(github_repos.account_id, legacyIds)).orderBy(desc(github_repos.stars)) : [];
+        return [...tracked, ...legacy];
+      } catch {
+        return db.select({ account_id: github_repos.account_id, repo_id: github_repos.repo_id, id: github_repos.id,
+          name: github_repos.name, language: github_repos.language, stars: github_repos.stars, forks: github_repos.forks,
+          pinned: github_repos.pinned }).from(github_repos).where(inArray(github_repos.account_id, accountIds))
+          .orderBy(desc(github_repos.stars));
+      }
+    })(),
+  ]);
+  const repositories = repositoryResult;
+  return {
+    followers: Number(statsResult.rows[0]?.followers ?? 0),
+    repositoryCount: repositories.length,
+    stars: repositories.reduce((total, repo) => total + Number(repo.stars ?? 0), 0),
+    forks: repositories.reduce((total, repo) => total + Number(repo.forks ?? 0), 0),
+    pinnedRepositories: repositories.filter((repo) => Boolean(repo.pinned)).slice(0, 50),
+  };
+}
+
 export async function getGithubTimeline(accountId: number, days = 30) {
   if (isMockMode()) return mock.githubTimeline;
   const since = new Date(); since.setDate(since.getDate() - days);

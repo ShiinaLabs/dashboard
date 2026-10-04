@@ -2,13 +2,11 @@ import { createGraphQLError } from "graphql-yoga";
 import { getOwnerId } from "@/lib/auth-helpers";
 import {
   AnalyticsSiteError,
-  getAnalyticsAcquisitionForSite,
   getAnalyticsDashboardForSite,
   getAnalyticsGlobalDashboard,
   getAnalyticsPortfolio,
   getAnalyticsSites,
   getAnalyticsInstallationForSite,
-  getAnalyticsTrafficForSite,
   type AnalyticsSite,
 } from "@/lib/services/analytics";
 import type { GraphQLContext } from "./context";
@@ -21,8 +19,6 @@ export const analyticsTypeDefs = /* GraphQL */ `
   type AnalyticsQuery {
     sites: [AnalyticsSite!]!
     installation(siteId: Int!): AnalyticsInstallation!
-    traffic(siteId: Int!, timezone: String = "UTC"): AnalyticsTraffic!
-    acquisition(siteId: Int!, timezone: String = "UTC"): AnalyticsAcquisition!
     dashboard(siteId: Int!, range: AnalyticsRange = DAYS_7, timezone: String = "UTC"): AnalyticsDashboard!
     globalDashboard(range: AnalyticsRange = DAYS_7, timezone: String = "UTC"): AnalyticsGlobalDashboard!
     portfolio(range: AnalyticsRange = DAYS_7, timezone: String = "UTC"): AnalyticsPortfolio!
@@ -40,29 +36,6 @@ export const analyticsTypeDefs = /* GraphQL */ `
   }
 
   type AnalyticsInstallation { trackerUrl: String! snippet: String! }
-
-  type AnalyticsPeriod {
-    days: Int!
-    timezone: String!
-  }
-
-  type AnalyticsTrafficOverview {
-    views: Int!
-    visitors: Int!
-    visits: Int!
-  }
-
-  type AnalyticsTrafficPoint {
-    date: String!
-    views: Int!
-    visitors: Int!
-    visits: Int!
-  }
-
-  type AnalyticsTopPage {
-    path: String!
-    views: Int!
-  }
 
   type AnalyticsCountryDimension {
     country: String!
@@ -84,27 +57,6 @@ export const analyticsTypeDefs = /* GraphQL */ `
     views: Int!
   }
 
-  type AnalyticsReferrerDimension {
-    referrer: String!
-    views: Int!
-  }
-
-  type AnalyticsTrafficDimensions {
-    referrers: [AnalyticsReferrerDimension!]!
-    countries: [AnalyticsCountryDimension!]!
-    browsers: [AnalyticsBrowserDimension!]!
-    operatingSystems: [AnalyticsOperatingSystemDimension!]!
-    devices: [AnalyticsDeviceDimension!]!
-  }
-
-  type AnalyticsTraffic {
-    period: AnalyticsPeriod!
-    overview: AnalyticsTrafficOverview!
-    timeline: [AnalyticsTrafficPoint!]!
-    topPages: [AnalyticsTopPage!]!
-    dimensions: AnalyticsTrafficDimensions!
-  }
-
   type AnalyticsAcquisitionReferrer {
     referrer: String!
     visits: Int!
@@ -120,13 +72,6 @@ export const analyticsTypeDefs = /* GraphQL */ `
     medium: String!
     campaign: String!
     visits: Int!
-  }
-
-  type AnalyticsAcquisition {
-    period: AnalyticsPeriod!
-    totalVisits: Int!
-    referrers: [AnalyticsAcquisitionReferrer!]!
-    entryPages: [AnalyticsEntryPage!]!
   }
 
   type AnalyticsDashboardPeriod {
@@ -147,6 +92,18 @@ export const analyticsTypeDefs = /* GraphQL */ `
     browsers: [AnalyticsBrowserDimension!]!
     operatingSystems: [AnalyticsOperatingSystemDimension!]!
     devices: [AnalyticsDeviceDimension!]!
+  }
+
+  type AnalyticsTrafficPoint {
+    date: String!
+    views: Int!
+    visitors: Int!
+    visits: Int!
+  }
+
+  type AnalyticsTopPage {
+    path: String!
+    views: Int!
   }
 
   type AnalyticsAcquisitionSummary {
@@ -258,8 +215,6 @@ interface AnalyticsSiteGraphQL {
   updatedAt: string;
 }
 
-type AnalyticsTrafficReport = Awaited<ReturnType<typeof getAnalyticsTrafficForSite>>;
-type AnalyticsAcquisitionReport = Awaited<ReturnType<typeof getAnalyticsAcquisitionForSite>>;
 type AnalyticsDashboardReport = Awaited<ReturnType<typeof getAnalyticsDashboardForSite>>;
 type AnalyticsPortfolioReport = Awaited<ReturnType<typeof getAnalyticsPortfolio>>;
 type AnalyticsGlobalDashboardReport = Awaited<ReturnType<typeof getAnalyticsGlobalDashboard>>;
@@ -321,24 +276,6 @@ export const analyticsResolvers = {
     },
     installation: async (_parent: unknown, args: { siteId: number }, context: GraphQLContext) =>
       mapServiceError(() => getAnalyticsInstallationForSite(args.siteId, { id: context.user.id, role: context.user.role })),
-    traffic: async (
-      _parent: unknown,
-      args: { siteId: number; timezone: string },
-      context: GraphQLContext,
-    ): Promise<AnalyticsTrafficReport> => mapServiceError(() => getAnalyticsTrafficForSite(
-      args.siteId,
-      { id: context.user.id, role: context.user.role },
-      args.timezone,
-    )),
-    acquisition: async (
-      _parent: unknown,
-      args: { siteId: number; timezone: string },
-      context: GraphQLContext,
-    ): Promise<AnalyticsAcquisitionReport> => mapServiceError(() => getAnalyticsAcquisitionForSite(
-      args.siteId,
-      { id: context.user.id, role: context.user.role },
-      args.timezone,
-    )),
     dashboard: async (
       _parent: unknown,
       args: { siteId: number; range: "DAYS_7" | "DAYS_30" | "DAYS_90"; timezone: string },

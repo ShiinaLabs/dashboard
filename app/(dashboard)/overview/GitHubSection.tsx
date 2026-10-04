@@ -22,7 +22,7 @@ interface RepoLike {
 }
 
 interface Props {
-  ghAllRepos: RepoLike[];
+  ghRepoCount: number;
   ghPinned: RepoLike[];
   ghTotalStars: number;
   ghTotalForks: number;
@@ -30,7 +30,7 @@ interface Props {
   ghAccounts: Account[];
 }
 
-export function GitHubSection({ ghAllRepos, ghPinned, ghTotalStars, ghTotalForks, ghFollowers, ghAccounts }: Props) {
+export function GitHubSection({ ghRepoCount, ghPinned, ghTotalStars, ghTotalForks, ghFollowers, ghAccounts }: Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
@@ -39,7 +39,7 @@ export function GitHubSection({ ghAllRepos, ghPinned, ghTotalStars, ghTotalForks
   return (
     <SectionShell icon={<GithubIcon />} title={t("overview.githubHeading")}>
       <MetricGrid>
-        <MetricCard label={t("overview.stats.repos")} value={ghAllRepos.length} icon={<GithubIcon />} />
+        <MetricCard label={t("overview.stats.repos")} value={ghRepoCount} icon={<GithubIcon />} />
         <MetricCard label={t("overview.stats.totalStars")} value={ghTotalStars} icon={<Star size={16} />} />
         <MetricCard label={t("overview.stats.totalForks")} value={ghTotalForks} icon={<GitFork size={16} />} />
         <MetricCard label={t("overview.stats.followers")} value={ghFollowers} icon={<TrendingUp size={16} />} />

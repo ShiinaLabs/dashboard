@@ -4,7 +4,9 @@ import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Group, Stack, Text } from "@/components/ui/layout-primitives";
-import { api, type RedditOverview, type RedditPost, type RedditComment } from "@/lib/api";
+import { api } from "@/lib/api";
+import { getRedditAccountPage } from "@/lib/client/graphql/platform-dashboards";
+import type { RedditPost, RedditComment } from "@/shared/types";
 import { formatDateTime, formatDate } from "@/lib/client/datetime";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -41,50 +43,22 @@ export default function RedditDetail() {
   const accountId = Number(id);
   const [days, setDays] = useState(30);
 
-  const { data: account, isLoading: accountLoading } = useQuery({
-    queryKey: ["account", accountId],
-    queryFn: () => api.getAccount(accountId),
-    enabled: !!accountId,
+  const { data: page, isLoading: accountLoading } = useQuery({
+    queryKey: ["reddit-account-page", accountId, days],
+    queryFn: ({ signal }) => getRedditAccountPage(accountId, days, signal),
+    enabled: Number.isInteger(accountId) && accountId > 0, staleTime: 60_000,
   });
+  const account = page?.account;
+  const overview = page?.overview;
+  const postsData = page?.posts;
+  const commentsData = page?.comments;
+  const timeline = page?.timeline;
+  const activity = page?.activity;
+  const subreddits = page?.subreddits;
 
   useEntityTitle(account ? account.screen_name : null);
 
-  const { data: overview, isLoading: overviewLoading } = useQuery<RedditOverview>({
-    queryKey: ["reddit", "overview", accountId],
-    queryFn: () => api.getRedditOverview(accountId!),
-    enabled: !!accountId,
-    refetchInterval: 3 * 60_000,
-  });
-
-  const { data: postsData } = useQuery({
-    queryKey: ["reddit", "posts", accountId, 1],
-    queryFn: () => api.getRedditPosts(accountId!, 1, 50, "score"),
-    enabled: !!accountId,
-  });
-
-  const { data: commentsData } = useQuery({
-    queryKey: ["reddit", "comments", accountId, 1],
-    queryFn: () => api.getRedditComments(accountId!, 1, 50),
-    enabled: !!accountId,
-  });
-
-  const { data: timeline } = useQuery({
-    queryKey: ["reddit", "timeline", accountId, days],
-    queryFn: () => api.getRedditTimeline(accountId!, days),
-    enabled: !!accountId,
-  });
-
-  const { data: activity } = useQuery({
-    queryKey: ["reddit", "activity", accountId, days],
-    queryFn: () => api.getRedditActivity(accountId!, days),
-    enabled: !!accountId,
-  });
-
-  const { data: subreddits } = useQuery({
-    queryKey: ["reddit", "subreddits", accountId],
-    queryFn: () => api.getRedditSubreddits(accountId!),
-    enabled: !!accountId,
-  });
+  const overviewLoading = accountLoading;
 
   const deleteMutation = useMutation({
     mutationFn: ({ token }: { token: string }) => api.deleteAccount(accountId, token),

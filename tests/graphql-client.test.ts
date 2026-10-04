@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getAnalyticsAcquisition, getAnalyticsDashboard, getAnalyticsGlobalDashboard, getAnalyticsPortfolio } from "@/lib/client/analytics-graphql";
+import { getAnalyticsPage } from "@/lib/client/analytics-graphql";
 import { getAppStoreAnalyticsPage, getRevenuePage } from "@/lib/client/graphql/app-store";
 import { getXAccountPageQuery } from "@/lib/client/graphql/x";
 import { GraphQLRequestError, graphqlRequest } from "@/lib/client/graphql";
@@ -55,92 +55,26 @@ describe("GraphQL client helper", () => {
     expect(replace).toHaveBeenCalledWith("/login?from=%2Fanalytics");
   });
 
-  it("loads typed acquisition data through graphqlRequest and the GraphQL endpoint", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: { analytics: { acquisition: {
-      period: { days: 7, timezone: "Asia/Tokyo" },
-      totalVisits: 2,
-      referrers: [{ referrer: "", visits: 1 }, { referrer: "google.com", visits: 1 }],
-      entryPages: [{ path: "/", visits: 1 }, { path: "/landing", visits: 1 }],
-    } } } })));
-
-    await expect(getAnalyticsAcquisition(12, "Asia/Tokyo")).resolves.toEqual({
-      period: { days: 7, timezone: "Asia/Tokyo" },
-      totalVisits: 2,
-      referrers: [{ referrer: "", visits: 1 }, { referrer: "google.com", visits: 1 }],
-      entryPages: [{ path: "/", visits: 1 }, { path: "/landing", visits: 1 }],
-    });
-    const [url, init] = vi.mocked(fetch).mock.calls[0];
-    expect(url).toBe("/api/graphql");
-    expect(JSON.parse(String(init?.body))).toMatchObject({ variables: { siteId: 12, timezone: "Asia/Tokyo" } });
-    expect(JSON.parse(String(init?.body)).query).toContain("acquisition");
-  });
-
-  it("loads the complete ranged dashboard through one GraphQL request", async () => {
-    const dashboard = {
-      period: { days: 30, timezone: "Asia/Tokyo", startDate: "2026-08-31", endDate: "2026-09-29" },
-      previousPeriod: { days: 30, timezone: "Asia/Tokyo", startDate: "2026-08-01", endDate: "2026-08-30" },
-      overview: { views: 12, visits: 4, visitorDays: 8 },
-      previousOverview: { views: 10, visits: 3, visitorDays: 7 },
-      timeline: [], topPages: [],
-      dimensions: { countries: [], browsers: [], operatingSystems: [], devices: [] },
-      acquisition: { totalVisits: 4, referrers: [], entryPages: [], campaigns: [{ source: "newsletter", medium: "email", campaign: "launch", visits: 2 }] },
-    };
-    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: { analytics: { dashboard } } })));
-    await expect(getAnalyticsDashboard(12, "DAYS_30", "Asia/Tokyo")).resolves.toEqual(dashboard);
+  it("loads Analytics options, dashboard, and installation through one page operation", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: { analytics: {
+      sites: [{ id: 12, name: "Site", siteKey: "site_key", host: "site.example", createdAt: "2026-09-01", updatedAt: "2026-09-02" }],
+      globalDashboard: null,
+      dashboard: { overview: { views: 1 } },
+      installation: { trackerUrl: "https://example.test/a/t.js", snippet: "<script>" },
+    } } })));
+    const signal = new AbortController().signal;
+    const result = await getAnalyticsPage({ range: "DAYS_30", timezone: "Asia/Tokyo", siteId: 12, showGlobal: false, showSite: true }, signal);
+    expect(result.sites[0]).toMatchObject({ id: 12, site_key: "site_key" });
     expect(fetch).toHaveBeenCalledTimes(1);
     const [url, init] = vi.mocked(fetch).mock.calls[0];
     const body = JSON.parse(String(init?.body));
     expect(url).toBe("/api/graphql");
-    expect(body.variables).toEqual({ siteId: 12, range: "DAYS_30", timezone: "Asia/Tokyo" });
-    expect(body.query).toContain("previousOverview { views visits visitorDays }");
-    expect(body.query).toContain("dimensions {");
-    expect(body.query).toContain("acquisition {");
-    expect(body.query).toContain("campaigns { source medium campaign visits }");
-  });
-
-  it("loads portfolio summaries and all sites through one GraphQL request", async () => {
-    const portfolio = {
-      period: { days: 30, timezone: "Asia/Tokyo", startDate: "2026-09-01", endDate: "2026-09-30" },
-      previousPeriod: { days: 30, timezone: "Asia/Tokyo", startDate: "2026-08-02", endDate: "2026-08-31" },
-      summary: { trackedSites: 1, activeSites: 1, views: 10, visits: 4 },
-      previousSummary: { views: 8, visits: 3 },
-      sites: [{ id: 12, name: "Site", host: "site.example", views: 10, visits: 4 }],
-    };
-    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: { analytics: { portfolio } } })));
-
-    await expect(getAnalyticsPortfolio("DAYS_30", "Asia/Tokyo")).resolves.toEqual(portfolio);
-    expect(fetch).toHaveBeenCalledTimes(1);
-    const [url, init] = vi.mocked(fetch).mock.calls[0];
-    const body = JSON.parse(String(init?.body));
-    expect(url).toBe("/api/graphql");
-    expect(body.variables).toEqual({ range: "DAYS_30", timezone: "Asia/Tokyo" });
-    expect(body.query).toContain("portfolio(range: $range, timezone: $timezone)");
-    expect(body.query).toContain("summary { trackedSites activeSites views visits }");
-    expect(body.query).toContain("sites { id name host views visits }");
-    expect(body.query).not.toContain("dashboard(");
-  });
-
-  it("loads the global dashboard as a separate GraphQL operation with range and timezone variables", async () => {
-    const globalDashboard = {
-      period: { days: 7, timezone: "Asia/Tokyo", startDate: "2026-09-24", endDate: "2026-09-30" },
-      previousPeriod: { days: 7, timezone: "Asia/Tokyo", startDate: "2026-09-17", endDate: "2026-09-23" },
-      overview: { trackedSites: 2, activeSites: 1, views: 10, visits: 4 }, previousOverview: { views: 8, visits: 3 },
-      timeline: [], sites: [], dimensions: { countries: [], browsers: [], operatingSystems: [], devices: [] },
-      acquisition: { totalVisits: 4, referrers: [], campaigns: [] },
-    };
-    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ data: { analytics: { globalDashboard } } })));
-    await expect(getAnalyticsGlobalDashboard("DAYS_7", "Asia/Tokyo")).resolves.toEqual(globalDashboard);
-    expect(fetch).toHaveBeenCalledTimes(1);
-    const [, init] = vi.mocked(fetch).mock.calls[0];
-    const body = JSON.parse(String(init?.body));
-    expect(body.variables).toEqual({ range: "DAYS_7", timezone: "Asia/Tokyo" });
-    expect(body.query).toContain("query AnalyticsGlobalDashboard(");
-    expect(body.query).toContain("globalDashboard(range: $range, timezone: $timezone)");
-    expect(body.query).toContain("campaigns { siteId siteName siteHost source medium campaign visits }");
-    expect(body.query).not.toContain("dashboard(siteId");
-    expect(body.query).not.toContain("topPages");
-    expect(body.query).not.toContain("entryPages");
-    expect(body.query).not.toContain("visitorDays");
+    expect(init?.signal).toBe(signal);
+    expect(body.variables).toEqual({ range: "DAYS_30", timezone: "Asia/Tokyo", siteId: 12, showGlobal: false, showSite: true });
+    expect(body.query).toContain("sites { id name siteKey host createdAt updatedAt }");
+    expect(body.query).toContain("globalDashboard(range: $range, timezone: $timezone) @include(if: $showGlobal)");
+    expect(body.query).toContain("installation(siteId: $siteId) @include(if: $showSite)");
+    expect(body.query).not.toContain("query AnalyticsAcquisition(");
   });
 
   it("loads App Store apps and analytics in one selected-field operation", async () => {

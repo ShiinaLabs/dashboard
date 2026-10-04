@@ -4,15 +4,23 @@ import { analyticsResolvers, analyticsTypeDefs } from "./analytics";
 import { appStoreResolvers, appStoreTypeDefs } from "./app-store";
 import { settingsResolvers, settingsTypeDefs } from "./settings";
 import { xResolvers, xTypeDefs } from "./x";
+import { accountsResolvers, accountsTypeDefs } from "./accounts";
+import { overviewResolvers, overviewTypeDefs } from "./overview";
+import { githubResolvers, githubTypeDefs } from "./github";
+import { platformDashboardResolvers, platformDashboardTypeDefs } from "./platform-dashboards";
 
 const schema = createSchema<GraphQLContext>({
-  typeDefs: [analyticsTypeDefs, appStoreTypeDefs, settingsTypeDefs, xTypeDefs],
+  typeDefs: [analyticsTypeDefs, appStoreTypeDefs, settingsTypeDefs, xTypeDefs, accountsTypeDefs, overviewTypeDefs, githubTypeDefs, platformDashboardTypeDefs],
   resolvers: {
     ...analyticsResolvers,
     ...appStoreResolvers,
     ...settingsResolvers,
     ...xResolvers,
-    Query: { ...analyticsResolvers.Query, ...appStoreResolvers.Query, ...settingsResolvers.Query, ...xResolvers.Query },
+    ...accountsResolvers,
+    ...overviewResolvers,
+    ...githubResolvers,
+    ...platformDashboardResolvers,
+    Query: { ...analyticsResolvers.Query, ...appStoreResolvers.Query, ...settingsResolvers.Query, ...xResolvers.Query, ...accountsResolvers.Query, ...overviewResolvers.Query, ...githubResolvers.Query, ...platformDashboardResolvers.Query },
   },
 });
 

@@ -8,8 +8,9 @@ import {
   Activity, GitFork, Layers, MessageSquare,
   Star, TrendingUp,
 } from "lucide-react";
-import { api } from "@/lib/api";
 import type { PulseContentItem } from "@/shared/types";
+import type { PulseResponse } from "@/lib/pulse";
+import { getOverviewPulse } from "@/lib/client/graphql/overview";
 import { HighlightCard } from "@/components/domain/shared/OverviewCards";
 import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";
@@ -57,14 +58,18 @@ function ContentRow({ item, labels }: { item: PulseContentItem; labels: { metric
   );
 }
 
-export function PulseSection() {
+export function PulseSection({ initialData }: { initialData: PulseResponse }) {
   const { t } = useTranslation();
   const [days, setDays] = useState(7);
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["pulse", days],
-    queryFn: () => api.getPulse(days),
-    refetchInterval: 3 * 60_000,
+  const query = useQuery({
+    queryKey: ["overview-pulse", days],
+    queryFn: ({ signal }) => getOverviewPulse(days, signal),
+    enabled: days !== 7,
+    staleTime: 5 * 60_000,
   });
+  const data = days === 7 ? initialData : query.data;
+  const isLoading = days !== 7 && query.isPending;
+  const isError = days !== 7 && query.isError;
 
   return (
     <SectionShell

@@ -14,7 +14,7 @@ import { calcYAxisWidth } from "@/lib/client/utils";
 interface Props {
   stats: OverviewStats | undefined;
   timeline: TimelineData | undefined;
-  topLiked: Tweet[] | undefined;
+  topLiked: Pick<Tweet, "id" | "full_text" | "favorite_count">[] | undefined;
   xAccounts: Account[];
 }
 

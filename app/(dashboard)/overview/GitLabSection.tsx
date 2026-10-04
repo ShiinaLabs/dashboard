@@ -21,7 +21,7 @@ interface ProjectLike {
 }
 
 interface Props {
-  glAllProjects: ProjectLike[];
+  glProjectCount: number;
   glPinned: ProjectLike[];
   glTotalStars: number;
   glTotalForks: number;
@@ -29,7 +29,7 @@ interface Props {
   glAccounts: Account[];
 }
 
-export function GitLabSection({ glAllProjects, glPinned, glTotalStars, glTotalForks, glFollowers, glAccounts }: Props) {
+export function GitLabSection({ glProjectCount, glPinned, glTotalStars, glTotalForks, glFollowers, glAccounts }: Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
@@ -38,7 +38,7 @@ export function GitLabSection({ glAllProjects, glPinned, glTotalStars, glTotalFo
   return (
     <SectionShell icon={<GitlabIcon />} title={t("overview.gitlabHeading")}>
       <MetricGrid>
-        <MetricCard label={t("overview.stats.projects")} value={glAllProjects.length} icon={<GitlabIcon />} />
+        <MetricCard label={t("overview.stats.projects")} value={glProjectCount} icon={<GitlabIcon />} />
         <MetricCard label={t("overview.stats.totalStars")} value={glTotalStars} icon={<Star size={16} />} />
         <MetricCard label={t("overview.stats.totalForks")} value={glTotalForks} icon={<GitFork size={16} />} />
         <MetricCard label={t("overview.stats.followers")} value={glFollowers} icon={<TrendingUp size={16} />} />

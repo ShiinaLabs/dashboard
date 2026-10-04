@@ -33,10 +33,11 @@ test("mock login keeps its session and opens the requested route", async ({ page
 
 test("Overview shows portfolio analytics from one ranged GraphQL request", async ({ page }) => {
   const portfolioRanges: string[] = [];
-  page.on("request", (request) => {
+  page.on("requestfinished", (request) => {
     if (!request.url().endsWith("/api/graphql") || request.method() !== "POST") return;
-    const body = request.postDataJSON() as { query?: string; variables?: { range?: string } };
-    if (body.query?.includes("query AnalyticsPortfolio(")) portfolioRanges.push(body.variables?.range ?? "");
+    const body = request.postDataJSON() as { query?: string; variables?: { range?: string; analyticsRange?: string } };
+    if (body.query?.includes("query OverviewPage(")) portfolioRanges.push(body.variables?.analyticsRange ?? "");
+    else if (body.query?.includes("query OverviewAnalyticsPortfolio(")) portfolioRanges.push(body.variables?.range ?? "");
   });
   await logIn(page);
 
@@ -76,7 +77,7 @@ test("Overview shows portfolio analytics from one ranged GraphQL request", async
     const response = page.waitForResponse((candidate) => {
       if (!candidate.url().endsWith("/api/graphql") || candidate.request().method() !== "POST") return false;
       const body = candidate.request().postDataJSON() as { query?: string; variables?: { range?: string } };
-      return body.query?.includes("query AnalyticsPortfolio(") === true && body.variables?.range === range;
+      return body.query?.includes("query OverviewAnalyticsPortfolio(") === true && body.variables?.range === range;
     });
     await section.getByRole("button", { name: buttonName, exact: true }).click();
     expect((await response).ok()).toBeTruthy();
@@ -85,14 +86,19 @@ test("Overview shows portfolio analytics from one ranged GraphQL request", async
   expect(portfolioRanges).toEqual(["DAYS_7", "DAYS_30", "DAYS_90"]);
 });
 
-test("Portfolio errors stay inside Web Analytics while other overview sections load", async ({ page }) => {
+test("targeted portfolio range errors stay inside Web Analytics while other overview sections remain visible", async ({ page }) => {
   await logIn(page);
-  await page.route("**/api/graphql", (route) => route.fulfill({
+  await page.route("**/api/graphql", async (route) => {
+    const body = route.request().postData() ?? "";
+    if (!body.includes("query OverviewAnalyticsPortfolio(")) return route.continue();
+    return route.fulfill({
     status: 200,
     contentType: "application/json",
     body: JSON.stringify({ errors: [{ message: "Internal server error" }] }),
-  }));
+    });
+  });
   await page.goto("/overview");
+  await page.getByRole("region", { name: "Web Analytics" }).getByRole("button", { name: "30D" }).click();
   await expect(page.getByText("Web Analytics unavailable", { exact: true })).toBeVisible();
   const overviewHealth = page.getByRole("region", { name: "Business Pulse" });
   await expect(overviewHealth.getByText("Business Pulse", { exact: true })).toBeVisible();
@@ -104,7 +110,7 @@ test("Portfolio empty and no-traffic states keep setup and site summaries useful
   await page.route("**/api/graphql", async (route) => {
     const response = await route.fetch();
     const payload = await response.json();
-    const portfolio = payload.data?.analytics?.portfolio;
+    const portfolio = payload.data?.overview?.page?.analyticsPortfolio;
     if (portfolio) {
       portfolio.summary = { trackedSites: 0, activeSites: 0, views: 0, visits: 0 };
       portfolio.previousSummary = { views: 0, visits: 0 };
@@ -122,7 +128,7 @@ test("Portfolio empty and no-traffic states keep setup and site summaries useful
   await page.route("**/api/graphql", async (route) => {
     const response = await route.fetch();
     const payload = await response.json();
-    const portfolio = payload.data?.analytics?.portfolio;
+    const portfolio = payload.data?.overview?.page?.analyticsPortfolio;
     if (portfolio) {
       portfolio.summary = { trackedSites: 1, activeSites: 0, views: 0, visits: 0 };
       portfolio.previousSummary = { views: 0, visits: 0 };
@@ -155,7 +161,7 @@ test("Top Sites limits rows to five and reports the remaining site count", async
   await page.route("**/api/graphql", async (route) => {
     const response = await route.fetch();
     const payload = await response.json();
-    const portfolio = payload.data?.analytics?.portfolio;
+    const portfolio = payload.data?.overview?.page?.analyticsPortfolio;
     if (portfolio) {
       portfolio.summary = { trackedSites: 7, activeSites: 7, views: 28, visits: 14 };
       portfolio.previousSummary = { views: 24, visits: 12 };
@@ -179,14 +185,15 @@ test("Top Sites limits rows to five and reports the remaining site count", async
 test("Analytics defaults to All Sites, issues one global query, and switches cleanly to and from a site", async ({ page }) => {
   await logIn(page);
   const analyticsRequests: string[] = [];
-  const installationRequests: string[] = [];
-  page.on("request", (request) => {
+  const installationRequests: boolean[] = [];
+  page.on("requestfinished", (request) => {
     if (request.url().endsWith("/api/graphql") && request.method() === "POST") {
-      const body = request.postDataJSON() as { query?: string };
-      if (body.query?.includes("query AnalyticsGlobalDashboard(")) analyticsRequests.push("global");
-      if (body.query?.includes("query AnalyticsDashboard(")) analyticsRequests.push("site");
+      const body = request.postDataJSON() as { query?: string; variables?: { showGlobal?: boolean; showSite?: boolean } };
+      if (body.query?.includes("query AnalyticsPage(")) {
+        analyticsRequests.push(body.variables?.showGlobal ? "global" : body.variables?.showSite ? "site" : "page");
+        installationRequests.push(body.variables?.showSite === true && body.query.includes("installation(siteId: $siteId)"));
+      }
     }
-    if (request.url().includes("/api/analytics/sites/") && request.url().endsWith("/installation")) installationRequests.push(request.url());
   });
   await page.goto("/analytics");
   const selector = page.getByRole("combobox", { name: "Select a website" });
@@ -206,14 +213,14 @@ test("Analytics defaults to All Sites, issues one global query, and switches cle
   await expect(page.getByRole("button", { name: "Rename Site" })).toHaveCount(0);
   for (const site of ["WiFi Lens", "Tazuki", "ShiinaPlay"]) await expect(page.getByText(site, { exact: true }).first()).toBeVisible();
   expect(analyticsRequests).toEqual(["global"]);
-  expect(installationRequests).toEqual([]);
+  expect(installationRequests).toEqual([false]);
 
   await selectSite(page, "WiFi Lens");
   await expect(page.getByText("Average Daily Visitors", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Tracking Setup" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Rename Site" })).toBeVisible();
   await expect.poll(() => analyticsRequests).toEqual(["global", "site"]);
-  expect(installationRequests).toHaveLength(1);
+  expect(installationRequests).toEqual([false, true]);
 
   const allSitesOption = page.getByRole("combobox", { name: "Select a website" });
   await allSitesOption.click();
@@ -221,7 +228,7 @@ test("Analytics defaults to All Sites, issues one global query, and switches cle
   await expect(page.getByText("Tracked Sites", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Tracking Setup", level: 2 })).toHaveCount(0);
   await expect.poll(() => analyticsRequests).toEqual(["global", "site"]);
-  expect(installationRequests).toHaveLength(1);
+  expect(installationRequests).toEqual([false, true]);
   for (const width of [390, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await expect(page.getByRole("combobox", { name: "Select a website" })).toContainText("All Sites");
@@ -231,16 +238,20 @@ test("Analytics defaults to All Sites, issues one global query, and switches cle
   }
 });
 
-test("Analytics keeps All Sites available with one site and skips the global query with no sites", async ({ page }) => {
+test("Analytics page query includes site list and the selected dashboard", async ({ page }) => {
   await logIn(page);
-  const site = { id: 12, name: "One Site", site_key: "one-site-key", host: "one.example", created_at: "2026-01-01", updated_at: "2026-01-01" };
-  await page.route("**/api/analytics/sites", (route) => route.fulfill({ json: { sites: [site] } }));
+  const site = { id: 12, name: "One Site", siteKey: "one-site-key", host: "one.example", createdAt: "2026-01-01", updatedAt: "2026-01-01" };
+  await page.route("**/api/graphql", async (route) => {
+    const response = await route.fetch();
+    const payload = await response.json();
+    if (payload.data?.analytics?.sites) payload.data.analytics.sites = [site];
+    await route.fulfill({ response, body: JSON.stringify(payload) });
+  });
   const requests: string[] = [];
-  page.on("request", (request) => {
+  page.on("requestfinished", (request) => {
     if (request.url().endsWith("/api/graphql") && request.method() === "POST") {
-      const query = (request.postDataJSON() as { query?: string }).query;
-      if (query?.includes("query AnalyticsGlobalDashboard(")) requests.push("global");
-      else if (query?.includes("query AnalyticsDashboard(")) requests.push("site");
+      const body = request.postDataJSON() as { query?: string; variables?: { showGlobal?: boolean; showSite?: boolean } };
+      if (body.query?.includes("query AnalyticsPage(")) requests.push(body.variables?.showGlobal ? "global" : body.variables?.showSite ? "site" : "page");
     }
   });
   await page.goto("/analytics");
@@ -251,14 +262,19 @@ test("Analytics keeps All Sites available with one site and skips the global que
   await expect(page.getByRole("option", { name: "All Sites", exact: true })).toBeVisible();
   await expect(page.getByRole("option", { name: /One Site · one\.example/ })).toBeVisible();
   await expect.poll(() => requests).toEqual(["global"]);
-  await page.unroute("**/api/analytics/sites");
-  await page.route("**/api/analytics/sites", (route) => route.fulfill({ json: { sites: [] } }));
+  await page.unroute("**/api/graphql");
+  await page.route("**/api/graphql", async (route) => {
+    const response = await route.fetch();
+    const payload = await response.json();
+    if (payload.data?.analytics?.sites) payload.data.analytics.sites = [];
+    await route.fulfill({ response, body: JSON.stringify(payload) });
+  });
   requests.length = 0;
   await page.goto("/analytics");
   await expect(page.getByRole("heading", { name: "No websites yet" })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Select a website" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Add Site" })).toBeVisible();
-  expect(requests).toEqual([]);
+  expect(requests).toEqual(["global"]);
 });
 
 test("Web Analytics adds and selects sites, then switches the complete dashboard across ranges", async ({ page }) => {
@@ -407,7 +423,8 @@ test("Web Analytics adds and selects sites, then switches the complete dashboard
 
   const thirtyDayResponse = page.waitForResponse((response) => {
     if (!response.url().endsWith("/api/graphql") || response.request().method() !== "POST") return false;
-    return JSON.parse(response.request().postData() ?? "{}").variables?.range === "DAYS_30";
+    const body = JSON.parse(response.request().postData() ?? "{}");
+    return body.query?.includes("query AnalyticsPage(") && body.variables?.range === "DAYS_30";
   });
   await page.getByRole("button", { name: "30D" }).click();
   const thirtyDayData = await thirtyDayResponse;
@@ -421,7 +438,8 @@ test("Web Analytics adds and selects sites, then switches the complete dashboard
 
   const ninetyDayResponse = page.waitForResponse((response) => {
     if (!response.url().endsWith("/api/graphql") || response.request().method() !== "POST") return false;
-    return JSON.parse(response.request().postData() ?? "{}").variables?.range === "DAYS_90";
+    const body = JSON.parse(response.request().postData() ?? "{}");
+    return body.query?.includes("query AnalyticsPage(") && body.variables?.range === "DAYS_90";
   });
   await page.getByRole("button", { name: "90D" }).click();
   const ninetyDayData = await ninetyDayResponse;
@@ -448,7 +466,7 @@ test("All Sites Analytics card headers have the shared vertical inset", async ({
   }
 });
 
-test("dashboard failures are reported while tracking setup remains available", async ({ page }) => {
+test("Analytics page query failures are reported when site options cannot load", async ({ page }) => {
   await logIn(page);
   await page.route("**/api/graphql", (route) => route.fulfill({
     status: 200,
@@ -456,15 +474,13 @@ test("dashboard failures are reported while tracking setup remains available", a
     body: JSON.stringify({ errors: [{ message: "Internal server error", extensions: { code: "INTERNAL_SERVER_ERROR" } }] }),
   }));
   await page.goto("/analytics");
-  await selectSite(page, "WiFi Lens");
-  await expect(page.getByText("Analytics data unavailable")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Tracking Setup" })).toBeVisible();
+  await expect(page.getByRole("alert").first()).toBeVisible();
 });
 
-test("dashboard shows separate acquisition empty states when the selected site has no visits", async ({ page }) => {
+test("selected site page query shows separate acquisition empty states when there are no visits", async ({ page }) => {
   await logIn(page);
   await page.route("**/api/graphql", (route) => {
-    const request = route.request().postDataJSON() as { query?: string };
+    const request = route.request().postDataJSON() as { query?: string; variables?: { showGlobal?: boolean; showSite?: boolean } };
     const dashboard = {
       period: { days: 7, timezone: "UTC", startDate: "2026-09-23", endDate: "2026-09-29" },
       previousPeriod: { days: 7, timezone: "UTC", startDate: "2026-09-16", endDate: "2026-09-22" },
@@ -483,9 +499,11 @@ test("dashboard shows separate acquisition empty states when the selected site h
       sites: [{ id: 1, name: "WiFi Lens", host: "wifi-lens.app", views: 0, visits: 0 }],
       acquisition: { totalVisits: 0, referrers: [], campaigns: [] },
     };
-    const data = request.query?.includes("query AnalyticsGlobalDashboard(")
-      ? { analytics: { globalDashboard } }
-      : { analytics: { dashboard } };
+    const data = { analytics: {
+      sites: [{ id: 1, name: "WiFi Lens", siteKey: "wifi", host: "wifi-lens.app", createdAt: "2026-01-01", updatedAt: "2026-01-01" }],
+      ...(request.variables?.showGlobal ? { globalDashboard } : {}),
+      ...(request.variables?.showSite ? { dashboard, installation: { trackerUrl: "https://dashboard.example/a/t.js", snippet: "<script></script>" } } : {}),
+    } };
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ data }) });
   });
   await page.goto("/analytics");

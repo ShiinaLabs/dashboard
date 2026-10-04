@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { FETCH_POLICY } from "@/lib/application/scheduler/fetchPolicy";
 import { api, type Account } from "@/lib/api";
+import { getAccountsList } from "@/lib/client/graphql/accounts";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { GithubIcon, GitlabIcon, RedditIcon, XIcon } from "@/components/BrandIcons";
@@ -42,13 +43,13 @@ export default function AccountsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["accounts"],
-    queryFn: api.getAccounts,
-    refetchInterval: 3 * 60_000,
+    queryKey: ["accounts", "list", tab],
+    queryFn: ({ signal }) => getAccountsList(tab.toUpperCase() as "TWITTER" | "GITHUB" | "GITLAB" | "REDDIT", signal),
+    staleTime: 2 * 60_000,
     enabled: tab !== "app-store",
   });
 
-  const accounts = (data?.accounts ?? []).filter((a: Account) => a.platform === tab);
+  const accounts = data ?? [];
   const now = useNow();
 
   const staleMap = useMemo(() => {
@@ -63,12 +64,12 @@ export default function AccountsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: ({ id, token }: { id: number; token: string }) => api.deleteAccount(id, token),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["accounts"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["accounts", "list"] }),
   });
 
   const toggleActiveMutation = useMutation({
     mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) => api.updateAccount(id, { isActive }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["accounts"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["accounts", "list"] }),
   });
 
   if (isLoading && tab !== "app-store") {
@@ -254,33 +255,8 @@ function AccountFormPanel({
   const isRedditPublic = isReddit && authType === "reddit_public";
 
   // Load reddit cookie details on edit — the list API no longer returns auth_token
-  const [cookieLoading, setCookieLoading] = useState(false);
-  const cookieInitDone = useRef(false);
-
   // cookie table state
   const [cookieEntries, setCookieEntries] = useState<{ key: string; value: string }[]>([]);
-
-  useEffect(() => {
-    if (!editing || !isReddit || !isRedditPublic || !account || cookieInitDone.current) return;
-    let cancelled = false;
-    // Defer the loading flag out of the synchronous effect body so the
-    // cascading-render lint stays happy; the fetch below resolves it.
-    const timer = setTimeout(() => { if (!cancelled) setCookieLoading(true); }, 0);
-    api.getAccount(account.id).then(detail => {
-      if (cancelled) return;
-      cookieInitDone.current = true;
-      if (detail?.auth_token) {
-        try {
-          const obj = JSON.parse(detail.auth_token);
-          const entries = Object.entries(obj).map(([k, v]) => ({ key: k, value: String(v) }));
-          setCookieEntries(entries);
-          setAuthToken(JSON.stringify(obj));
-        } catch { /* ignore */ }
-      }
-      setCookieLoading(false);
-    }).catch(() => { if (!cancelled) setCookieLoading(false); });
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [editing, isReddit, isRedditPublic, account]);
 
   const syncCookieToken = (entries: { key: string; value: string }[]) => {
     setCookieEntries(entries);
@@ -385,7 +361,6 @@ function AccountFormPanel({
           </legend>
 
           {isRedditPublic ? (
-            cookieLoading ? <p className="text-sm text-[var(--muted-foreground)]">{t("common.loading")}</p> :
             <CookieTable entries={cookieEntries} onChange={syncCookieToken} t={t} />
           ) : (
             <div>

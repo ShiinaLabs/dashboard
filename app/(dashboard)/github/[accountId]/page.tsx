@@ -5,7 +5,9 @@ import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Group, Stack, Text } from "@/components/ui/layout-primitives";
-import { api, type GithubOverview, type GithubContribution, type GithubRepo } from "@/lib/api";
+import { api } from "@/lib/api";
+import { getGithubAccountPage } from "@/lib/client/graphql/github";
+import type { GithubContribution, GithubRepo } from "@/shared/types";
 import { formatDateTime } from "@/lib/client/datetime";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -116,7 +118,7 @@ export default function GitHubDetail() {
 
   const handlePinSave = async () => {
     await api.setPinnedRepos(accountId, [...pinnedIds]);
-    queryClient.invalidateQueries({ queryKey: ["github", "overview", accountId] });
+    queryClient.invalidateQueries({ queryKey: ["github-account-page", accountId] });
     setShowPinDialog(false);
   };
 
@@ -130,26 +132,19 @@ export default function GitHubDetail() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [showPinDialog]);
 
-  const { data: account, isLoading: accountLoading } = useQuery({
-    queryKey: ["account", accountId],
-    queryFn: () => api.getAccount(accountId),
-    enabled: !!accountId,
+  const { data: page, isLoading: accountLoading } = useQuery({
+    queryKey: ["github-account-page", accountId],
+    queryFn: ({ signal }) => getGithubAccountPage(accountId, signal),
+    enabled: Number.isInteger(accountId) && accountId > 0,
+    staleTime: 60_000,
   });
+  const account = page?.account;
+  const overview = page?.overview;
+  const contributions = page?.contributions;
 
   useEntityTitle(account ? account.screen_name : null);
 
-  const { data: overview, isLoading: overviewLoading } = useQuery<GithubOverview>({
-    queryKey: ["github", "overview", accountId],
-    queryFn: () => api.getGithubOverview(accountId!),
-    enabled: !!accountId,
-    refetchInterval: 3 * 60_000,
-  });
-
-  const { data: contributions } = useQuery<GithubContribution[]>({
-    queryKey: ["github", "contributions", accountId],
-    queryFn: () => api.getGithubContributions(accountId!),
-    enabled: !!accountId,
-  });
+  const overviewLoading = accountLoading;
 
   const deleteMutation = useMutation({
     mutationFn: ({ token }: { token: string }) => api.deleteAccount(accountId, token),

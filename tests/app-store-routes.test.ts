@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { requireSession } from "../lib/auth-helpers";
-import { createConnection, deleteConnection, getConnectionDetail, listConnections, updateConnection, refreshApps, setAppEnabled, AppStoreError } from "../lib/services/app-store";
-import { loader, action } from "../app/api/app-store/connections/route";
-import { loader as detailLoader, action as detailAction } from "../app/api/app-store/connections/[id]/route";
+import { createConnection, deleteConnection, updateConnection, refreshApps, setAppEnabled } from "../lib/services/app-store";
+import { action } from "../app/api/app-store/connections/route";
+import { action as detailAction } from "../app/api/app-store/connections/[id]/route";
 import { action as refreshAction } from "../app/api/app-store/connections/[id]/refresh/route";
 import { action as appAction } from "../app/api/app-store/connections/[id]/apps/[appId]/route";
 import { createConfirmToken } from "../lib/confirm-helpers";
@@ -11,7 +11,7 @@ import { AppStoreApiError } from "../lib/infra/app-store/AppStoreConnectClient";
 vi.mock("../lib/auth-helpers", () => ({ requireSession: vi.fn() }));
 vi.mock("../lib/services/app-store", async (original) => ({
   ...await original<typeof import("../lib/services/app-store")>(),
-  createConnection: vi.fn(), deleteConnection: vi.fn(), getConnectionDetail: vi.fn(), listConnections: vi.fn(), updateConnection: vi.fn(), refreshApps: vi.fn(), setAppEnabled: vi.fn(),
+  createConnection: vi.fn(), deleteConnection: vi.fn(), updateConnection: vi.fn(), refreshApps: vi.fn(), setAppEnabled: vi.fn(),
 }));
 
 const viewer = { id: 10, username: "member", role: "user" };
@@ -26,13 +26,11 @@ beforeEach(() => {
 describe("ASC routes", () => {
   it("requires a session for all operations", async () => {
     vi.mocked(requireSession).mockResolvedValue(null);
-    for (const response of [await loader(args()), await action(args("POST", {})), await detailLoader(args()), await detailAction(args("PUT", {})), await refreshAction(args("POST")), await appAction(args("PUT", {}))]) expect(response.status).toBe(401);
+    for (const response of [await action(args("POST", {})), await detailAction(args("PUT", {})), await refreshAction(args("POST")), await appAction(args("PUT", {}))]) expect(response.status).toBe(401);
     expect(createConnection).not.toHaveBeenCalled();
   });
 
-  it("passes the authenticated viewer to lists, creation and updates", async () => {
-    await loader(args());
-    expect(listConnections).toHaveBeenCalledWith(viewer);
+  it("passes the authenticated viewer to connection creation and updates", async () => {
     vi.mocked(createConnection).mockResolvedValue({ id: 3 } as never);
     expect((await action(args("POST", { owner_id: 999, name: "Team" }))).status).toBe(201);
     expect(createConnection).toHaveBeenCalledWith(viewer, { owner_id: 999, name: "Team" });
@@ -48,9 +46,6 @@ describe("ASC routes", () => {
   });
 
   it("maps ownership and validation errors and hides internal error details", async () => {
-    vi.mocked(getConnectionDetail).mockRejectedValueOnce(new AppStoreError("forbidden", 403, "Forbidden"));
-    expect((await detailLoader(args())).status).toBe(403);
-    expect((await detailLoader(args("GET", undefined, { id: "1.5", appId: "2" }))).status).toBe(400);
     vi.mocked(createConnection).mockRejectedValueOnce(new Error("SQL includes PRIVATE KEY"));
     const response = await action(args("POST", {}));
     expect(response.status).toBe(500);

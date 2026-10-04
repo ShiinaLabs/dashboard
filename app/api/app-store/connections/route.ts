@@ -1,16 +1,8 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
 import { json } from "@/lib/api-server";
 import { requireSession } from "@/lib/auth-helpers";
-import { createConnection, listConnections } from "@/lib/services/app-store";
+import { createConnection } from "@/lib/services/app-store";
 import { appStoreErrorResponse } from "@/lib/app-store-http";
-
-export async function loader({ request }: LoaderFunctionArgs) {
-  if (request.method !== "GET") return json({ error: "Method not allowed" }, { status: 405 });
-  const auth = await requireSession(request);
-  if (!auth) return json({ error: "Unauthorized" }, { status: 401 });
-  try { return json({ connections: await listConnections(auth.user) }); }
-  catch (error) { return appStoreErrorResponse(error); }
-}
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "POST") return json({ error: "Method not allowed" }, { status: 405 });
