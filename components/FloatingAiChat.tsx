@@ -24,7 +24,7 @@ function getPageLabel(pathname: string): string {
 export function FloatingAiChat({ pathname = "/overview" }: { pathname?: string }) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
-  const chat = useAiChat({ overviewPage: pathname === "/overview" });
+  const chat = useAiChat({ overviewPage: pathname === "/overview", enabled: isOpen });
 
   useEffect(() => {
     if (isOpen) window.setTimeout(() => chat.inputRef.current?.focus(), 100);

@@ -290,7 +290,7 @@ export default function GitHubDetail() {
 
           <Modal opened={showPinDialog} onClose={() => setShowPinDialog(false)} title={t("githubDetail.managePins")}>
             <Stack gap="xs">
-              {overview.allRepos?.map((repo: GithubRepo) => (
+              {overview.allRepos?.map((repo) => (
                 <Checkbox key={repo.id} checked={pinnedIds.has(repo.repo_id)} onChange={(e) => {
                   setPinnedIds(prev => { const next = new Set(prev); if (e.currentTarget.checked) next.add(repo.repo_id); else next.delete(repo.repo_id); return next; });
                 }} label={<span>{repo.full_name}{repo.language ? ` · ${repo.language}` : ""}</span>} />

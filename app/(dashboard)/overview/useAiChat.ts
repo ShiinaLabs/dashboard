@@ -10,7 +10,7 @@ export interface Message {
   content: string;
 }
 
-export function useAiChat({ overviewPage = false }: { overviewPage?: boolean } = {}) {
+export function useAiChat({ overviewPage = false, enabled = false }: { overviewPage?: boolean; enabled?: boolean } = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -27,7 +27,7 @@ export function useAiChat({ overviewPage = false }: { overviewPage?: boolean } =
     queryFn: ({ signal }) => overviewPage
       ? getOverviewPage(pageVariables, signal).then((page) => page.aiStatus)
       : getAiStatusPage(signal),
-    enabled: !overviewPage || Boolean(timezone),
+    enabled: overviewPage ? Boolean(timezone) : enabled,
     staleTime: 60_000,
   });
 

@@ -53,6 +53,8 @@ REST remains for authentication/session, commands and mutations, background fetc
 
 Range changes use targeted page operations and React Query cache keys. Query helpers pass cancellation through the shared transport. GraphQL is deliberately query-only; all writes stay on REST commands.
 
+`tests/api-contract-inventory.test.ts` inventories registered route modules and browser query operations, verifies their method surface and owning contract suite, and rejects credential-shaped fields in client query documents. It currently inventories 31 registered REST/public routes (including the `/api/*` fallback) and 21 named browser GraphQL operations. Suite mapping is an inventory guard; behavior and owner/admin assertions remain in the linked route/read-model suites.
+
 ## Public tracking collector
 
 `POST /a/e` and `OPTIONS /a/e` are public browser-tracking routes outside `/api`. The route owns HTTP parsing, body limits, Origin/UA/country headers, and CORS/status behavior. The collector service validates site identity and event data before repository access. It stores only allow-listed UTM source, medium, and campaign values, never the full query string.

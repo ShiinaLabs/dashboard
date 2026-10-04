@@ -36,6 +36,8 @@ Single-process deployment is intentional and supported. This is a first-class ar
 
 Authenticated browser reads use page-oriented GraphQL operations over viewer-scoped services/read models. Overview combines platform summaries, Pulse, Fetch Health, Top Content, and Analytics Portfolio; Analytics and App Store pages combine their option lists with the requested dashboard/report; account and detail pages fetch current visible data through a single page operation. REST remains the command, authentication/session, streaming, collector, and infrastructure interface. GraphQL resolvers call application services and do not access repositories or database code directly.
 
+React Router route modules are split for production navigation. The authenticated shell is present in the server HTML; browser-only locale/theme/sidebar preferences apply after hydration. Hashed static assets retain one-year immutable caching with ETag validation; Node does not gzip or Brotli responses, so the deployed proxy/ingress/CDN must provide and be verified for text compression. `performance/baseline.json` records cold navigation request, payload, bundle, and timing comparisons for local production-build mock data; it is not a production VPS measurement.
+
 Serverless, Edge, and Function runtimes are future deployment options, not current architecture targets. Do not prepare for them by removing Node APIs, replacing `pg` or Argon2, externalizing the scheduler, introducing queues or cron services, or changing cryptography. Portability is desirable only when it does not add current operational or code complexity without present value.
 
 ## App Store Connect Boundary

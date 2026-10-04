@@ -229,8 +229,8 @@ function GithubWatchlistDialog({
   const save = useMutation({
     mutationFn: () => api.saveGithubWatchlist(accountId, { orgs, watched: [...watched] }),
     onSuccess: (payload) => {
-      queryClient.invalidateQueries({ queryKey: ["github", "overview", accountId] });
-      queryClient.invalidateQueries({ queryKey: ["github", "watchlist", accountId] });
+      queryClient.invalidateQueries({ queryKey: ["github-account-page", accountId] });
+      queryClient.invalidateQueries({ queryKey: ["github-watchlist-manager", accountId] });
       if (payload.errors?.length) {
         setErrors(payload.errors);
         notifications.show({ color: "red", message: t("githubWatchlist.partialSave") });

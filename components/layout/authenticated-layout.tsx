@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -23,7 +23,7 @@ export function AuthenticatedLayout({ children }: { children: React.ReactNode })
   const { pathname } = useLocation();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
-  const [open, setOpen] = useState(loadSidebarOpen);
+  const [open, setOpen] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
 
   const { data: authData } = useQuery({
@@ -35,6 +35,13 @@ export function AuthenticatedLayout({ children }: { children: React.ReactNode })
   const setSidebarOpen = useCallback((next: boolean) => {
     setOpen(next);
     if (typeof window !== "undefined") localStorage.setItem(SIDEBAR_KEY, JSON.stringify(next));
+  }, []);
+
+  // localStorage is browser-only. Read it after hydration to keep the server
+  // and first client render structurally identical.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setOpen(loadSidebarOpen()));
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   const handleLogout = async () => {

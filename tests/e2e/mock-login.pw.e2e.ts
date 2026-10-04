@@ -3,10 +3,16 @@ import { expect, test } from "@playwright/test";
 async function logIn(page: import("@playwright/test").Page) {
   await page.goto("/login?from=%2Foverview");
   await page.getByRole("textbox", { name: "Username" }).fill("admin");
+  await page.getByRole("textbox", { name: "Password" }).fill("mock-test-password");
   const loginResponse = page.waitForResponse((response) => response.url().includes("/api/auth/login"));
   await page.getByRole("button", { name: "Log in" }).click();
   expect((await loginResponse).ok()).toBeTruthy();
   await expect(page).toHaveURL(/\/overview$/);
+}
+
+async function establishMockSession(page: import("@playwright/test").Page) {
+  const response = await page.request.post("/api/auth/login", { data: { username: "admin", password: "mock-test-password" } });
+  expect(response.ok()).toBeTruthy();
 }
 
 async function selectSite(page: import("@playwright/test").Page, name: string) {
@@ -29,6 +35,68 @@ test("mock login keeps its session and opens the requested route", async ({ page
     username: "admin",
     role: "admin",
   });
+});
+
+test("authenticated route HTML contains the useful app shell before browser JavaScript runs", async ({ page }) => {
+  await establishMockSession(page);
+  const response = await page.request.get("/overview");
+  expect(response.ok()).toBeTruthy();
+  const html = await response.text();
+  expect(html).toContain("data-app-shell");
+  expect(html).toContain("<main");
+  expect(html).toMatch(/Overview|OverviewPage|aria-label="Overview"/);
+  const assetPath = html.match(/(?:src|href)="([^"]+\.js)/)?.[1];
+  expect(assetPath).toBeTruthy();
+  const asset = await page.request.get(assetPath!);
+  expect(asset.headers()["cache-control"]).toBe("public, max-age=31536000, immutable");
+  const etag = asset.headers().etag;
+  expect(etag).toBeTruthy();
+  const conditionalAsset = await page.request.get(assetPath!, { headers: { "If-None-Match": etag! } });
+  expect(conditionalAsset.status()).toBe(304);
+});
+
+test("Overview cold load stays within one application GraphQL operation", async ({ page }) => {
+  const operations: string[] = [];
+  page.on("request", (request) => {
+    if (!request.url().endsWith("/api/graphql") || request.method() !== "POST") return;
+    const body = request.postDataJSON() as { operationName?: string; query?: string };
+    const operationName = body.operationName ?? body.query?.match(/\bquery\s+([A-Za-z0-9_]+)/)?.[1];
+    if (operationName) operations.push(operationName);
+  });
+  await establishMockSession(page);
+  await page.goto("/overview");
+  await page.waitForResponse((response) => response.url().endsWith("/api/graphql"));
+  await expect(page.getByRole("region", { name: "Overview" })).toBeVisible();
+  await expect.poll(() => operations.length).toBe(1);
+  expect(operations).toEqual(["OverviewPage"]);
+});
+
+test("cold page data stays within one GraphQL operation across dashboard routes", async ({ page }) => {
+  await establishMockSession(page);
+  await page.goto("/overview");
+  await page.waitForResponse((response) => response.url().endsWith("/api/graphql"));
+  const paths = [
+    "/analytics", "/app-store", "/revenue", "/accounts", "/github/2", "/github/2/repos/1001",
+    "/gitlab/3", "/gitlab/3/projects/2001", "/reddit/4", "/x/1", "/settings", "/admin",
+  ];
+  for (const path of paths) {
+    const operations: string[] = [];
+    const listener = (request: import("@playwright/test").Request) => {
+      if (!request.url().endsWith("/api/graphql") || request.method() !== "POST") return;
+      const body = request.postDataJSON() as { operationName?: string; query?: string };
+      const operationName = body.operationName ?? body.query?.match(/\bquery\s+([A-Za-z0-9_]+)/)?.[1];
+      if (operationName) operations.push(operationName);
+    };
+    page.on("request", listener);
+    const response = page.waitForResponse((candidate) => candidate.url().endsWith("/api/graphql"));
+    await page.goto(path);
+    const graphqlResponse = await response;
+    const payload = await graphqlResponse.json() as { data?: unknown; errors?: unknown[] };
+    expect(payload.errors, `${path} GraphQL errors`).toBeUndefined();
+    await expect.poll(() => operations.length, { message: `${path} operation count` }).toBe(1);
+    page.off("request", listener);
+    expect(operations, path).toHaveLength(1);
+  }
 });
 
 test("Overview shows portfolio analytics from one ranged GraphQL request", async ({ page }) => {

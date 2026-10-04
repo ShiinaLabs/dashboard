@@ -14,7 +14,9 @@ if (!i18n.isInitialized) {
   i18n.use(initReactI18next).init({
     resources: { en: { translation: en }, zh: { translation: zh } },
     fallbackLng: "en",
-    lng: isBrowser ? undefined : "en",
+    // Server and browser must start from the same language for hydration.
+    // Stored/browser language preferences are applied after the first render.
+    lng: "en",
     interpolation: { escapeValue: false },
     detection: isBrowser
       ? {

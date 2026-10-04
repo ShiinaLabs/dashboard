@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
-import { applyTheme, loadSettings, resolveTheme, saveSettings } from "@/lib/client/themes";
+import i18n from "@/lib/client/i18n";
+import { applyTheme, DEFAULT_SETTINGS, loadSettings, resolveTheme, saveSettings } from "@/lib/client/themes";
 import type { ThemeSettings } from "@/lib/client/themes";
-import "@/lib/client/i18n";
 
 function matchSystemDark() {
   return window.matchMedia("(prefers-color-scheme: dark)");
@@ -16,13 +16,6 @@ function getSystemColorScheme(): "light" | "dark" {
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  // Hydration guard: render the client shell only after the browser takes
-  // over, so i18n language detection never causes an SSR/client mismatch.
-  const mounted = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  );
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -31,8 +24,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
         },
       })
   );
-  const [settings, setSettingsState] = useState<ThemeSettings>(loadSettings);
-  const [systemColorScheme, setSystemColorScheme] = useState(getSystemColorScheme);
+  const [settings, setSettingsState] = useState<ThemeSettings>(DEFAULT_SETTINGS);
+  const [systemColorScheme, setSystemColorScheme] = useState<"light" | "dark">("light");
 
   const setSettings = useCallback((nextSettings: ThemeSettings) => {
     setSettingsState(nextSettings);
@@ -40,6 +33,18 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }, []);
 
   const themeId = useMemo(() => resolveTheme(settings, systemColorScheme), [settings, systemColorScheme]);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      setSettingsState(loadSettings());
+      setSystemColorScheme(getSystemColorScheme());
+    });
+    let savedLanguage: string | null = null;
+    try { savedLanguage = localStorage.getItem("i18n-lang"); } catch { /* Browser storage can be disabled. */ }
+    const browserLanguage = navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
+    const language = savedLanguage === "zh" || savedLanguage === "en" ? savedLanguage : browserLanguage;
+    if (language !== i18n.language) void i18n.changeLanguage(language);
+    return () => cancelAnimationFrame(frame);
+  }, []);
   useEffect(() => {
     if (settings.mode !== "system") return;
 
@@ -54,10 +59,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     applyTheme(themeId);
   }, [themeId]);
-
-  if (!mounted) {
-    return <div className="min-h-dvh bg-[var(--background)]" aria-label="Loading" />;
-  }
 
   return (
     <QueryClientProvider client={queryClient}>

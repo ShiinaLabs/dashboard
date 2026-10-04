@@ -276,7 +276,7 @@ export default function GitLabDetail() {
 
           <Modal opened={showPinDialog} onClose={() => setShowPinDialog(false)} title={t("gitlabDetail.managePins")}>
             <Stack gap="xs">
-              {overview.allProjects?.map((p: GitlabProject) => (
+              {overview.allProjects?.map((p) => (
                 <Checkbox key={p.id} checked={pinnedIds.has(p.project_id)} onChange={(e) => {
                   setPinnedIds(prev => { const next = new Set(prev); if (e.currentTarget.checked) next.add(p.project_id); else next.delete(p.project_id); return next; });
                 }} label={<span>{p.path_with_namespace}{p.language ? ` · ${p.language}` : ""}</span>} />

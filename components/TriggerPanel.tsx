@@ -27,9 +27,18 @@ export function TriggerPanel({ accountId, platform = "github" }: { accountId: nu
   const [level, setLevel] = useState<string>("all");
   const ns = DETAIL_NAMESPACES[platform] ?? "githubDetail";
 
+  const refreshQueries = async () => {
+    const keys: unknown[][] = [["accounts", "list"], ["overview-page"]];
+    if (platform === "github") keys.push(["github-account-page", accountId], ["github-repo-page", accountId]);
+    if (platform === "gitlab") keys.push(["gitlab-account-page", accountId], ["gitlab-project-page", accountId]);
+    if (platform === "reddit") keys.push(["reddit-account-page", accountId]);
+    if (platform === "twitter" || platform === "x") keys.push(["x-account-page", accountId]);
+    await Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
+  };
+
   const trigger = useMutation({
     mutationFn: () => api.triggerFetch(accountId, level),
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: refreshQueries,
   });
 
   return (

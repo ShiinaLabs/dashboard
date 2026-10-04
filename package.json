@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "react-router dev",
     "mock": "HTTPS=false MOCK_DATA=1 NEXT_PUBLIC_MOCK_DATA=1 ANALYTICS_PUBLIC_ORIGIN=https://dashboard.example react-router dev",
-    "build": "pnpm run build:client && pnpm run build:server",
+    "build": "pnpm run build:client && pnpm run build:server && pnpm run perf:bundle",
     "start": "node server/index.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -18,7 +18,10 @@
     "build:client": "RR_SKIP_SSR=1 NODE_OPTIONS=\"--max-old-space-size=512 --max-semi-space-size=8\" react-router build",
     "build:server": "RR_SKIP_CLIENT=1 NODE_OPTIONS=\"--max-old-space-size=192 --max-semi-space-size=8\" react-router build",
     "test:e2e": "playwright test",
-    "perf:query-plane": "node scripts/query-plane-perf.mjs"
+    "perf:query-plane": "node scripts/query-plane-perf.mjs",
+    "perf:compression": "node scripts/check-compression.mjs",
+    "perf:bundle": "node scripts/bundle-budget.mjs",
+    "perf:baseline:summary": "node scripts/summarize-network-baseline.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.46",

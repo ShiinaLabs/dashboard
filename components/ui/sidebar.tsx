@@ -128,6 +128,7 @@ function SidebarProvider({
       <TooltipProvider delayDuration={0}>
         <div
           data-slot='sidebar-wrapper'
+          data-app-shell
           style={
             {
               '--sidebar-width': SIDEBAR_WIDTH,

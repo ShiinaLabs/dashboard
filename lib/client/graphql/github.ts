@@ -3,14 +3,14 @@ import type { AccountWithStats, GithubContribution, GithubOverview, GithubRepo, 
 
 export interface GithubAccountPage {
   account: AccountWithStats;
-  overview: Omit<GithubOverview, "topRepos"> & { repos: GithubRepo[]; allRepos: GithubRepo[] };
+  overview: Omit<GithubOverview, "topRepos" | "allRepos"> & { repos: GithubRepo[]; allRepos: { id: number; repo_id: number; full_name: string; language: string | null; pinned: boolean }[] };
   contributions: GithubContribution[];
 }
 
 const accountPage = /* GraphQL */ `query GithubAccountPage($accountId: Int!) {
   github { accountPage(accountId: $accountId) {
     account { id screen_name platform user_id fetch_interval is_active last_fetched_at error_message instance_url auth_type created_at updated_at stats { followers_count following_count tweet_count } recentFetchRuns { id trigger status started_at finished_at duration_ms error_message capability_gaps { capability message } } }
-    overview { stats { public_repos public_gists followers following } repos { id account_id repo_id name full_name description language stars forks open_issues open_issues_only open_pull_requests topics homepage is_fork pinned created_at } allRepos { id account_id repo_id name full_name description language stars forks open_issues open_issues_only open_pull_requests topics homepage is_fork pinned created_at } totalStars totalForks totalRepos languages { language count } }
+    overview { stats { public_repos public_gists followers following } repos { id account_id repo_id name full_name description language stars forks open_issues open_issues_only open_pull_requests topics homepage is_fork pinned created_at } allRepos { id repo_id full_name language pinned } totalStars totalForks totalRepos languages { language count } }
     contributions { date count }
   } }
 }`;

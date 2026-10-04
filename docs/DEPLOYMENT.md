@@ -122,6 +122,24 @@ server {
     listen 443 ssl;
     server_name dashboard.example.com;
 
+    # Compress text responses on the edge. If a CDN already compresses this
+    # origin, configure it there instead and avoid compressing twice.
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_comp_level 5;
+    gzip_types
+        application/graphql-response+json
+        application/json
+        application/javascript
+        application/manifest+json
+        application/xml
+        image/svg+xml
+        text/css
+        text/html
+        text/plain
+        text/xml;
+
     location / {
         proxy_pass http://localhost:3000;
         proxy_set_header Host $host;
@@ -131,5 +149,15 @@ server {
     }
 }
 ```
+
+The Node static server preserves `Cache-Control: public, max-age=31536000,
+immutable` for hashed `/assets/` files and supports conditional requests with
+ETag/Last-Modified. It does not compress responses itself. Verify the live
+HTML, JavaScript, CSS, and authenticated JSON endpoints with
+`BASE_URL=https://dashboard.example.com PLAYWRIGHT_STORAGE_STATE=/path/to/state.json
+pnpm run perf:compression`; require `Content-Encoding: br` or `gzip` for text
+responses over 1 KiB. This check measures response headers and wire bytes rather
+than inferring compression from proxy configuration. The deployment target must
+be checked after proxy/CDN changes.
 
 Set `ALLOWED_ORIGINS=https://dashboard.example.com` and `HTTPS=true` in the app config.

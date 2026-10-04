@@ -24,7 +24,7 @@ export async function getGitlabAccountPage(viewer: AuthUser, id: number) {
   const [overview, contributions] = await Promise.all([
     getGitlabOverview(id), getGitlabContributions(id, new Date().getFullYear()),
   ]);
-  return { account, overview: { ...overview, projects: overview.projects.slice(0, 500), allProjects: overview.allProjects.slice(0, 500), topProjects: overview.topProjects.slice(0, 10), languages: Object.entries(overview.languages).map(([language, count]) => ({ language, count })) }, contributions };
+  return { account, overview: { ...overview, projects: overview.projects.slice(0, 500), allProjects: overview.allProjects.slice(0, 500).map((project) => ({ id: project.id, project_id: project.project_id, name: project.name, path_with_namespace: project.path_with_namespace, language: project.language, pinned: project.pinned })), topProjects: overview.topProjects.slice(0, 10), languages: Object.entries(overview.languages).map(([language, count]) => ({ language, count })) }, contributions };
 }
 
 export async function getGitlabProjectPage(viewer: AuthUser, accountId: number, projectId: number, days: number) {

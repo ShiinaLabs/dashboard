@@ -6,7 +6,8 @@ export const platformDashboardTypeDefs = /* GraphQL */ `
   extend type Query { gitlab: GitlabQuery!, reddit: RedditQuery! }
   type GitlabQuery { accountPage(accountId: Int!): GitlabAccountPage!, projectPage(accountId: Int!, projectId: Int!, days: Int! = 30): GitlabProjectPage! }
   type GitlabAccountPage { account: AccountDetail!, overview: GitlabOverview!, contributions: [GitlabContribution!]! }
-  type GitlabOverview { stats: GitlabStats, projects: [GitlabProject!]!, allProjects: [GitlabProject!]!, totalStars: Int!, totalForks: Int!, totalProjects: Int!, languages: [GitlabLanguage!]!, topProjects: [GitlabProject!]! }
+  type GitlabOverview { stats: GitlabStats, projects: [GitlabProject!]!, allProjects: [GitlabPinProject!]!, totalStars: Int!, totalForks: Int!, totalProjects: Int!, languages: [GitlabLanguage!]! }
+  type GitlabPinProject { id: Int!, project_id: Int!, name: String!, path_with_namespace: String!, language: String, pinned: Int! }
   type GitlabStats { public_projects: Int, followers: Int, following: Int }
   type GitlabProject { id: Int!, account_id: Int!, project_id: Int!, name: String!, path_with_namespace: String!, description: String, language: String, stars: Int!, forks: Int!, open_issues: Int!, topics: String!, homepage: String, is_fork: Int!, pinned: Int!, visibility: String!, created_at: String!, updated_at: String!, last_activity_at: String! }
   type GitlabContribution { date: String!, count: Int! }

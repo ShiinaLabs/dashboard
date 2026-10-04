@@ -33,18 +33,19 @@ describe("mobile layout contracts", () => {
 
     // SSR must render the open sidebar deterministically; the client then
     // reconciles via matchMedia / localStorage without a hydration flash.
-    expect(source).toContain("useState(loadSidebarOpen)");
+    expect(source).toContain("useState(true)");
     expect(source).toContain('typeof window === "undefined"');
-    expect(source).toContain("loadSidebarOpen()");
+    expect(source).toContain("requestAnimationFrame(() => setOpen(loadSidebarOpen()))");
   });
 
-  it("waits for the client before rendering detected translations", () => {
+  it("renders deterministic English on the server, then applies browser language preference", () => {
     const i18n = readProjectFile("lib/client/i18n.ts");
     const providers = readProjectFile("app/providers.tsx");
 
-    expect(i18n).toContain('lng: isBrowser ? undefined : "en"');
-    expect(providers).toContain("useSyncExternalStore");
-    expect(providers).toContain("if (!mounted)");
+    expect(i18n).toContain('lng: "en"');
+    expect(providers).toContain('localStorage.getItem("i18n-lang")');
+    expect(providers).toContain("i18n.changeLanguage(language)");
+    expect(providers).not.toContain("useSyncExternalStore");
   });
 
   it("gives the most-used detail pages a full-width mobile control row", () => {

@@ -1,0 +1,2066 @@
+{
+  "schemaVersion": 1,
+  "environment": {
+    "baseUrl": "http://localhost:3000",
+    "commit": "b58aed90bd075ca87fc1f9d6899f4fb8164729e8",
+    "nodeVersion": "v22.23.2",
+    "browser": "Chromium 153.0.8010.12",
+    "capturedAt": "2026-10-04T12:57:07.681Z",
+    "fixtureEnv": {
+      "githubAccountId": "2",
+      "githubRepoId": "1001",
+      "gitlabAccountId": "3",
+      "gitlabProjectId": "2001",
+      "redditAccountId": "4",
+      "xAccountId": "1"
+    },
+    "profileConfig": {
+      "normal": {
+        "latency": 0,
+        "downloadThroughput": -1,
+        "uploadThroughput": -1
+      },
+      "high-latency": {
+        "latency": 300,
+        "downloadThroughput": -1,
+        "uploadThroughput": -1
+      },
+      "weak": {
+        "latency": 300,
+        "downloadThroughput": 131072,
+        "uploadThroughput": 32768
+      }
+    },
+    "mockServer": true,
+    "mockClientBuild": true
+  },
+  "skippedPages": [],
+  "results": [
+    {
+      "profile": "normal",
+      "requestedPath": "/overview",
+      "route": "/overview",
+      "applicationRequestCount": 1,
+      "graphqlRequestCount": 1,
+      "graphqlOperations": [
+        "OverviewPage"
+      ],
+      "apiBytes": 28568,
+      "graphqlBytes": 28568,
+      "restJsonBytes": 0,
+      "htmlBytes": 12161,
+      "jsBytes": 1264552,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1403160,
+      "domContentLoadedMs": 45.20000001788139,
+      "firstMeaningfulAppShellMs": 144.78750000000002,
+      "usefulContentMs": 221.74075000000005,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 28568
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "normal",
+      "requestedPath": "/analytics",
+      "route": "/analytics",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AnalyticsPage",
+        "AiStatus"
+      ],
+      "apiBytes": 3880,
+      "graphqlBytes": 3880,
+      "restJsonBytes": 0,
+      "htmlBytes": 10798,
+      "jsBytes": 1441664,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1564104,
+      "domContentLoadedMs": 16.599999994039536,
+      "firstMeaningfulAppShellMs": 89.72495800000002,
+      "usefulContentMs": 134.502166,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 3087
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "normal",
+      "requestedPath": "/app-store",
+      "route": "/app-store",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AppStoreAnalyticsPage",
+        "AiStatus"
+      ],
+      "apiBytes": 2911,
+      "graphqlBytes": 2911,
+      "restJsonBytes": 0,
+      "htmlBytes": 9978,
+      "jsBytes": 1165585,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1286236,
+      "domContentLoadedMs": 16.5,
+      "firstMeaningfulAppShellMs": 89.20637499999975,
+      "usefulContentMs": 114.32933300000013,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 2118
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "normal",
+      "requestedPath": "/revenue",
+      "route": "/revenue",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "RevenuePage",
+        "AiStatus"
+      ],
+      "apiBytes": 4513,
+      "graphqlBytes": 4513,
+      "restJsonBytes": 0,
+      "htmlBytes": 10093,
+      "jsBytes": 1174166,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1296534,
+      "domContentLoadedMs": 15.600000023841858,
+      "firstMeaningfulAppShellMs": 86.5771249999998,
+      "usefulContentMs": 113.35249999999996,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 3720
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "normal",
+      "requestedPath": "/accounts",
+      "route": "/accounts",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AccountsList",
+        "AiStatus"
+      ],
+      "apiBytes": 1829,
+      "graphqlBytes": 1829,
+      "restJsonBytes": 0,
+      "htmlBytes": 11185,
+      "jsBytes": 875748,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 993199,
+      "domContentLoadedMs": 34.69999998807907,
+      "firstMeaningfulAppShellMs": 101.72845899999993,
+      "usefulContentMs": 116.75941699999976,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1036
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "normal",
+      "requestedPath": "/github",
+      "route": "/github",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AccountsList",
+        "AiStatus"
+      ],
+      "apiBytes": 1828,
+      "graphqlBytes": 1828,
+      "restJsonBytes": 0,
+      "htmlBytes": 9929,
+      "jsBytes": 788623,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 908630,
+      "domContentLoadedMs": 17.900000005960464,
+      "firstMeaningfulAppShellMs": 76.74354200000016,
+      "usefulContentMs": 83.14875000000029,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1035
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "normal",
+      "requestedPath": "/github/:accountId",
+      "route": "/github/2",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "GithubAccountPage",
+        "AiStatus"
+      ],
+      "apiBytes": 19900,
+      "graphqlBytes": 19900,
+      "restJsonBytes": 0,
+      "htmlBytes": 13491,
+      "jsBytes": 1204083,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1347678,
+      "domContentLoadedMs": 22.899999976158142,
+      "firstMeaningfulAppShellMs": 102.18066699999963,
+      "usefulContentMs": 140.0188330000001,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 19107
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "normal",
+      "requestedPath": "/github/:accountId/repos/:repoId",
+      "route": "/github/2/repos/1001",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "GithubRepoPage",
+        "AiStatus"
+      ],
+      "apiBytes": 21180,
+      "graphqlBytes": 21180,
+      "restJsonBytes": 0,
+      "htmlBytes": 15779,
+      "jsBytes": 1217595,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1352433,
+      "domContentLoadedMs": 20.69999998807907,
+      "firstMeaningfulAppShellMs": 87.75224999999955,
+      "usefulContentMs": 175.31725000000006,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 20387
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "normal",
+      "requestedPath": "/gitlab",
+      "route": "/gitlab",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AccountsList",
+        "AiStatus"
+      ],
+      "apiBytes": 1844,
+      "graphqlBytes": 1844,
+      "restJsonBytes": 0,
+      "htmlBytes": 9929,
+      "jsBytes": 788805,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 908841,
+      "domContentLoadedMs": 16.599999994039536,
+      "firstMeaningfulAppShellMs": 77.32700000000023,
+      "usefulContentMs": 83.51008300000012,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1051
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "normal",
+      "requestedPath": "/gitlab/:accountId",
+      "route": "/gitlab/3",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "GitlabAccountPage",
+        "AiStatus"
+      ],
+      "apiBytes": 22006,
+      "graphqlBytes": 22006,
+      "restJsonBytes": 0,
+      "htmlBytes": 13517,
+      "jsBytes": 1182266,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1328004,
+      "domContentLoadedMs": 16.599999994039536,
+      "firstMeaningfulAppShellMs": 79.6538330000003,
+      "usefulContentMs": 108.18029100000058,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 21213
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "normal",
+      "requestedPath": "/gitlab/:accountId/projects/:projectId",
+      "route": "/gitlab/3/projects/2001",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "GitlabProjectPage",
+        "AiStatus"
+      ],
+      "apiBytes": 5265,
+      "graphqlBytes": 5265,
+      "restJsonBytes": 0,
+      "htmlBytes": 15735,
+      "jsBytes": 1187642,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1314961,
+      "domContentLoadedMs": 17.400000005960464,
+      "firstMeaningfulAppShellMs": 79.07345900000018,
+      "usefulContentMs": 120.01291700000002,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 4472
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "normal",
+      "requestedPath": "/reddit",
+      "route": "/reddit",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AccountsList",
+        "AiStatus"
+      ],
+      "apiBytes": 1829,
+      "graphqlBytes": 1829,
+      "restJsonBytes": 0,
+      "htmlBytes": 10022,
+      "jsBytes": 789239,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 909361,
+      "domContentLoadedMs": 16.799999982118607,
+      "firstMeaningfulAppShellMs": 75.07995800000026,
+      "usefulContentMs": 81.14137500000106,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1036
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "normal",
+      "requestedPath": "/reddit/:accountId",
+      "route": "/reddit/4",
+      "applicationRequestCount": 3,
+      "graphqlRequestCount": 3,
+      "graphqlOperations": [
+        "RedditAccountPage",
+        "AiStatus",
+        "RedditAccountPage"
+      ],
+      "apiBytes": 2943,
+      "graphqlBytes": 2943,
+      "restJsonBytes": 0,
+      "htmlBytes": 13918,
+      "jsBytes": 1256090,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1379184,
+      "domContentLoadedMs": 17.5,
+      "firstMeaningfulAppShellMs": 84.21491699999933,
+      "usefulContentMs": null,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1075
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1075
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "normal",
+      "requestedPath": "/x",
+      "route": "/x",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AccountsList",
+        "AiStatus"
+      ],
+      "apiBytes": 1829,
+      "graphqlBytes": 1829,
+      "restJsonBytes": 0,
+      "htmlBytes": 9667,
+      "jsBytes": 784277,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 903937,
+      "domContentLoadedMs": 18.099999994039536,
+      "firstMeaningfulAppShellMs": 73.62612499999886,
+      "usefulContentMs": 79.0335410000007,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1036
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "normal",
+      "requestedPath": "/x/:accountId",
+      "route": "/x/1",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "XAccountPage",
+        "AiStatus"
+      ],
+      "apiBytes": 14580,
+      "graphqlBytes": 14580,
+      "restJsonBytes": 0,
+      "htmlBytes": 13428,
+      "jsBytes": 1237923,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1363810,
+      "domContentLoadedMs": 18.700000017881393,
+      "firstMeaningfulAppShellMs": 86.984375,
+      "usefulContentMs": 156.00258400000166,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 13787
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "normal",
+      "requestedPath": "/settings",
+      "route": "/settings",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "SettingsPage",
+        "AiStatus"
+      ],
+      "apiBytes": 1583,
+      "graphqlBytes": 1583,
+      "restJsonBytes": 0,
+      "htmlBytes": 10274,
+      "jsBytes": 842714,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 959008,
+      "domContentLoadedMs": 14,
+      "firstMeaningfulAppShellMs": 82.62870800000019,
+      "usefulContentMs": 86.48212500000227,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 790
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "normal",
+      "requestedPath": "/admin",
+      "route": "/admin",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AiStatus",
+        "AdminUsersPage"
+      ],
+      "apiBytes": 1701,
+      "graphqlBytes": 1701,
+      "restJsonBytes": 0,
+      "htmlBytes": 10219,
+      "jsBytes": 823237,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 939594,
+      "domContentLoadedMs": 14.700000017881393,
+      "firstMeaningfulAppShellMs": 66.265625,
+      "usefulContentMs": 76.95358300000225,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 908
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "high-latency",
+      "requestedPath": "/overview",
+      "route": "/overview",
+      "applicationRequestCount": 1,
+      "graphqlRequestCount": 1,
+      "graphqlOperations": [
+        "OverviewPage"
+      ],
+      "apiBytes": 28568,
+      "graphqlBytes": 28568,
+      "restJsonBytes": 0,
+      "htmlBytes": 12161,
+      "jsBytes": 1264552,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1428520,
+      "domContentLoadedMs": 929.1999999880791,
+      "firstMeaningfulAppShellMs": 3755.213416999999,
+      "usefulContentMs": 4539.037417,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 28568
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "high-latency",
+      "requestedPath": "/analytics",
+      "route": "/analytics",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AiStatus",
+        "AnalyticsPage"
+      ],
+      "apiBytes": 3880,
+      "graphqlBytes": 3880,
+      "restJsonBytes": 0,
+      "htmlBytes": 10798,
+      "jsBytes": 1441664,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1564104,
+      "domContentLoadedMs": 929.5,
+      "firstMeaningfulAppShellMs": 3227.8466249999983,
+      "usefulContentMs": 3229.3212499999972,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 3087
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "high-latency",
+      "requestedPath": "/app-store",
+      "route": "/app-store",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AppStoreAnalyticsPage",
+        "AiStatus"
+      ],
+      "apiBytes": 2911,
+      "graphqlBytes": 2911,
+      "restJsonBytes": 0,
+      "htmlBytes": 9978,
+      "jsBytes": 1165585,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1286236,
+      "domContentLoadedMs": 929.5,
+      "firstMeaningfulAppShellMs": 3235.0194999999985,
+      "usefulContentMs": 3236.823042,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 2118
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "high-latency",
+      "requestedPath": "/revenue",
+      "route": "/revenue",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "RevenuePage",
+        "AiStatus"
+      ],
+      "apiBytes": 4513,
+      "graphqlBytes": 4513,
+      "restJsonBytes": 0,
+      "htmlBytes": 10093,
+      "jsBytes": 1174166,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1296534,
+      "domContentLoadedMs": 934.9000000059605,
+      "firstMeaningfulAppShellMs": 3238.454666999998,
+      "usefulContentMs": 3240.1430420000033,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 3720
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "high-latency",
+      "requestedPath": "/accounts",
+      "route": "/accounts",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AccountsList",
+        "AiStatus"
+      ],
+      "apiBytes": 1829,
+      "graphqlBytes": 1829,
+      "restJsonBytes": 0,
+      "htmlBytes": 11185,
+      "jsBytes": 875748,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 993199,
+      "domContentLoadedMs": 924.1999999880791,
+      "firstMeaningfulAppShellMs": 3222.0381250000064,
+      "usefulContentMs": 3504.772834000003,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1036
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "high-latency",
+      "requestedPath": "/github",
+      "route": "/github",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AiStatus",
+        "AccountsList"
+      ],
+      "apiBytes": 1828,
+      "graphqlBytes": 1828,
+      "restJsonBytes": 0,
+      "htmlBytes": 9929,
+      "jsBytes": 788623,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 911993,
+      "domContentLoadedMs": 930.6999999880791,
+      "firstMeaningfulAppShellMs": 3241.852209000004,
+      "usefulContentMs": 3251.8695000000007,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1035
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "high-latency",
+      "requestedPath": "/github/:accountId",
+      "route": "/github/2",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "GithubAccountPage",
+        "AiStatus"
+      ],
+      "apiBytes": 19900,
+      "graphqlBytes": 19900,
+      "restJsonBytes": 0,
+      "htmlBytes": 13491,
+      "jsBytes": 1204083,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1351041,
+      "domContentLoadedMs": 934,
+      "firstMeaningfulAppShellMs": 3753.219124999996,
+      "usefulContentMs": 3800.7728329999954,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 19107
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "high-latency",
+      "requestedPath": "/github/:accountId/repos/:repoId",
+      "route": "/github/2/repos/1001",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "GithubRepoPage",
+        "AiStatus"
+      ],
+      "apiBytes": 21180,
+      "graphqlBytes": 21180,
+      "restJsonBytes": 0,
+      "htmlBytes": 15779,
+      "jsBytes": 1217595,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1360873,
+      "domContentLoadedMs": 929.4000000059605,
+      "firstMeaningfulAppShellMs": 3758.8058329999985,
+      "usefulContentMs": 3859.4611670000013,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 20387
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "high-latency",
+      "requestedPath": "/gitlab",
+      "route": "/gitlab",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AccountsList",
+        "AiStatus"
+      ],
+      "apiBytes": 1844,
+      "graphqlBytes": 1844,
+      "restJsonBytes": 0,
+      "htmlBytes": 9929,
+      "jsBytes": 788805,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 912204,
+      "domContentLoadedMs": 933.3000000119209,
+      "firstMeaningfulAppShellMs": 3250.4287079999995,
+      "usefulContentMs": 3253.6808329999985,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1051
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "high-latency",
+      "requestedPath": "/gitlab/:accountId",
+      "route": "/gitlab/3",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AiStatus",
+        "GitlabAccountPage"
+      ],
+      "apiBytes": 22006,
+      "graphqlBytes": 22006,
+      "restJsonBytes": 0,
+      "htmlBytes": 13517,
+      "jsBytes": 1182266,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1331367,
+      "domContentLoadedMs": 936.9000000059605,
+      "firstMeaningfulAppShellMs": 3748.648000000001,
+      "usefulContentMs": 3797.691500000001,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 21213
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "high-latency",
+      "requestedPath": "/gitlab/:accountId/projects/:projectId",
+      "route": "/gitlab/3/projects/2001",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AiStatus",
+        "GitlabProjectPage"
+      ],
+      "apiBytes": 5265,
+      "graphqlBytes": 5265,
+      "restJsonBytes": 0,
+      "htmlBytes": 15735,
+      "jsBytes": 1187642,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1314961,
+      "domContentLoadedMs": 931.5999999940395,
+      "firstMeaningfulAppShellMs": 3750.624250000008,
+      "usefulContentMs": 3794.8822920000093,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 4472
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "high-latency",
+      "requestedPath": "/reddit",
+      "route": "/reddit",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AccountsList",
+        "AiStatus"
+      ],
+      "apiBytes": 1829,
+      "graphqlBytes": 1829,
+      "restJsonBytes": 0,
+      "htmlBytes": 10022,
+      "jsBytes": 789239,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 912740,
+      "domContentLoadedMs": 934,
+      "firstMeaningfulAppShellMs": 3251.463625000004,
+      "usefulContentMs": 3254.1296250000014,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1036
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "high-latency",
+      "requestedPath": "/reddit/:accountId",
+      "route": "/reddit/4",
+      "applicationRequestCount": 3,
+      "graphqlRequestCount": 3,
+      "graphqlOperations": [
+        "AiStatus",
+        "RedditAccountPage",
+        "RedditAccountPage"
+      ],
+      "apiBytes": 2943,
+      "graphqlBytes": 2943,
+      "restJsonBytes": 0,
+      "htmlBytes": 13918,
+      "jsBytes": 1256090,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1379184,
+      "domContentLoadedMs": 931.1999999880791,
+      "firstMeaningfulAppShellMs": 3756.8253750000003,
+      "usefulContentMs": null,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1075
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1075
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "high-latency",
+      "requestedPath": "/x",
+      "route": "/x",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AiStatus",
+        "AccountsList"
+      ],
+      "apiBytes": 1829,
+      "graphqlBytes": 1829,
+      "restJsonBytes": 0,
+      "htmlBytes": 9667,
+      "jsBytes": 784277,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 907198,
+      "domContentLoadedMs": 930,
+      "firstMeaningfulAppShellMs": 2733.341916999998,
+      "usefulContentMs": 2912.3274579999998,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1036
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "high-latency",
+      "requestedPath": "/x/:accountId",
+      "route": "/x/1",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AiStatus",
+        "XAccountPage"
+      ],
+      "apiBytes": 14580,
+      "graphqlBytes": 14580,
+      "restJsonBytes": 0,
+      "htmlBytes": 13428,
+      "jsBytes": 1237923,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1372164,
+      "domContentLoadedMs": 934,
+      "firstMeaningfulAppShellMs": 3741.1681249999965,
+      "usefulContentMs": 4524.4250410000095,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 13787
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "high-latency",
+      "requestedPath": "/settings",
+      "route": "/settings",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "SettingsPage",
+        "AiStatus"
+      ],
+      "apiBytes": 1583,
+      "graphqlBytes": 1583,
+      "restJsonBytes": 0,
+      "htmlBytes": 10274,
+      "jsBytes": 842714,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 959008,
+      "domContentLoadedMs": 932,
+      "firstMeaningfulAppShellMs": 3249.8887499999983,
+      "usefulContentMs": 3254.541459,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 790
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "high-latency",
+      "requestedPath": "/admin",
+      "route": "/admin",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AiStatus",
+        "AdminUsersPage"
+      ],
+      "apiBytes": 1701,
+      "graphqlBytes": 1701,
+      "restJsonBytes": 0,
+      "htmlBytes": 10219,
+      "jsBytes": 823237,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 939594,
+      "domContentLoadedMs": 934.5999999940395,
+      "firstMeaningfulAppShellMs": 3252.3289579999982,
+      "usefulContentMs": 3254.8127079999977,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 908
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "weak",
+      "requestedPath": "/overview",
+      "route": "/overview",
+      "applicationRequestCount": 1,
+      "graphqlRequestCount": 1,
+      "graphqlOperations": [
+        "OverviewPage"
+      ],
+      "apiBytes": 28568,
+      "graphqlBytes": 28568,
+      "restJsonBytes": 0,
+      "htmlBytes": 12161,
+      "jsBytes": 1264552,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1409718,
+      "domContentLoadedMs": 4584.0999999940395,
+      "firstMeaningfulAppShellMs": 12427.665041,
+      "usefulContentMs": 12747.022790999996,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 28568
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "weak",
+      "requestedPath": "/analytics",
+      "route": "/analytics",
+      "applicationRequestCount": 0,
+      "graphqlRequestCount": 0,
+      "graphqlOperations": [],
+      "apiBytes": 0,
+      "graphqlBytes": 0,
+      "restJsonBytes": 0,
+      "htmlBytes": 10798,
+      "jsBytes": 1441664,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1549568,
+      "domContentLoadedMs": 4576,
+      "firstMeaningfulAppShellMs": null,
+      "usefulContentMs": null,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "weak",
+      "requestedPath": "/app-store",
+      "route": "/app-store",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AppStoreAnalyticsPage",
+        "AiStatus"
+      ],
+      "apiBytes": 2911,
+      "graphqlBytes": 2911,
+      "restJsonBytes": 0,
+      "htmlBytes": 9978,
+      "jsBytes": 1165585,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1286236,
+      "domContentLoadedMs": 4564.0999999940395,
+      "firstMeaningfulAppShellMs": 10893.064374999987,
+      "usefulContentMs": 10894.207834,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 2118
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "weak",
+      "requestedPath": "/revenue",
+      "route": "/revenue",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "RevenuePage",
+        "AiStatus"
+      ],
+      "apiBytes": 4513,
+      "graphqlBytes": 4513,
+      "restJsonBytes": 0,
+      "htmlBytes": 10093,
+      "jsBytes": 1174166,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1296534,
+      "domContentLoadedMs": 4572.200000017881,
+      "firstMeaningfulAppShellMs": 11403.236249999987,
+      "usefulContentMs": 11404.468792,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 3720
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "weak",
+      "requestedPath": "/accounts",
+      "route": "/accounts",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AccountsList",
+        "AiStatus"
+      ],
+      "apiBytes": 1829,
+      "graphqlBytes": 1829,
+      "restJsonBytes": 0,
+      "htmlBytes": 11185,
+      "jsBytes": 875748,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 993199,
+      "domContentLoadedMs": 4569.0999999940395,
+      "firstMeaningfulAppShellMs": 9386.245541000011,
+      "usefulContentMs": 9387.388166000019,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1036
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "weak",
+      "requestedPath": "/github",
+      "route": "/github",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AccountsList",
+        "AiStatus"
+      ],
+      "apiBytes": 1828,
+      "graphqlBytes": 1828,
+      "restJsonBytes": 0,
+      "htmlBytes": 9929,
+      "jsBytes": 788623,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 917070,
+      "domContentLoadedMs": 4564.199999988079,
+      "firstMeaningfulAppShellMs": 8385.087874999997,
+      "usefulContentMs": 8565.104290999996,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1035
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "weak",
+      "requestedPath": "/github/:accountId",
+      "route": "/github/2",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AiStatus",
+        "GithubAccountPage"
+      ],
+      "apiBytes": 19900,
+      "graphqlBytes": 19900,
+      "restJsonBytes": 0,
+      "htmlBytes": 13491,
+      "jsBytes": 1204083,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1351041,
+      "domContentLoadedMs": 4585.200000017881,
+      "firstMeaningfulAppShellMs": 11920.774334000016,
+      "usefulContentMs": 12107.788084,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 19107
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "weak",
+      "requestedPath": "/github/:accountId/repos/:repoId",
+      "route": "/github/2/repos/1001",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AiStatus",
+        "GithubRepoPage"
+      ],
+      "apiBytes": 21180,
+      "graphqlBytes": 21180,
+      "restJsonBytes": 0,
+      "htmlBytes": 15779,
+      "jsBytes": 1217595,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1360873,
+      "domContentLoadedMs": 4597.700000017881,
+      "firstMeaningfulAppShellMs": 11950.982917000016,
+      "usefulContentMs": 12224.10166700001,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 20387
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "weak",
+      "requestedPath": "/gitlab",
+      "route": "/gitlab",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AccountsList",
+        "AiStatus"
+      ],
+      "apiBytes": 1844,
+      "graphqlBytes": 1844,
+      "restJsonBytes": 0,
+      "htmlBytes": 9929,
+      "jsBytes": 788805,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 917281,
+      "domContentLoadedMs": 4573.9000000059605,
+      "firstMeaningfulAppShellMs": 8392.994459000009,
+      "usefulContentMs": 8575.357959000015,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1051
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "weak",
+      "requestedPath": "/gitlab/:accountId",
+      "route": "/gitlab/3",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AiStatus",
+        "GitlabAccountPage"
+      ],
+      "apiBytes": 22006,
+      "graphqlBytes": 22006,
+      "restJsonBytes": 0,
+      "htmlBytes": 13517,
+      "jsBytes": 1182266,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1331367,
+      "domContentLoadedMs": 4587.299999982119,
+      "firstMeaningfulAppShellMs": 11923.752917000005,
+      "usefulContentMs": 12102.348459,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 21213
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "weak",
+      "requestedPath": "/gitlab/:accountId/projects/:projectId",
+      "route": "/gitlab/3/projects/2001",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "GitlabProjectPage",
+        "AiStatus"
+      ],
+      "apiBytes": 5265,
+      "graphqlBytes": 5265,
+      "restJsonBytes": 0,
+      "htmlBytes": 15735,
+      "jsBytes": 1187642,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1314961,
+      "domContentLoadedMs": 4596.0999999940395,
+      "firstMeaningfulAppShellMs": 11438.947249999997,
+      "usefulContentMs": 11648.643333000015,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 4472
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "weak",
+      "requestedPath": "/reddit",
+      "route": "/reddit",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AccountsList",
+        "AiStatus"
+      ],
+      "apiBytes": 1829,
+      "graphqlBytes": 1829,
+      "restJsonBytes": 0,
+      "htmlBytes": 10022,
+      "jsBytes": 789239,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 917715,
+      "domContentLoadedMs": 4574.0999999940395,
+      "firstMeaningfulAppShellMs": 8394.058790999989,
+      "usefulContentMs": 8582.34362499998,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1036
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "weak",
+      "requestedPath": "/reddit/:accountId",
+      "route": "/reddit/4",
+      "applicationRequestCount": 3,
+      "graphqlRequestCount": 3,
+      "graphqlOperations": [
+        "RedditAccountPage",
+        "AiStatus",
+        "RedditAccountPage"
+      ],
+      "apiBytes": 2943,
+      "graphqlBytes": 2943,
+      "restJsonBytes": 0,
+      "htmlBytes": 13918,
+      "jsBytes": 1256090,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1379184,
+      "domContentLoadedMs": 4595.0999999940395,
+      "firstMeaningfulAppShellMs": 12432.73116699999,
+      "usefulContentMs": null,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1075
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1075
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "weak",
+      "requestedPath": "/x",
+      "route": "/x",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AccountsList",
+        "AiStatus"
+      ],
+      "apiBytes": 1829,
+      "graphqlBytes": 1829,
+      "restJsonBytes": 0,
+      "htmlBytes": 9667,
+      "jsBytes": 784277,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 912291,
+      "domContentLoadedMs": 4574.4000000059605,
+      "firstMeaningfulAppShellMs": 8393.30895799998,
+      "usefulContentMs": 8573.402000000002,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 1036
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "weak",
+      "requestedPath": "/x/:accountId",
+      "route": "/x/1",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AiStatus",
+        "XAccountPage"
+      ],
+      "apiBytes": 14580,
+      "graphqlBytes": 14580,
+      "restJsonBytes": 0,
+      "htmlBytes": 13428,
+      "jsBytes": 1237923,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 1372164,
+      "domContentLoadedMs": 4585,
+      "firstMeaningfulAppShellMs": 11924.124500000034,
+      "usefulContentMs": 12710.389166000008,
+      "largestRequest": {
+        "path": "/assets/CategoricalChart-Bblsx9I7.js",
+        "resourceType": "Script",
+        "bytes": 302552
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 13787
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "weak",
+      "requestedPath": "/settings",
+      "route": "/settings",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "SettingsPage",
+        "AiStatus"
+      ],
+      "apiBytes": 1583,
+      "graphqlBytes": 1583,
+      "restJsonBytes": 0,
+      "htmlBytes": 10274,
+      "jsBytes": 842714,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 959008,
+      "domContentLoadedMs": 4572.600000023842,
+      "firstMeaningfulAppShellMs": 8890.28462500003,
+      "usefulContentMs": 8891.930541999987,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 790
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    },
+    {
+      "profile": "weak",
+      "requestedPath": "/admin",
+      "route": "/admin",
+      "applicationRequestCount": 2,
+      "graphqlRequestCount": 2,
+      "graphqlOperations": [
+        "AiStatus",
+        "AdminUsersPage"
+      ],
+      "apiBytes": 1701,
+      "graphqlBytes": 1701,
+      "restJsonBytes": 0,
+      "htmlBytes": 10219,
+      "jsBytes": 823237,
+      "cssBytes": 97106,
+      "totalTransferredBytes": 939594,
+      "domContentLoadedMs": 4575,
+      "firstMeaningfulAppShellMs": 8387.83150000003,
+      "usefulContentMs": 8675.379375000019,
+      "largestRequest": {
+        "path": "/assets/entry.client-DgQF3aJl.js",
+        "resourceType": "Script",
+        "bytes": 183357
+      },
+      "criticalRequestChain": [
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 793
+        },
+        {
+          "path": "/api/graphql",
+          "status": 200,
+          "bytes": 908
+        }
+      ],
+      "error": null,
+      "skipReason": null
+    }
+  ]
+}

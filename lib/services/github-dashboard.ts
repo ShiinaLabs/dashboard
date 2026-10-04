@@ -32,12 +32,13 @@ export async function getGithubAccountPage(viewer: AuthUser, accountId: number) 
     open_issues: repo.open_issues, open_issues_only: repo.open_issues_only, open_pull_requests: repo.open_pull_requests,
     topics: repo.topics, homepage: repo.homepage, is_fork: repo.is_fork, pinned: repo.pinned, created_at: repo.created_at,
   });
+  const pinCandidate = (repo: GithubRepo) => ({ id: repo.id, repo_id: repo.repo_id, full_name: repo.full_name, language: repo.language, pinned: repo.pinned });
   return {
     account,
     overview: {
       stats: overview.stats,
       repos: overview.repos.slice(0, 500).map(compactRepo),
-      allRepos: (overview.allRepos as GithubRepo[]).slice(0, 500).map(compactRepo),
+      allRepos: (overview.allRepos as GithubRepo[]).slice(0, 500).map(pinCandidate),
       totalStars: overview.totalStars,
       totalForks: overview.totalForks,
       totalRepos: overview.totalRepos,

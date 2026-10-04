@@ -46,6 +46,8 @@ Regular users are scoped to their own non-deleted sites; admins use the portfoli
 
 GitHub, GitLab, and Reddit detail screens use `github.accountPage`, `github.repoPage`, `gitlab.accountPage`, `gitlab.projectPage`, and `reddit.accountPage`. Each read model checks the viewer and platform before fetching dependent data, then runs independent domain reads together. GitHub repository history uses the active range; descriptions, content, and asset lists are bounded. Watchlist dialog reads combine saved selections and available organizations in `github.watchlistManager`; saving remains REST.
 
+GitHub and GitLab account reads now use a compact pin-candidate shape for the complete pin chooser. Repeated full project/repository descriptions, topics, activity fields, and unused top-project rows are not serialized for that chooser.
+
 App Store connections use `appStore.connections` and `appStore.connection(id)` for safe connection metadata, app records, recent sync state, health, and analytics status. The public type includes only whether a private key is configured; it never returns the key. Creating/updating connections, app toggles, refresh, sync, setup, and backfill stay REST commands.
 
 Page operations are React Query cache units and use `AbortSignal` through `graphqlRequest` → `apiRequest` → `fetch`. Range or tab changes use a targeted operation and query key. The browser should not return to per-account fan-out or a sequence of dependent `useQuery` calls for the initial visible page.

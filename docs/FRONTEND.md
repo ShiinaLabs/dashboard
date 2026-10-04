@@ -98,7 +98,7 @@ Routes are declared in `app/routes.ts` (React Router Framework Mode). All pages 
 
 - Uses @tanstack/react-query for caching and refetching.
 - `QueryClient` is created in `app/providers.tsx` with `retry: 1` and `staleTime: 3 minutes`.
-- API client in `lib/api.ts` wraps fetch calls against the route handlers under `app/api/`.
+- `lib/client/graphql/` owns page reads; `lib/api.ts` retains REST commands and session calls. Both use `lib/client/api-transport.ts` for credentials, redirects, and abort propagation.
 - `MOCK_DATA=1` makes the server serve fixture data from `lib/mock`; `NEXT_PUBLIC_MOCK_DATA=1` is the build-time mirror that shows the `MockModeBanner` (both are set by `pnpm run mock`).
 
 ## i18n
@@ -149,11 +149,18 @@ The authenticated layout (`components/layout/authenticated-layout.tsx`) follows 
 
 Multi-layered loading strategy for smooth UX on slow networks:
 
-1. **Providers hydration guard** — a minimal background shell renders before the client shell mounts, preventing SSR/client mismatch
+1. **Server render** — authenticated route HTML includes the app shell and page content/skeleton before browser JavaScript. Browser-only language, theme, viewport, and sidebar preferences apply after hydration to keep the first client render deterministic.
 2. **Auth check** — non-blocking; the layout renders immediately
 3. **Navigating overlay** — semi-transparent backdrop + spinner only while React Router reports a pending navigation
 4. **Progress bar** — animated gradient bar at top of page only while navigation is pending
 5. **Skeleton loading** — `MetricCardSkeleton` / `ChartCardSkeleton` replace "Loading…" text
 6. **Fade-in animation** — `page-enter` class on route content for smooth appearance; disabled under `prefers-reduced-motion`
+
+## Weak-network checks
+
+- `pnpm run perf:query-plane` records page request topology, transferred bytes, GraphQL raw/gzip/Brotli payload sizes, core render timings, and route assets under normal, 300 ms RTT, and 300 ms RTT + 1 Mbps down / 256 Kbps up profiles. Set `BASE_URL`, `PLAYWRIGHT_STORAGE_STATE`, and fixture IDs for detail pages; missing fixtures are recorded as skipped.
+- `pnpm run perf:bundle` records raw/gzip/Brotli chunk sizes. `pnpm run build` runs this guard automatically and enforces relative aggregate and largest-chunk budgets against `performance/bundle-baseline.json`.
+- `pnpm run perf:compression` probes actual HTML, JavaScript, CSS, authenticated REST JSON, and GraphQL response headers. Run it against the deployed public URL; a local Node response without a reverse proxy is expected to be uncompressed.
+- `performance/baseline.json` is the checked-in local production-build/mock baseline comparison. It is a reproducible code baseline, not a measurement of the production VPS.
 
 ASC connection details expose manual Sync Analytics and Sync Revenue alongside the existing Analytics setup and Edit Connection controls. Vendor Number setup uses Edit Connection rather than a separate wizard. Revenue supports enabled All Apps/single App, 7/30/90-day and Territory filters; Settlements use a separate Apple fiscal-month filter. Original currencies render separately, unknown metrics render `—`, Paying Users is not summed across rows, and subscription Active uses the latest per-app snapshot. Production charts read imported facts; no production report samples are requested by the UI. The browser converts decimal strings to chart coordinates only; monetary cards and tables preserve exact strings.

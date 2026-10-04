@@ -20,7 +20,8 @@ export const githubTypeDefs = /* GraphQL */ `
   type GithubReleaseGrowthPoint { day: Int!, download_count: Int!, snapshot_date: String!, assets: [GithubAssetDownload!]! }
   type GithubAssetDownload { name: String!, downloadCount: Int! }
   type GithubAccountPage { account: AccountDetail!, overview: GithubAccountOverview!, contributions: [GithubContribution!]! }
-  type GithubAccountOverview { stats: GithubStats, repos: [GithubPageRepo!]!, allRepos: [GithubPageRepo!]!, totalStars: Int!, totalForks: Int!, totalRepos: Int!, languages: [GithubLanguage!]! }
+  type GithubAccountOverview { stats: GithubStats, repos: [GithubPageRepo!]!, allRepos: [GithubPinCandidate!]!, totalStars: Int!, totalForks: Int!, totalRepos: Int!, languages: [GithubLanguage!]! }
+  type GithubPinCandidate { id: Int!, repo_id: Int!, full_name: String!, language: String, pinned: Boolean! }
   type GithubStats { public_repos: Int, public_gists: Int, followers: Int, following: Int }
   type GithubPageRepo { id: Int!, account_id: Int!, repo_id: Int!, name: String!, full_name: String!, description: String, language: String, stars: Int!, forks: Int!, open_issues: Int!, open_issues_only: Int, open_pull_requests: Int, topics: String, homepage: String, is_fork: Boolean!, pinned: Boolean!, created_at: String }
   type GithubContribution { date: String!, count: Int! }

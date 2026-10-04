@@ -75,7 +75,20 @@ async function serveStatic(req, res, pathname) {
     "Content-Type": type,
     "Content-Length": info.size,
     "Cache-Control": cacheControl(pathname),
+    ETag: `W/"${info.size.toString(16)}-${Math.trunc(info.mtimeMs).toString(16)}"`,
+    "Last-Modified": info.mtime.toUTCString(),
   };
+  const ifNoneMatch = req.headers["if-none-match"];
+  const ifModifiedSince = req.headers["if-modified-since"];
+  const notModified = ifNoneMatch
+    ? ifNoneMatch.split(",").map((tag) => tag.trim()).includes(headers.ETag) || ifNoneMatch.trim() === "*"
+    : ifModifiedSince && Date.parse(ifModifiedSince) >= Math.floor(info.mtimeMs / 1000) * 1000;
+  if (notModified) {
+    delete headers["Content-Length"];
+    res.writeHead(304, headers);
+    res.end();
+    return;
+  }
   res.writeHead(200, headers);
   if (req.method === "HEAD") {
     res.end();

@@ -75,3 +75,5 @@ Connection lists/details, apps, health, analytics status, Analytics reports, and
 | GET | `/bing-wallpaper` | public | Redirect to upstream daily wallpaper |
 
 Settings, admin user metadata, and AI quota/status use GraphQL. AI chat remains a streaming REST response. GraphiQL is enabled only outside production and request batching is disabled.
+
+Static hashed assets use immutable one-year caching plus ETag/Last-Modified conditional requests. Node intentionally does not compress responses; compression belongs at the production reverse proxy, ingress, or CDN. Verify deployed response headers and wire bytes with `pnpm run perf:compression` rather than assuming that a proxy configuration is active.
