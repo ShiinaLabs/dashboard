@@ -1,5 +1,5 @@
 // @ts-nocheck — Drizzle ORM types are complex
-import { eq, and, desc, sql, gte, type SQL } from "drizzle-orm";
+import { eq, and, desc, sql, gte, inArray, type SQL } from "drizzle-orm";
 import { getDb } from "../db/connection";
 import { isMockMode } from "../config";
 import * as mock from "../mock";
