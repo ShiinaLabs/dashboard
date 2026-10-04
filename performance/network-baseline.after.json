@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "environment": {
     "baseUrl": "http://localhost:3000",
-    "commit": "b58aed90bd075ca87fc1f9d6899f4fb8164729e8",
-    "workingTreeDiffSha256": "9187694483d693dd533486b7f6f14cca65fe778750ec5ba6315ecac845ab2830",
+    "commit": "18457c4",
+    "workingTreeDiffSha256": null,
     "nodeVersion": "v22.23.2",
     "browser": "Chromium 153.0.8010.12",
     "capturedAt": "2026-10-04T13:18:35.246Z",
@@ -33,7 +33,8 @@
       }
     },
     "mockServer": true,
-    "mockClientBuild": true
+    "mockClientBuild": true,
+    "cleanCommittedSource": true
   },
   "skippedPages": [],
   "results": [

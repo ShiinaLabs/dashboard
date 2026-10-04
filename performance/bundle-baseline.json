@@ -1,6 +1,6 @@
 {
   "generatedAt": "2026-10-04T13:26:44.115Z",
-  "commit": "b58aed90bd075ca87fc1f9d6899f4fb8164729e8",
+  "commit": "18457c4",
   "nodeVersion": "v22.23.2",
   "totals": {
     "js": {
@@ -1088,5 +1088,6 @@
       "gzipBytes": 220,
       "brotliBytes": 195
     }
-  ]
+  ],
+  "cleanCommittedSource": true
 }
