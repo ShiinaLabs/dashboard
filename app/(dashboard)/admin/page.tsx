@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { useOutletContext } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
+import type { AuthUser } from "@/lib/auth-helpers";
 import { api } from "@/lib/api";
 import { getAdminUsersPage } from "@/lib/client/graphql/settings";
 import { Users, Plus, Trash2 } from "lucide-react";
@@ -21,6 +23,7 @@ export const handle = { titleKey } satisfies TitleHandle;
 
 export default function Admin() {
   const { t } = useTranslation();
+  const authData = useOutletContext<AuthUser>();
   const [createError, setCreateError] = useState("");
   const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
   const [password, setPassword] = useState("");
@@ -29,15 +32,10 @@ export default function Admin() {
   const pwRules = validatePassword(password).rules;
   const pwMismatch = confirmPassword !== "" && password !== confirmPassword;
 
-  const { data: authData } = useQuery({
-    queryKey: ["auth", "me"],
-    queryFn: () => api.checkAuth(),
-  });
-
   const { data: usersData, refetch: refetchUsers } = useQuery({
     queryKey: ["users"],
     queryFn: ({ signal }) => getAdminUsersPage(signal),
-    enabled: authData?.role === "admin",
+    enabled: authData.role === "admin",
   });
 
   const users = usersData?.users || [];
@@ -70,7 +68,7 @@ export default function Admin() {
     }
   };
 
-  if (authData?.role !== "admin") {
+  if (authData.role !== "admin") {
     return (
       <div className="text-center py-12 text-[var(--muted-foreground)]">
         {t("admin.forbidden")}

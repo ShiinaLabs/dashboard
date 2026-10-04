@@ -1,16 +1,63 @@
-const STORAGE_KEY = "timezone";
-const isBrowser = typeof window !== "undefined";
+import { isValidTimezone, TIMEZONE_COOKIE } from "../timezone";
 
-export function getTimezone(): string {
-  if (!isBrowser) {
-    return "UTC";
+const STORAGE_KEY = "timezone";
+const TIMEZONE_COOKIE_MAX_AGE = 365 * 24 * 60 * 60;
+
+function readStoredTimezone(): string | null {
+  try {
+    const value = localStorage.getItem(STORAGE_KEY);
+    return isValidTimezone(value) ? value : null;
+  } catch {
+    return null;
   }
-  return localStorage.getItem(STORAGE_KEY) || Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
-export function setTimezone(tz: string) {
-  if (!isBrowser) return;
-  localStorage.setItem(STORAGE_KEY, tz);
+function getBrowserTimezone(): string {
+  try {
+    const value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return isValidTimezone(value) ? value : "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
+function readTimezoneCookie(): string | null {
+  try {
+    const cookie = document.cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${TIMEZONE_COOKIE}=`));
+    if (!cookie) return null;
+    const value = decodeURIComponent(cookie.slice(TIMEZONE_COOKIE.length + 1));
+    return isValidTimezone(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeTimezoneCookie(timezone: string) {
+  document.cookie = `${TIMEZONE_COOKIE}=${encodeURIComponent(timezone)}; Path=/; SameSite=Lax; Max-Age=${TIMEZONE_COOKIE_MAX_AGE}`;
+}
+
+export function getTimezone(): string {
+  if (typeof window === "undefined") return "UTC";
+  return readStoredTimezone() ?? readTimezoneCookie() ?? getBrowserTimezone();
+}
+
+export function setTimezone(timezone: string) {
+  if (typeof window === "undefined" || !isValidTimezone(timezone)) return;
+  try {
+    localStorage.setItem(STORAGE_KEY, timezone);
+  } catch {
+    // Keep the request cookie useful when browser storage is unavailable.
+  }
+  writeTimezoneCookie(timezone);
+}
+
+export function syncTimezoneCookie(): string {
+  if (typeof window === "undefined") return "UTC";
+  const storedTimezone = readStoredTimezone();
+  const cookieTimezone = readTimezoneCookie();
+  const timezone = storedTimezone ?? cookieTimezone ?? getBrowserTimezone();
+  if (cookieTimezone !== timezone) writeTimezoneCookie(timezone);
+  return timezone;
 }
 
 export function formatDate(date: Date | string, timeZone?: string): string {

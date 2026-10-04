@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { analyticsPublicOrigin } from "../config";
+import { isValidTimezone } from "../timezone";
 import {
   createAnalyticsSite as createSite,
   getAnalyticsSiteById as findSite,
@@ -83,16 +84,6 @@ export async function renameAnalyticsSite(id: number, viewer: AnalyticsViewer, i
 
 export async function getAnalyticsSiteById(id: number): Promise<AnalyticsSiteRow | undefined> {
   return findSite(id);
-}
-
-function isValidTimezone(timezone: string): boolean {
-  if (typeof timezone !== "string" || timezone.length === 0 || timezone.length > 100) return false;
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: timezone });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export async function getAnalyticsTrafficForSite(siteId: number, viewer: AnalyticsViewer, timezone: string): Promise<AnalyticsTrafficReport> {

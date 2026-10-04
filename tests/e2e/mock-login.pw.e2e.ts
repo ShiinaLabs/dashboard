@@ -55,6 +55,22 @@ test("authenticated route HTML contains the useful app shell before browser Java
   expect(conditionalAsset.status()).toBe(304);
 });
 
+test("Overview cold load uses server auth bootstrap and migrates timezone without a request", async ({ page }) => {
+  const authRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/auth/me")) authRequests.push(request.url());
+  });
+  await establishMockSession(page);
+  await page.addInitScript(() => localStorage.setItem("timezone", "Asia/Tokyo"));
+  await page.goto("/overview");
+  await expect(page.getByRole("button", { name: "admin admin", exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.cookie)).toContain("dash_timezone=Asia%2FTokyo");
+  expect(authRequests).toEqual([]);
+  await page.goto("/admin");
+  await expect(page.getByRole("heading", { name: "User Management" })).toBeVisible();
+  expect(authRequests).toEqual([]);
+});
+
 test("Overview cold load stays within one application GraphQL operation", async ({ page }) => {
   const operations: string[] = [];
   page.on("request", (request) => {
@@ -725,6 +741,10 @@ test("account form exposes selected platform and Reddit access mode", async ({ p
 });
 
 test("mobile navigation opens, closes, and logout returns to login", async ({ page }) => {
+  const logoutRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/auth/logout")) logoutRequests.push(request.method());
+  });
   await page.setViewportSize({ width: 390, height: 844 });
   await logIn(page);
 
@@ -740,6 +760,7 @@ test("mobile navigation opens, closes, and logout returns to login", async ({ pa
   await page.getByRole("menuitem", { name: "Log out" }).click();
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
+  expect(logoutRequests).toEqual(["POST"]);
 });
 
 test("timezone selector filters and selects options with the keyboard", async ({ page }) => {

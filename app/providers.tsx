@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import i18n from "@/lib/client/i18n";
 import { applyTheme, DEFAULT_SETTINGS, loadSettings, resolveTheme, saveSettings } from "@/lib/client/themes";
 import type { ThemeSettings } from "@/lib/client/themes";
+import { syncTimezoneCookie } from "@/lib/client/datetime";
 
 function matchSystemDark() {
   return window.matchMedia("(prefers-color-scheme: dark)");
@@ -37,6 +38,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     const frame = requestAnimationFrame(() => {
       setSettingsState(loadSettings());
       setSystemColorScheme(getSystemColorScheme());
+      syncTimezoneCookie();
     });
     let savedLanguage: string | null = null;
     try { savedLanguage = localStorage.getItem("i18n-lang"); } catch { /* Browser storage can be disabled. */ }

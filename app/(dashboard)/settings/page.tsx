@@ -5,7 +5,7 @@ import { themes, type Theme, type ThemeSettings } from "@/lib/client/themes";
 import { api } from "@/lib/api";
 import { getSettingsPage } from "@/lib/client/graphql/settings";
 import { getTimezone, setTimezone as saveTimezone } from "@/lib/client/datetime";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { validatePassword } from "@/lib/client/validatePassword";
 import { PasswordHints } from "@/components/ui/PasswordHints";
@@ -34,7 +34,8 @@ export default function Settings() {
   const [pwError, setPwError] = useState("");
   const [pwSuccess, setPwSuccess] = useState("");
   const [pwLoading, setPwLoading] = useState(false);
-  const [timezone, setTimezone] = useState(getTimezone);
+  const [timezone, setTimezone] = useState("UTC");
+  useEffect(() => { setTimezone(getTimezone()); }, []);
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
   const pwRules = validatePassword(newPw).rules;

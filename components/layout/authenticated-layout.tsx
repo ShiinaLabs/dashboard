@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { api } from "@/lib/api";
+import type { AuthUser } from "@/lib/auth-helpers";
 import { useIsMobile } from "@/lib/client/useIsMobile";
 import { FloatingAiChat } from "@/components/FloatingAiChat";
 import { NavigationProgress } from "@/components/NavigationProgress";
@@ -18,19 +19,13 @@ function loadSidebarOpen() {
   try { return JSON.parse(localStorage.getItem(SIDEBAR_KEY) ?? "true") as boolean; } catch { return true; }
 }
 
-export function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
+export function AuthenticatedLayout({ children, user }: { children: React.ReactNode; user: AuthUser }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
-
-  const { data: authData } = useQuery({
-    queryKey: ["auth", "me"],
-    queryFn: () => api.checkAuth(),
-    staleTime: 2 * 60_000,
-  });
 
   const setSidebarOpen = useCallback((next: boolean) => {
     setOpen(next);
@@ -57,9 +52,9 @@ export function AuthenticatedLayout({ children }: { children: React.ReactNode })
       <NavigationProgress />
       <NavigatingOverlay />
       <AppSidebar
-        isAdmin={authData?.role === "admin"}
-        username={authData?.username ?? ""}
-        role={authData?.role ?? "user"}
+        isAdmin={user.role === "admin"}
+        username={user.username}
+        role={user.role}
         loggingOut={loggingOut}
         onLogout={handleLogout}
       />

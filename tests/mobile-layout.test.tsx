@@ -46,6 +46,7 @@ describe("mobile layout contracts", () => {
     expect(providers).toContain('localStorage.getItem("i18n-lang")');
     expect(providers).toContain("i18n.changeLanguage(language)");
     expect(providers).not.toContain("useSyncExternalStore");
+    expect(providers).toContain("syncTimezoneCookie()");
   });
 
   it("gives the most-used detail pages a full-width mobile control row", () => {

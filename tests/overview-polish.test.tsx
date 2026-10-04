@@ -74,7 +74,9 @@ describe("dashboard presentation and behavior", () => {
     expect(en.admin.role).toBeTruthy();
     expect(admin).toContain('label={t("admin.password")}');
     expect(admin).toContain('label={t("admin.confirmPassword")}');
-    expect(admin).toContain('authData?.role !== "admin"');
+    expect(admin).toContain('authData.role !== "admin"');
+    expect(admin).toContain("useOutletContext<AuthUser>()");
+    expect(admin).not.toContain("api.checkAuth()");
   });
 
   it("keeps account identity separate from its action controls", () => {

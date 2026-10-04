@@ -15,9 +15,10 @@ describe("shadcn UI architecture contracts", () => {
     const layout = readFileSync("components/layout/authenticated-layout.tsx", "utf8");
     const route = readFileSync("app/(dashboard)/layout.tsx", "utf8");
     expect(layout).toContain("@tanstack/react-query");
-    expect(layout).toContain("api.checkAuth()");
+    expect(layout).not.toContain("api.checkAuth()");
     expect(layout).toContain("api.logout()");
-    expect(route).toContain("<Outlet />");
+    expect(route).toContain("requireSession(request)");
+    expect(route).toContain("<Outlet context={user} />");
   });
 
   it("uses the donor sidebar shell with accessible shadcn primitives", () => {
