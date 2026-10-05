@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { SegmentedControl } from "@/components/ui/form-controls";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 
 const OPTIONS: { value: number; labelKey: string }[] = [
   { value: 7, labelKey: "timeRange.7d" },

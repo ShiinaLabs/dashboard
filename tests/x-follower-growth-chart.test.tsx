@@ -87,4 +87,14 @@ describe("XFollowerGrowthChart", () => {
     expect(source).toContain('calcYAxisWidth(data, "followers_count")');
     expect(source).toContain("data.length >= 2");
   });
+
+  it("keeps text measurement out of the shared UI utility module", () => {
+    const sharedUtils = readProjectFile("lib/client/utils.ts");
+    const chartUtils = readProjectFile("lib/client/chart-utils.ts");
+
+    expect(sharedUtils).not.toContain("@chenglou/pretext");
+    expect(sharedUtils).not.toContain("calcYAxisWidth");
+    expect(chartUtils).toContain('from "@chenglou/pretext"');
+    expect(chartUtils).toContain("export function calcYAxisWidth");
+  });
 });

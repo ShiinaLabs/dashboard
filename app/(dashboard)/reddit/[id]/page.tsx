@@ -15,7 +15,7 @@ import { MetricGrid } from "@/components/domain/shared/MetricGrid";
 import { ChartCard } from "@/components/domain/shared/ChartCard";
 import { TriggerPanel } from "@/components/TriggerPanel";
 import { TimeRangeSelector } from "@/components/TimeRangeSelector";
-import { calcYAxisWidth } from "@/lib/client/utils";
+import { calcYAxisWidth } from "@/lib/client/chart-utils";
 import { ArrowLeft, ArrowUpRight, Trash2, AlertCircle, ThumbsUp, MessageSquare, TrendingUp, FileText } from "lucide-react";
 import { useIsMobile } from "@/lib/client/useIsMobile";
 import { RedditIcon } from "@/components/BrandIcons";

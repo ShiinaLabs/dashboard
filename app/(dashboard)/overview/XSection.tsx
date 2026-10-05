@@ -9,7 +9,7 @@ import { XIcon } from "@/components/BrandIcons";
 import { MessageSquare, Heart, Repeat2, Eye, TrendingUp } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
 import { useIsMobile } from "@/lib/client/useIsMobile";
-import { calcYAxisWidth } from "@/lib/client/utils";
+import { calcYAxisWidth } from "@/lib/client/chart-utils";
 
 interface Props {
   stats: OverviewStats | undefined;

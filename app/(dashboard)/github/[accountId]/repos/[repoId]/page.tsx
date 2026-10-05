@@ -15,7 +15,7 @@ import {
 } from "recharts";
 import { ArrowLeft, Star, GitFork, Download, ExternalLink, Globe, TrendingUp, Eye, CircleDot, GitPullRequest, FileText } from "lucide-react";
 import { useIsMobile } from "@/lib/client/useIsMobile";
-import { calcYAxisWidth } from "@/lib/client/utils";
+import { calcYAxisWidth } from "@/lib/client/chart-utils";
 import { sumSelectedAssetDownloads } from "@/lib/utils/download-growth";
 import { ActionIcon, Button, Checkbox, TextInput } from "@/components/ui/form-controls";
 import { ChartCard } from "@/components/domain/shared/ChartCard";

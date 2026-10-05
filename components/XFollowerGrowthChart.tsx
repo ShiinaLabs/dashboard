@@ -4,7 +4,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { useIsMobile } from "@/lib/client/useIsMobile";
-import { calcYAxisWidth } from "@/lib/client/utils";
+import { calcYAxisWidth } from "@/lib/client/chart-utils";
 import type { TimelineData } from "@/lib/api";
 
 interface Props {

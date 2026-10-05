@@ -11,7 +11,7 @@ import {
   LineChart, Line, PieChart, Pie, Cell,
 } from "recharts";
 import { useIsMobile } from "@/lib/client/useIsMobile";
-import { calcYAxisWidth } from "@/lib/client/utils";
+import { calcYAxisWidth } from "@/lib/client/chart-utils";
 
 interface SubredditDatum { subreddit: string; count: number }
 

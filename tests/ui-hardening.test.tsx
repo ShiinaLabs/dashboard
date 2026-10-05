@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Card } from "@/components/ui/card";
 import { Button, SegmentedControl, TextInput } from "@/components/ui/form-controls";
+import { SegmentedControl as DirectSegmentedControl } from "@/components/ui/segmented-control";
 import { Group, Text } from "@/components/ui/layout-primitives";
 
 describe("UI migration adapter hardening", () => {
@@ -54,5 +55,7 @@ describe("UI migration adapter hardening", () => {
 
     expect(input).toContain("h-9");
     expect(segmented).toContain('aria-pressed="false" disabled=""');
+    expect(renderToStaticMarkup(<DirectSegmentedControl aria-label="Options" value="enabled" onChange={() => undefined} data={["enabled", "locked"]} fullWidth />))
+      .toContain('role="group" aria-label="Options" class="inline-flex rounded-lg border bg-muted p-1 w-full"');
   });
 });

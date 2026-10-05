@@ -18,7 +18,7 @@ import { api } from "@/lib/api";
 import { compareAnalyticsPeriod } from "@/lib/client/analytics-comparison";
 import { getAnalyticsPage, type AnalyticsRange } from "@/lib/client/analytics-graphql";
 import { getTimezone } from "@/lib/client/datetime";
-import { calcYAxisWidth } from "@/lib/client/utils";
+import { calcYAxisWidth } from "@/lib/client/chart-utils";
 import { useIsMobile } from "@/lib/client/useIsMobile";
 import { notifications } from "@/components/ui/notifications";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";

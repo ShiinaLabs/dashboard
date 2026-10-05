@@ -6,7 +6,7 @@ import { getGitlabProjectPage } from "@/lib/client/graphql/platform-dashboards";
 import { formatDate } from "@/lib/client/datetime";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChartCard } from "@/components/domain/shared/ChartCard";
-import { calcYAxisWidth } from "@/lib/client/utils";
+import { calcYAxisWidth } from "@/lib/client/chart-utils";
 import { Badge } from "@/components/ui/badge";
 import { TimeRangeSelector } from "@/components/TimeRangeSelector";
 import {

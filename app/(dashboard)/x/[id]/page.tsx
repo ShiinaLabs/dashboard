@@ -12,7 +12,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";
 import { ChartCard } from "@/components/domain/shared/ChartCard";
-import { calcYAxisWidth } from "@/lib/client/utils";
+import { calcYAxisWidth } from "@/lib/client/chart-utils";
 import {
   ArrowLeft, Trash2, AlertCircle,
   MessageSquare, Heart, Repeat2, Eye, ExternalLink, Users, UserPlus,
