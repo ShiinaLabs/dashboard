@@ -50,7 +50,20 @@ describe("Overview page query", () => {
         gitlab: { followers: 5, projectCount: 6, stars: 7, forks: 8, pinnedProjects: [] },
         reddit: { postKarma: 9 },
       },
-      fetchHealth: { summary: {}, unsupportedAccounts: [], issues: [{}, {}, {}, {}, {}, {}] },
+      fetchHealth: { summary: {}, unsupportedAccounts: [], issues: Array.from({ length: 6 }, (_, index) => ({
+        accountId: index + 1,
+        platform: "github",
+        screenName: `member-${index + 1}`,
+        isActive: true,
+        status: "stale",
+        lastAttemptAt: null,
+        lastSuccessAt: null,
+        nextDueAt: null,
+        consecutiveFailures: 0,
+        latestError: null,
+        capabilityGaps: [],
+        recentRuns: [],
+      })) },
     } as never);
     expect(projected).toMatchObject({
       github: { followers: 1, itemCount: 2, stars: 3, forks: 4, pinned: [] },

@@ -80,7 +80,17 @@ export function projectOverviewFetchHealth(health: OverviewFetchHealthReadModel)
   return {
     summary: health.summary,
     unsupportedAccounts: health.unsupportedAccounts,
-    issues: health.issues.slice(0, 5),
+    issues: health.issues.slice(0, 5).map((issue) => ({
+      accountId: issue.accountId,
+      platform: issue.platform,
+      screenName: issue.screenName,
+      status: issue.status,
+      latestError: issue.latestError,
+      capabilityGaps: issue.capabilityGaps.map((gap) => ({
+        capability: gap.capability,
+        message: gap.message,
+      })),
+    })),
     issueCount: health.issues.length,
   };
 }

@@ -58,7 +58,37 @@ const rawOverview = {
     previousSummary: { views: 0, visits: 0 },
     sites: [],
   },
-  fetchHealth: { summary: {}, unsupportedAccounts: [], issues: [{}, {}, {}, {}, {}, {}] },
+  fetchHealth: {
+    summary: {},
+    unsupportedAccounts: [],
+    issues: [{
+      accountId: 3,
+      platform: "github",
+      screenName: "member",
+      isActive: true,
+      status: "failed",
+      lastAttemptAt: "2026-10-05T00:00:00.000Z",
+      lastSuccessAt: "2026-10-04T00:00:00.000Z",
+      nextDueAt: "2026-10-05T01:00:00.000Z",
+      consecutiveFailures: 3,
+      latestError: "boom",
+      capabilityGaps: [{ capability: "github_traffic", message: "unavailable", internalCode: "private" }],
+      recentRuns: [{ id: 99, status: "failed" }],
+    }, ...Array.from({ length: 5 }, (_, index) => ({
+      accountId: index + 4,
+      platform: "github",
+      screenName: `member-${index + 1}`,
+      isActive: true,
+      status: "stale",
+      lastAttemptAt: null,
+      lastSuccessAt: null,
+      nextDueAt: null,
+      consecutiveFailures: 0,
+      latestError: null,
+      capabilityGaps: [],
+      recentRuns: [],
+    }))],
+  },
 };
 
 function args(request: Request) {
@@ -88,8 +118,31 @@ describe("Overview route loader", () => {
     expect(data).toMatchObject({
       github: { followers: 1, itemCount: 2, pinned: [{ external_id: 321 }] },
       gitlab: { followers: 5, itemCount: 6, pinned: [{ external_id: 654 }] },
-      fetchHealth: { issueCount: 6, issues: [{}, {}, {}, {}, {}] },
+      fetchHealth: {
+        issueCount: 6,
+        issues: [{
+          accountId: 3,
+          platform: "github",
+          screenName: "member",
+          status: "failed",
+          latestError: "boom",
+          capabilityGaps: [{ capability: "github_traffic", message: "unavailable" }],
+        }, ...Array.from({ length: 4 }, (_, index) => ({
+          accountId: index + 4,
+          platform: "github",
+          screenName: `member-${index + 1}`,
+          status: "stale",
+          latestError: null,
+          capabilityGaps: [],
+        }))],
+      },
     });
+    expect(data.fetchHealth.issues[0]).not.toHaveProperty("recentRuns");
+    expect(data.fetchHealth.issues[0]).not.toHaveProperty("lastAttemptAt");
+    expect(data.fetchHealth.issues[0]).not.toHaveProperty("lastSuccessAt");
+    expect(data.fetchHealth.issues[0]).not.toHaveProperty("nextDueAt");
+    expect(data.fetchHealth.issues[0]).not.toHaveProperty("consecutiveFailures");
+    expect(data.fetchHealth.issues[0]).not.toHaveProperty("isActive");
     expect(data.accounts[0]).not.toHaveProperty("owner_id");
     expect(data.accounts[0]).not.toHaveProperty("auth_token");
   });
