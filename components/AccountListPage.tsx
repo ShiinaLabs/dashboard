@@ -24,6 +24,8 @@ export interface AccountListPageProps {
   formatUsername?: (account: Account) => string;
 }
 
+const EMPTY_ACCOUNTS: Account[] = [];
+
 const PLATFORM_PREFIX: Record<string, string> = {
   twitter: "x",
   github: "github",
@@ -50,7 +52,7 @@ export default function AccountListPage({
     staleTime: 2 * 60_000,
   });
 
-  const accounts = data ?? [];
+  const accounts = data ?? EMPTY_ACCOUNTS;
   const now = useNow();
 
   const staleMap = useMemo(() => {

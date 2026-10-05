@@ -5,7 +5,7 @@ import { requireSession } from "@/lib/auth-helpers";
 import { getRequestTimezone } from "@/lib/timezone.server";
 import { getOverviewReadModel } from "@/lib/services/overview";
 import { projectOverviewReadModel } from "@/lib/services/overview-projection";
-import type { OverviewPageData } from "@/lib/client/graphql/overview";
+import type { OverviewPageData } from "@shared/overview-page";
 import { useTranslation } from "react-i18next";
 import { ArrowUpRight, Layers3, MessageSquareText, Star, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -48,7 +48,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const overviewData = getOverviewReadModel(authenticated.user, {
     ...initialParams,
     timezone: getRequestTimezone(request),
-  }).then((readModel) => projectOverviewReadModel(readModel) as unknown as OverviewPageData);
+  }).then(projectOverviewReadModel);
   void overviewData.catch(() => {});
   return { overviewData };
 }
@@ -68,7 +68,7 @@ function OverviewSkeleton() {
 export default function Overview() {
   const { overviewData } = useLoaderData<typeof loader>();
   return <Suspense fallback={<OverviewSkeleton />}><Await resolve={overviewData} errorElement={<OverviewLoadError />}>
-    {(data) => <OverviewContent data={data as unknown as OverviewPageData} />}
+    {(data) => <OverviewContent data={data} />}
   </Await></Suspense>;
 }
 

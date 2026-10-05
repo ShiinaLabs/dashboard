@@ -1,45 +1,17 @@
 import { graphqlRequest } from "../graphql";
-import type { Account, OverviewStats, TimelineData, Tweet, PulseResponse, TopContentResponse } from "@/shared/types";
-import type { AnalyticsPortfolio, AnalyticsRange } from "../analytics-graphql";
+import type { AnalyticsRange } from "../analytics-graphql";
+import type { OverviewPageData, OverviewAnalyticsPortfolio } from "@shared/overview-page";
+import type { PulseResponse } from "@/lib/pulse";
+import type { TopContentResponse } from "@/lib/top-content";
 
-export interface OverviewCodeSummary {
-  followers: number;
-  itemCount: number;
-  stars: number;
-  forks: number;
-  pinned: Array<{ id: number; account_id: number; external_id: number; name: string; language: string | null; stars: number; forks: number }>;
-}
+type AnalyticsPortfolio = OverviewAnalyticsPortfolio;
 
-export interface OverviewRedditSummary {
-  postKarma: number;
-  commentKarma: number;
-  totalPosts: number;
-  totalComments: number;
-  karmaTimeline: Array<{ date: string; post_karma: number; comment_karma: number }>;
-  dailyActivity: Array<{ date: string; posts: number; comments: number }>;
-  subreddits: Array<{ subreddit: string; count: number }>;
-}
-
-export interface OverviewFetchHealth {
-  summary: { totalAccounts: number; activeAccounts: number; healthy: number; stale: number; partial: number; failed: number; capabilityGap: number; running: number };
-  unsupportedAccounts: Array<{ accountId: number; platform: string; screenName: string }>;
-  issues: Array<{ accountId: number; platform: string; screenName: string; status: string; latestError: string | null; capabilityGaps: Array<{ capability: string; message?: string }> }>;
-  issueCount: number;
-}
-
-export interface OverviewPageData {
-  accounts: Account[];
-  stats: OverviewStats;
-  timeline: TimelineData;
-  topLiked: Pick<Tweet, "id" | "full_text" | "favorite_count">[];
-  github: OverviewCodeSummary;
-  gitlab: OverviewCodeSummary;
-  reddit: OverviewRedditSummary;
-  pulse: PulseResponse;
-  topContent: TopContentResponse;
-  fetchHealth: OverviewFetchHealth;
-  analyticsPortfolio: AnalyticsPortfolio;
-}
+export type {
+  OverviewCodeSummary,
+  OverviewFetchHealth,
+  OverviewPageData,
+  OverviewRedditSummary,
+} from "@shared/overview-page";
 
 const pageQuery = /* GraphQL */ `
   query OverviewPage($pulseDays: Int!, $contentDays: Int!, $analyticsRange: AnalyticsRange!, $timezone: String!) {

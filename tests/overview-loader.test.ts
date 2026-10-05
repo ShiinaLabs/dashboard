@@ -8,19 +8,57 @@ vi.mock("@/lib/auth-helpers", () => ({ requireSession: vi.fn() }));
 vi.mock("@/lib/services/overview", () => ({ getOverviewReadModel: vi.fn() }));
 
 const rawOverview = {
-  accounts: [],
-  stats: {},
-  timeline: {},
+  accounts: [{
+    id: 3,
+    owner_id: 12,
+    screen_name: "member",
+    platform: "github",
+    user_id: "github-member",
+    auth_token: "server-only-token",
+    fetch_interval: 3600,
+    is_active: 1,
+    last_fetched_at: null,
+    error_message: null,
+    instance_url: null,
+    auth_type: null,
+    created_at: "2026-10-01T00:00:00.000Z",
+    updated_at: "2026-10-01T00:00:00.000Z",
+  }],
+  stats: {
+    tweet_count: 0, tweet_likes: 0, tweet_retweets: 0, tweet_views: 0,
+    reply_count: 0, reply_likes: 0, reply_retweets: 0, reply_views: 0,
+    followersCount: 0, followingCount: 0, userTweetCount: 0,
+    todayTweets: 0, todayLikes: 0, todayRetweets: 0,
+  },
+  timeline: { dailyTweets: [], followerGrowth: [] },
   topLiked: [],
   platforms: {
-    github: { followers: 1, repositoryCount: 2, stars: 3, forks: 4, pinnedRepositories: [] },
-    gitlab: { followers: 5, projectCount: 6, stars: 7, forks: 8, pinnedProjects: [] },
+    github: {
+      followers: 1,
+      repositoryCount: 2,
+      stars: 3,
+      forks: 4,
+      pinnedRepositories: [{ id: 21, account_id: 3, repo_id: 321, name: "member/repo", language: "TypeScript", stars: 13, forks: 2 }],
+    },
+    gitlab: {
+      followers: 5,
+      projectCount: 6,
+      stars: 7,
+      forks: 8,
+      pinnedProjects: [{ id: 22, account_id: 3, project_id: 654, name: "member/project", language: "Go", stars: 17, forks: 3 }],
+    },
     reddit: { postKarma: 9, commentKarma: 10, totalPosts: 11, totalComments: 12, karmaTimeline: [], dailyActivity: [], subreddits: [] },
   },
   pulse: {},
   topContent: {},
+  analyticsPortfolio: {
+    period: { days: 7, timezone: "UTC", startDate: "2026-10-01", endDate: "2026-10-07" },
+    previousPeriod: { days: 7, timezone: "UTC", startDate: "2026-09-24", endDate: "2026-09-30" },
+    summary: { trackedSites: 0, activeSites: 0, views: 0, visits: 0 },
+    previousSummary: { views: 0, visits: 0 },
+    sites: [],
+  },
   fetchHealth: { summary: {}, unsupportedAccounts: [], issues: [{}, {}, {}, {}, {}, {}] },
-  analyticsPortfolio: {},
 };
 
 function args(request: Request) {
@@ -46,11 +84,14 @@ describe("Overview route loader", () => {
       analyticsRange: "DAYS_7",
       timezone: "Asia/Tokyo",
     });
-    await expect(result.overviewData).resolves.toMatchObject({
-      github: { followers: 1, itemCount: 2, pinned: [] },
-      gitlab: { followers: 5, itemCount: 6, pinned: [] },
+    const data = await result.overviewData;
+    expect(data).toMatchObject({
+      github: { followers: 1, itemCount: 2, pinned: [{ external_id: 321 }] },
+      gitlab: { followers: 5, itemCount: 6, pinned: [{ external_id: 654 }] },
       fetchHealth: { issueCount: 6, issues: [{}, {}, {}, {}, {}] },
     });
+    expect(data.accounts[0]).not.toHaveProperty("owner_id");
+    expect(data.accounts[0]).not.toHaveProperty("auth_token");
   });
 
   it("returns before the shared read model resolves", async () => {

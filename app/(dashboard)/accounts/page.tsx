@@ -32,6 +32,7 @@ const TABS = [
 ] as const;
 
 type Platform = (typeof TABS)[number]["key"];
+const EMPTY_ACCOUNTS: Account[] = [];
 
 export default function AccountsPage() {
   const { t } = useTranslation();
@@ -49,7 +50,7 @@ export default function AccountsPage() {
     enabled: tab !== "app-store",
   });
 
-  const accounts = data ?? [];
+  const accounts = data ?? EMPTY_ACCOUNTS;
   const now = useNow();
 
   const staleMap = useMemo(() => {

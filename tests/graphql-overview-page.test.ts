@@ -27,6 +27,24 @@ describe("Overview page query", () => {
 
   it("projects the shared read model into the existing page shape", () => {
     const projected = projectOverviewReadModel({
+      accounts: [],
+      stats: {
+        tweet_count: 0, tweet_likes: 0, tweet_retweets: 0, tweet_views: 0,
+        reply_count: 0, reply_likes: 0, reply_retweets: 0, reply_views: 0,
+        followersCount: 0, followingCount: 0, userTweetCount: 0,
+        todayTweets: 0, todayLikes: 0, todayRetweets: 0,
+      },
+      timeline: { dailyTweets: [], followerGrowth: [] },
+      topLiked: [],
+      pulse: {},
+      topContent: {},
+      analyticsPortfolio: {
+        period: { days: 7, timezone: "UTC", startDate: "2026-10-01", endDate: "2026-10-07" },
+        previousPeriod: { days: 7, timezone: "UTC", startDate: "2026-09-24", endDate: "2026-09-30" },
+        summary: { trackedSites: 0, activeSites: 0, views: 0, visits: 0 },
+        previousSummary: { views: 0, visits: 0 },
+        sites: [],
+      },
       platforms: {
         github: { followers: 1, repositoryCount: 2, stars: 3, forks: 4, pinnedRepositories: [] },
         gitlab: { followers: 5, projectCount: 6, stars: 7, forks: 8, pinnedProjects: [] },
