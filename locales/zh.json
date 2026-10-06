@@ -991,7 +991,7 @@
     "allTerritories": "所有地区",
     "updated": "更新时间",
     "coverage": "覆盖范围",
-    "partialCoverage": "部分覆盖 {{reportingApps}}/{{totalApps}} 个应用",
+    "partialCoverage": "部分覆盖 · {{reportingApps}}/{{totalApps}} 个应用 · {{reportingAppDays}}/{{totalAppDays}} 个应用日",
     "partialTrendCoverage": "有 {{days}} 天为部分覆盖",
     "noEnabledApps": "请先在连接中启用应用。",
     "overview": "概览",

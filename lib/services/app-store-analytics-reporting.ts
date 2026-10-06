@@ -16,7 +16,7 @@ export async function listEnabledAnalyticsApps(viewer: Viewer): Promise<AppStore
 export const filterSchema = z.object({ from: z.iso.date(), to: z.iso.date(), appId: z.coerce.number().int().positive().optional(), territory: z.string().trim().min(1).max(100).optional() });
 
 export function emptyDashboard(): AppStoreAnalyticsDashboard {
-  const unknown = (): AppStoreMetricCoverage => ({ state: "unknown", reportingApps: 0, totalApps: 0 });
+  const unknown = (): AppStoreMetricCoverage => ({ state: "unknown", reportingApps: 0, totalApps: 0, reportingAppDays: 0, totalAppDays: 0 });
   const coverage = { impressions: unknown(), views: unknown(), firstTimeDownloads: unknown(), downloads: unknown(), conversion: unknown() };
   return { updatedAt: null, completeThrough: null, overview: { impressions: null, views: null, firstTimeDownloads: null, downloads: null, conversion: null }, coverage, trend: [], acquisition: [], campaigns: [], territories: [] };
 }
@@ -35,8 +35,9 @@ export async function getAppStoreAnalyticsDashboard(viewer: Viewer, input: unkno
     const multiplier = filter.appId ? 1 : apps.length;
     if (filter.territory && filter.territory !== "USA") return emptyDashboard();
     const completeThrough = new Date(Math.max(Date.parse(filter.from), Date.parse(filter.to) - 2 * 86400000)).toISOString().slice(0, 10);
-    const completeCoverage: AppStoreMetricCoverage = { state: "complete", reportingApps: apps.length, totalApps: apps.length };
-    const coverage: AppStoreAnalyticsCoverage = { impressions: completeCoverage, views: completeCoverage, firstTimeDownloads: completeCoverage, downloads: completeCoverage, conversion: { state: "unknown", reportingApps: 0, totalApps: apps.length } };
+    const dayCount = Math.floor((Date.parse(`${filter.to}T00:00:00Z`) - Date.parse(`${filter.from}T00:00:00Z`)) / 86_400_000) + 1;
+    const completeCoverage: AppStoreMetricCoverage = { state: "complete", reportingApps: apps.length, totalApps: apps.length, reportingAppDays: apps.length * dayCount, totalAppDays: apps.length * dayCount };
+    const coverage: AppStoreAnalyticsCoverage = { impressions: completeCoverage, views: completeCoverage, firstTimeDownloads: completeCoverage, downloads: completeCoverage, conversion: { state: "unknown", reportingApps: 0, totalApps: apps.length, reportingAppDays: 0, totalAppDays: apps.length * dayCount } };
     const trend: AppStoreAnalyticsDashboard["trend"] = [];
     for (let time = Date.parse(`${filter.from}T00:00:00Z`); time <= Date.parse(`${completeThrough}T00:00:00Z`); time += 86400000) {
       const date = new Date(time).toISOString().slice(0, 10), day = Math.floor(time / 86400000);
@@ -50,9 +51,9 @@ export async function getAppStoreAnalyticsDashboard(viewer: Viewer, input: unkno
       conversion: null,
     };
     return { updatedAt: completeThrough, completeThrough, overview, coverage, trend, acquisition: [
-      { source: "App Store Search", impressions: 180 * multiplier, views: 45 * multiplier, firstTimeDownloads: 9 * multiplier, downloads: 13 * multiplier, conversion: 5 },
-      { source: "App Store Browse", impressions: 60 * multiplier, views: 20 * multiplier, firstTimeDownloads: 3 * multiplier, downloads: 4 * multiplier, conversion: 5 },
-      ...["App Referrer", "Web Referrer", "Campaign"].map((source) => ({ source, impressions: null, views: null, firstTimeDownloads: null, downloads: null, conversion: null })),
+      { source: "App Store Search", impressions: 180 * multiplier, views: 45 * multiplier, firstTimeDownloads: 9 * multiplier, downloads: 13 * multiplier, conversion: 5, coverage },
+      { source: "App Store Browse", impressions: 60 * multiplier, views: 20 * multiplier, firstTimeDownloads: 3 * multiplier, downloads: 4 * multiplier, conversion: 5, coverage },
+      ...["App Referrer", "Web Referrer", "Campaign"].map((source) => ({ source, impressions: null, views: null, firstTimeDownloads: null, downloads: null, conversion: null, coverage })),
     ], campaigns: [], territories: ["USA"] };
   }
   const appIds = apps.filter((app) => !filter.appId || app.id === filter.appId).map((app) => app.id);
@@ -61,9 +62,15 @@ export async function getAppStoreAnalyticsDashboard(viewer: Viewer, input: unkno
   const discovery = relevant(data.discovery), downloads = relevant(data.downloads);
   const partitions = data.partitions.filter((p) => p.report_kind === "discovery" || p.report_kind === "downloads");
   const metricCoverage = (kind: string, from: string, to: string): { coverage: AppStoreMetricCoverage; apps: Set<number> } => {
-    const reporting = new Set(partitions.filter((p) => p.report_kind === kind && p.date >= from && p.date <= to).map((p) => p.app_id).filter((id) => appIds.includes(id)));
-    const count = reporting.size;
-    return { coverage: { state: count === 0 ? "unknown" : count === appIds.length ? "complete" : "partial", reportingApps: count, totalApps: appIds.length }, apps: reporting };
+    const reportingAppDays = new Set(partitions.filter((partition) => partition.report_kind === kind && partition.date >= from && partition.date <= to && appIds.includes(partition.app_id)).map((partition) => `${partition.app_id}:${partition.date}`));
+    const reporting = new Set([...reportingAppDays].map((key) => Number(key.slice(0, key.indexOf(":")))));
+    const days = Math.floor((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
+    const totalAppDays = appIds.length * days;
+    const reportedDays = reportingAppDays.size;
+    return {
+      coverage: { state: reportedDays === 0 ? "unknown" : reportedDays === totalAppDays ? "complete" : "partial", reportingApps: reporting.size, totalApps: appIds.length, reportingAppDays: reportedDays, totalAppDays },
+      apps: reporting,
+    };
   };
   const total = <T extends { counts: string | null }>(rows: T[], reportingApps: Set<number>): number | null => {
     if (!reportingApps.size) return null;
@@ -84,7 +91,7 @@ export async function getAppStoreAnalyticsDashboard(viewer: Viewer, input: unkno
       firstTimeDownloads: sumFor(dl.filter((r) => r.download_type === "First-time Download"), downloadApps.apps),
       downloads: sumFor(dl.filter((r) => r.download_type === "First-time Download" || r.download_type === "Redownload"), downloadApps.apps),
       conversion: null, // Unique users are not additive across report dimensions.
-      coverage: { impressions: discoveryApps.coverage, views: discoveryApps.coverage, firstTimeDownloads: downloadApps.coverage, downloads: downloadApps.coverage, conversion: { state: "unknown", reportingApps: 0, totalApps: appIds.length } } satisfies AppStoreAnalyticsCoverage,
+      coverage: { impressions: discoveryApps.coverage, views: discoveryApps.coverage, firstTimeDownloads: downloadApps.coverage, downloads: downloadApps.coverage, conversion: { state: "unknown", reportingApps: 0, totalApps: appIds.length, reportingAppDays: 0, totalAppDays: appIds.length * (Math.floor((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1) } } satisfies AppStoreAnalyticsCoverage,
     };
   };
   const reportedDates = [...new Set(partitions.filter((p) => p.date >= filter.from && p.date <= filter.to).map((p) => p.date))].sort();

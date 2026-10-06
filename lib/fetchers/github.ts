@@ -121,7 +121,7 @@ export async function fetchGithubAccount(account: AccountRow) {
       }
     } else {
       issueSplitError = "No GitHub PAT configured; Issues and Pull Requests cannot be counted separately.";
-      getLogger().warn("GitHub", "@%s: %s", username, issueSplitError);
+      getLogger().debug("GitHub", "@%s: optional issue/PR split unavailable without a PAT", username);
     }
 
     for (const repo of repos) {
@@ -187,7 +187,7 @@ export async function fetchGithubAccount(account: AccountRow) {
         getLogger().info("GitHub", "@%s: traffic + releases fetched", username);
       }
     } else {
-      getLogger().info("GitHub", "@%s: no token — skipping traffic & releases", username);
+      getLogger().debug("GitHub", "@%s: no token; optional traffic and releases are unavailable", username);
       capabilityGaps.push({
         capability: "github_traffic",
         message: "No GitHub PAT configured; traffic, referrers, paths, releases, and download counts are unavailable.",
@@ -203,15 +203,20 @@ export async function fetchGithubAccount(account: AccountRow) {
 
     // 4. Fetch contribution calendar
     await sleep(1000);
-    try {
-      const year = new Date().getFullYear();
-      const contributions = await fetchContributions(username, token, year);
-      await upsertGithubContributions(account.id, contributions);
-      getLogger().info("GitHub", "@%s: %d contributions saved", username, contributions.length);
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : String(e);
-      getLogger().warn("GitHub", "@%s: contributions fetch skipped (%s)", username, message);
-      capabilityGaps.push({ capability: "github_contributions", message });
+    if (!token) {
+      getLogger().debug("GitHub", "@%s: no token; contributions are unavailable", username);
+      capabilityGaps.push({ capability: "github_contributions", message: "No GitHub PAT configured; contributions are unavailable." });
+    } else {
+      try {
+        const year = new Date().getFullYear();
+        const contributions = await fetchContributions(username, token, year);
+        await upsertGithubContributions(account.id, contributions);
+        getLogger().info("GitHub", "@%s: %d contributions saved", username, contributions.length);
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : String(e);
+        getLogger().warn("GitHub", "@%s: contributions fetch partial (%s)", username, message);
+        capabilityGaps.push({ capability: "github_contributions", message });
+      }
     }
 
     await updateAccount(account.id, {

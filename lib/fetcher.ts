@@ -202,10 +202,12 @@ export async function fetchAccount(account: AccountRow) {
 
         if (!found) errorCount++;
       } catch (e: unknown) {
-        logger.warn("Fetcher", "@%s: detail error for %s: %s", account.screen_name, tid, e instanceof Error ? e.message : String(e));
+        logger.debug("Fetcher", "@%s: tweet detail failed for %s: %s", account.screen_name, tid, e instanceof Error ? e.message : String(e));
         errorCount++;
       }
     }
+
+    if (errorCount > 0) logger.warn("Fetcher", "twitter_detail_fetch_partial requested=%d saved=%d failed=%d", allIds.length, savedCount, errorCount);
 
     logger.info("Fetcher", "@%s: %d saved, %d errors", account.screen_name, savedCount, errorCount);
 

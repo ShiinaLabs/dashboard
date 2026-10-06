@@ -39,16 +39,26 @@ export interface AppStoreSyncRun {
 
 export interface AppStoreDiagnosticSummary {
   version: 1;
-  checkpoint: string;
+  checkpoint: "request" | "catalog" | "instance" | "download" | "parse" | "map" | "commit" | "verify" | "finished";
   checkpointAt: string;
   source: string;
   scope: string | null;
   trigger: "manual" | "scheduler";
   counters: Array<{ name: string; value: string }>;
-  reports: Array<{ appId: number; reportKind: string; accessType: string; state: string; appleProcessingDate: string | null; localProcessingDate: string | null; latestData: string | null }>;
+  reports: AppStoreDiagnosticReport[];
   before: Array<{ name: string; value: string }>;
   after: Array<{ name: string; value: string }>;
   issues: Array<{ severity: "info" | "warn" | "error"; stage: string; code: string; appId?: number; reportKind?: string }>;
+}
+
+export interface AppStoreDiagnosticReport {
+  appId: number;
+  reportKind: string;
+  accessType: "ONGOING" | "ONE_TIME_SNAPSHOT";
+  state: "waiting" | "no_reports" | "no_daily_instances" | "pending_segments" | "imported" | "unchanged" | "failed" | "current";
+  appleProcessingDate: string | null;
+  localProcessingDate: string | null;
+  latestData: string | null;
 }
 
 export interface AppStoreConnectionDetail {

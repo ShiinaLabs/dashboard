@@ -101,10 +101,10 @@ test("App Store Analytics tabs, app/date/territory filters and missing campaign 
     const query = new URLSearchParams(Object.entries(body.variables).map(([key, value]) => [key, String(value)]));
     filters.push(query);
     const metrics = { impressions: 100, views: 30, firstTimeDownloads: 0, downloads: 10, conversion: null };
-    const coverage = Object.fromEntries(["impressions", "views", "firstTimeDownloads", "downloads", "conversion"].map((key) => [key, { state: "complete", reportingApps: 2, totalApps: 2 }])) as Record<string, { state: string; reportingApps: number; totalApps: number }>;
+    const coverage = Object.fromEntries(["impressions", "views", "firstTimeDownloads", "downloads", "conversion"].map((key) => [key, { state: "complete", reportingApps: 2, totalApps: 2, reportingAppDays: 10, totalAppDays: 10 }])) as Record<string, { state: string; reportingApps: number; totalApps: number; reportingAppDays: number; totalAppDays: number }>;
     return route.fulfill({ json: { data: { appStore: { enabledApps: [{ id: 1, name: "Sample App" }, { id: 2, name: "Second App" }], analytics: {
       overview: metrics, coverage, updatedAt: "2026-10-02T00:00:00Z", completeThrough: "2026-09-29", trend: [{ date: query.get("to"), ...metrics, coverage }],
-      acquisition: [{ source: "App Store Search", ...metrics }, { source: "Web Referrer", impressions: null, views: null, firstTimeDownloads: null, downloads: null, conversion: null }],
+      acquisition: [{ source: "App Store Search", ...metrics, coverage }, { source: "Web Referrer", impressions: null, views: null, firstTimeDownloads: null, downloads: null, conversion: null, coverage }],
       campaigns: [], territories: ["USA", "JPN"],
     } } } } });
   });

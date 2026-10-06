@@ -69,10 +69,11 @@ export class SyncXAccount {
           errorCount++;
         }
       } catch (e) {
-        logger.warn("Fetcher", "@%s: detail error for %s: %s", account.screenName, tid, e instanceof Error ? e.message : String(e));
+        logger.debug("Fetcher", "@%s: tweet detail failed for %s: %s", account.screenName, tid, e instanceof Error ? e.message : String(e));
         errorCount++;
       }
     }
+    if (errorCount > 0) logger.warn("Fetcher", "twitter_detail_fetch_partial requested=%d saved=%d failed=%d", ids.length, savedCount, errorCount);
     logger.info("Fetcher", "@%s: %d saved, %d errors", account.screenName, savedCount, errorCount);
 
     await write.updateAccount(account.id, { last_fetched_at: new Date().toISOString(), error_message: errorCount > 0 ? `${errorCount} tweet detail(s) could not be refreshed` : null });

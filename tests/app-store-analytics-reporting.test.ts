@@ -51,11 +51,27 @@ describe("ASC Analytics filters and missing values", () => {
     } as never);
     const dashboard = await getAppStoreAnalyticsDashboard(viewer, { from: "2026-10-01", to: "2026-10-01" });
     expect(dashboard.overview.impressions).toBe(12);
-    expect(dashboard.coverage.impressions).toEqual({ state: "partial", reportingApps: 1, totalApps: 2 });
+    expect(dashboard.coverage.impressions).toEqual({ state: "partial", reportingApps: 1, totalApps: 2, reportingAppDays: 1, totalAppDays: 2 });
     expect(dashboard.overview.downloads).toBeNull();
-    expect(dashboard.coverage.downloads).toEqual({ state: "unknown", reportingApps: 0, totalApps: 2 });
-    expect(dashboard.trend[0].coverage.impressions).toEqual({ state: "partial", reportingApps: 1, totalApps: 2 });
+    expect(dashboard.coverage.downloads).toEqual({ state: "unknown", reportingApps: 0, totalApps: 2, reportingAppDays: 0, totalAppDays: 2 });
+    expect(dashboard.trend[0].coverage.impressions).toEqual({ state: "partial", reportingApps: 1, totalApps: 2, reportingAppDays: 1, totalAppDays: 2 });
     expect(dashboard.completeThrough).toBeNull();
+  });
+
+  it("marks a range partial when every app reported at least once but some app-days are missing", async () => {
+    vi.stubEnv("MOCK_DATA", "0");
+    vi.mocked(getApps).mockResolvedValue([{ id: 1, name: "First", is_enabled: true }, { id: 2, name: "Second", is_enabled: true }] as never);
+    const discoveryPartitions = [
+      { app_id: 1, report_kind: "discovery", date: "2026-10-01", processing_date: "2026-10-04" },
+      { app_id: 1, report_kind: "discovery", date: "2026-10-02", processing_date: "2026-10-04" },
+      { app_id: 2, report_kind: "discovery", date: "2026-10-01", processing_date: "2026-10-04" },
+    ];
+    vi.mocked(readAnalyticsFacts).mockResolvedValue({ discovery: [{ app_id: 1, date: "2026-10-01", territory: "USA", source_type: "App Store Search", event: "Impression", page_type: null, counts: "5", unique_counts: null }], downloads: [], partitions: discoveryPartitions } as never);
+    const dashboard = await getAppStoreAnalyticsDashboard(viewer, { from: "2026-10-01", to: "2026-10-02" });
+    expect(dashboard.coverage.impressions).toEqual({ state: "partial", reportingApps: 2, totalApps: 2, reportingAppDays: 3, totalAppDays: 4 });
+    expect(dashboard.acquisition[0].coverage.impressions.reportingAppDays).toBe(3);
+    expect(dashboard.trend[0].coverage.impressions).toEqual({ state: "complete", reportingApps: 2, totalApps: 2, reportingAppDays: 2, totalAppDays: 2 });
+    expect(dashboard.trend[1].coverage.impressions).toEqual({ state: "partial", reportingApps: 1, totalApps: 2, reportingAppDays: 1, totalAppDays: 2 });
   });
 
   it("advances complete-through only when all enabled apps and required reports are complete", () => {

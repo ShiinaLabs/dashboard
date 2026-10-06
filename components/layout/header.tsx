@@ -34,14 +34,16 @@ export function Header() {
   const context = routeContext(pathname, t);
   const freshness = useFreshness();
   const now = useNow();
+  const serverChecked = freshness.lastServerCheckAt === null ? "—" : new Date(freshness.lastServerCheckAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const dataRefreshed = freshness.lastSuccessfulDataRefreshAt === null ? "—" : new Date(freshness.lastSuccessfulDataRefreshAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const freshnessLabel = freshness.serverState === "offline" ? "Offline"
     : freshness.serverState === "unreachable" ? "Server unavailable"
       : freshness.serverState === "checking" ? "Checking server…"
         : freshness.refreshState === "refreshing" ? "Refreshing…"
           : freshness.refreshState === "failed" ? "Refresh failed"
-            : freshness.lastSuccessfulRefreshAt === null ? "Updated —"
-              : now - freshness.lastSuccessfulRefreshAt > 10 * 60_000 ? `Stale · ${Math.floor((now - freshness.lastSuccessfulRefreshAt) / 60_000)}m`
-                : `Updated ${new Date(freshness.lastSuccessfulRefreshAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+            : freshness.lastSuccessfulDataRefreshAt === null ? "Updated —"
+              : now - freshness.lastSuccessfulDataRefreshAt > 10 * 60_000 ? `Stale · ${Math.floor((now - freshness.lastSuccessfulDataRefreshAt) / 60_000)}m`
+                : `Updated ${dataRefreshed}`;
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b bg-background/95 px-4 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-6">
       <SidebarTrigger variant="outline" className="size-9" aria-expanded={isOpen} aria-label={isOpen ? t("common.collapseSidebar") : t("common.expandSidebar")}>
@@ -53,7 +55,7 @@ export function Header() {
         <span aria-hidden="true" className="hidden text-muted-foreground sm:inline">/</span>
         <span className="truncate font-medium text-foreground">{context}</span>
       </nav>
-      <span role="status" aria-label={`Dashboard server freshness: ${freshnessLabel}`} className="ml-auto shrink-0 text-xs text-muted-foreground">{freshnessLabel}</span>
+      <span role="status" aria-label={`Dashboard server freshness: ${freshnessLabel}`} title={`Server checked ${serverChecked}; Data refreshed ${dataRefreshed}`} className="ml-auto shrink-0 text-xs text-muted-foreground">{freshnessLabel}</span>
     </header>
   );
 }

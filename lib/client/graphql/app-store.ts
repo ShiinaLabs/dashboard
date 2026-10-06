@@ -38,9 +38,9 @@ const analyticsPage = /* GraphQL */ `
       analytics(from: $from, to: $to, appId: $appId, territory: $territory) {
         updatedAt completeThrough
         overview { impressions views firstTimeDownloads downloads conversion }
-        coverage { impressions { state reportingApps totalApps } views { state reportingApps totalApps } firstTimeDownloads { state reportingApps totalApps } downloads { state reportingApps totalApps } conversion { state reportingApps totalApps } }
-        trend { date impressions views firstTimeDownloads downloads conversion coverage { impressions { state reportingApps totalApps } views { state reportingApps totalApps } firstTimeDownloads { state reportingApps totalApps } downloads { state reportingApps totalApps } conversion { state reportingApps totalApps } } }
-        acquisition { source impressions views firstTimeDownloads downloads conversion }
+        coverage { impressions { state reportingApps totalApps reportingAppDays totalAppDays } views { state reportingApps totalApps reportingAppDays totalAppDays } firstTimeDownloads { state reportingApps totalApps reportingAppDays totalAppDays } downloads { state reportingApps totalApps reportingAppDays totalAppDays } conversion { state reportingApps totalApps reportingAppDays totalAppDays } }
+        trend { date impressions views firstTimeDownloads downloads conversion coverage { impressions { state reportingApps totalApps reportingAppDays totalAppDays } views { state reportingApps totalApps reportingAppDays totalAppDays } firstTimeDownloads { state reportingApps totalApps reportingAppDays totalAppDays } downloads { state reportingApps totalApps reportingAppDays totalAppDays } conversion { state reportingApps totalApps reportingAppDays totalAppDays } } }
+        acquisition { source impressions views firstTimeDownloads downloads conversion coverage { impressions { state reportingApps totalApps reportingAppDays totalAppDays } views { state reportingApps totalApps reportingAppDays totalAppDays } firstTimeDownloads { state reportingApps totalApps reportingAppDays totalAppDays } downloads { state reportingApps totalApps reportingAppDays totalAppDays } conversion { state reportingApps totalApps reportingAppDays totalAppDays } } }
         campaigns { campaign impressions views firstTimeDownloads downloads conversion trend { date downloads } }
         territories
       }

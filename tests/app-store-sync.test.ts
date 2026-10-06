@@ -40,7 +40,7 @@ const viewer = { id: 1, role: "admin" };
 function catalog(names: string[]): AnalyticsReport[] {
   return names.map((name, index) => ({ id: `report-${index}`, type: "analyticsReports", attributes: { name, category: "APP_STORE_COMMERCE" } }));
 }
-function clientWithCatalog(names: string[]) {
+function clientWithCatalog(names: string[], processingDate = "2026-10-02") {
   const common = { Date: "2026-09-29", "App Apple Identifier": "123", Territory: "USA" };
   const row = { ...common, Event: "Impression", "Page Type": "No page", "Source Type": "App Store search", Counts: "10", "Unique Counts": "8", "Download Type": "First-time Download" };
   const bytes = gzipSync(Object.keys(row).join("\t") + "\n" + Object.values(row).join("\t"));
@@ -49,7 +49,7 @@ function clientWithCatalog(names: string[]) {
     const path = new URL(String(input)).pathname;
     if (path.endsWith("/analyticsReportRequests")) return Response.json({ data: [{ id: "request", type: "analyticsReportRequests", attributes: { accessType: "ONGOING", stoppedDueToInactivity: false } }] });
     if (path.endsWith("/reports")) return Response.json({ data: catalog(names) });
-    if (path.endsWith("/instances")) return Response.json({ data: [{ id: "instance", type: "analyticsReportInstances", attributes: { granularity: "DAILY", processingDate: "2026-10-02" } }] });
+    if (path.endsWith("/instances")) return Response.json({ data: [{ id: "instance", type: "analyticsReportInstances", attributes: { granularity: "DAILY", processingDate } }] });
     if (path.endsWith("/segments")) return Response.json({ data: [segment] });
     if (path.endsWith("/analyticsReportSegments/segment")) return Response.json({ data: segment });
     if (path === "/segment") return new Response(bytes);
@@ -127,6 +127,34 @@ describe("production Analytics sync selection", () => {
     const diagnostics = mocks.checkpoints.mock.calls.map(([, summary]) => summary);
     for (const checkpoint of ["request", "catalog", "instance", "download", "parse", "map", "commit", "verify", "finished"]) expect(diagnostics.some((summary) => summary.checkpoint === checkpoint), JSON.stringify(diagnostics.map((summary) => summary.checkpoint))).toBe(true);
     expect(JSON.stringify(diagnostics)).not.toMatch(/https:|synthetic-token|App Store search|Counts|raw report/i);
+    const infoEvents = mocks.info.mock.calls.map(([, message]) => JSON.parse(message).event);
+    expect(infoEvents).toEqual(["sync_started", "sync_finished"]);
+    expect(mocks.debug.mock.calls.map(([, message]) => JSON.parse(message).event)).toEqual(expect.arrayContaining(["analytics_report_selected", "analytics_instances_discovered", "analytics_instance_started", "analytics_segments_discovered", "analytics_instance_parsed", "analytics_instance_mapped", "analytics_instance_commit_started", "analytics_instance_committed"]));
+  });
+
+  it("stores unique semantic report state from verified local dates after a correction import", async () => {
+    clientWithCatalog([analyticsReportDefinitions.discovery.standardName], "2026-10-05");
+    const preSync = [{ app_id: 2, report_kind: "discovery", date: "2026-10-03", processing_date: "2026-10-04" }];
+    const postSync = [
+      { app_id: 2, report_kind: "discovery", date: "2026-10-03", processing_date: "2026-10-05" },
+      { app_id: 2, report_kind: "discovery", date: "2026-10-04", processing_date: "2026-10-04" },
+    ];
+    mocks.partitions.mockResolvedValueOnce(preSync).mockResolvedValueOnce(postSync);
+
+    expect(await syncAppStoreAnalytics(1, viewer)).toMatchObject({ status: "success", imported: 1 });
+    const diagnostic = mocks.checkpoints.mock.calls.at(-1)![1];
+    expect(diagnostic.checkpoint).toBe("finished");
+    expect(diagnostic.reports.filter((report: { appId: number; reportKind: string; accessType: string }) => report.appId === 2 && report.reportKind === "discovery" && report.accessType === "ONGOING")).toEqual([{
+      appId: 2,
+      reportKind: "discovery",
+      accessType: "ONGOING",
+      state: "imported",
+      appleProcessingDate: "2026-10-05",
+      localProcessingDate: "2026-10-05",
+      latestData: "2026-10-04",
+    }]);
+    expect(new Set(diagnostic.reports.map((report: { appId: number; reportKind: string; accessType: string }) => `${report.appId}:${report.reportKind}:${report.accessType}`)).size).toBe(diagnostic.reports.length);
+    expect(diagnostic.after).toMatchObject({ latestProcessingDate: "2026-10-05", latestBusinessDate: "2026-10-04" });
   });
 
   it("normal sync selects only Ongoing requests when Apple lists both access types", async () => {
@@ -382,7 +410,11 @@ describe("production Analytics sync selection", () => {
     const result = await syncAppStoreRevenue(1, viewer, { from: reportDate, to: reportDate, fiscalMonth: "2026-09", regionCode: "ZZ" });
     expect(result.sources.sales.status).toBe("success");
     expect(result.sources.finance.status).toBe("success");
-    const events = [...mocks.info.mock.calls, ...mocks.error.mock.calls].map(([, message]) => JSON.parse(message));
+    const events = [...mocks.info.mock.calls, ...mocks.debug.mock.calls, ...mocks.error.mock.calls].map(([, message]) => JSON.parse(message));
+    const infoEvents = mocks.info.mock.calls.map(([, message]) => JSON.parse(message).event);
+    expect(infoEvents.filter((event) => event === "sync_finished")).toHaveLength(3);
+    expect(infoEvents.some((event) => /^sales_report_|^finance_report_/.test(event))).toBe(false);
+    expect(mocks.debug.mock.calls.map(([, message]) => JSON.parse(message).event)).toEqual(expect.arrayContaining(["sales_report_started", "sales_report_downloaded", "sales_report_parsed", "sales_report_mapped", "finance_report_started", "finance_report_downloaded", "finance_report_parsed", "finance_report_mapped"]));
     for (const event of ["sales_report_started", "sales_report_downloaded", "sales_report_parsed", "sales_report_mapped", "sales_report_committed", "finance_report_started", "finance_report_downloaded", "finance_report_parsed", "finance_report_mapped", "finance_report_committed"]) expect(events.some((entry) => entry.event === event)).toBe(true);
     expect(events.find((entry) => entry.event === "finance_report_parsed")).toMatchObject({ trailerStatus: "validated", rowCount: 1, fiscalMonth: "2026-09", regionCode: "ZZ" });
     expect(JSON.stringify(events)).not.toMatch(/12345678|sensitive-sku|private-sku|1\.4|100|https:|synthetic-token/);

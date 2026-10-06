@@ -28,10 +28,10 @@ export const appStoreTypeDefs = /* GraphQL */ `
   type ASCHealth { connection: ASCHealthItem!, analytics: ASCHealthItem!, revenueAnalytics: ASCHealthItem!, sales: ASCHealthItem!, finance: ASCHealthItem! }
   type ASCAnalyticsStatus { enabledApps: Int!, state: String!, snapshot: String!, ongoing: String!, latestData: String, completeThrough: String, lastSync: ASCSyncRun, message: String }
   type AppStoreAnalyticsMetrics { impressions: Int, views: Int, firstTimeDownloads: Int, downloads: Int, conversion: Float }
-  type AppStoreAnalyticsSource { source: String!, impressions: Int, views: Int, firstTimeDownloads: Int, downloads: Int, conversion: Float }
+  type AppStoreAnalyticsSource { source: String!, impressions: Int, views: Int, firstTimeDownloads: Int, downloads: Int, conversion: Float, coverage: AppStoreAnalyticsCoverage! }
   type AppStoreAnalyticsCampaign { campaign: String!, impressions: Int, views: Int, firstTimeDownloads: Int, downloads: Int, conversion: Float, trend: [AppStoreCampaignPoint!]! }
   type AppStoreCampaignPoint { date: String!, downloads: Int }
-  type AppStoreMetricCoverage { state: String!, reportingApps: Int!, totalApps: Int! }
+  type AppStoreMetricCoverage { state: String!, reportingApps: Int!, totalApps: Int!, reportingAppDays: Int!, totalAppDays: Int! }
   type AppStoreAnalyticsCoverage { impressions: AppStoreMetricCoverage!, views: AppStoreMetricCoverage!, firstTimeDownloads: AppStoreMetricCoverage!, downloads: AppStoreMetricCoverage!, conversion: AppStoreMetricCoverage! }
   type AppStoreAnalyticsPoint { date: String!, impressions: Int, views: Int, firstTimeDownloads: Int, downloads: Int, conversion: Float, coverage: AppStoreAnalyticsCoverage! }
   type AppStoreAnalyticsReport { updatedAt: String, completeThrough: String, overview: AppStoreAnalyticsMetrics!, coverage: AppStoreAnalyticsCoverage!, trend: [AppStoreAnalyticsPoint!]!, acquisition: [AppStoreAnalyticsSource!]!, campaigns: [AppStoreAnalyticsCampaign!]!, territories: [String!]! }

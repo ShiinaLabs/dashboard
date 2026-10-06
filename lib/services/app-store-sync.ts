@@ -14,6 +14,8 @@ import { analyticsRunStatus } from "./app-store-analytics";
 import type { ConnectionRow } from "../repositories/app-store";
 import { logStructured } from "../logger";
 import { latestSalesReportDate } from "../../shared/app-store-revenue";
+import { summarizeLocalReportPartitions, upsertDiagnosticReport } from "./app-store-diagnostics";
+import type { AppStoreDiagnosticReport } from "../../shared/app-store";
 import type { AppStoreDiagnosticSummary } from "@/db/schema/app-store";
 import { readAnalyticsPartitions } from "../repositories/app-store-facts";
 
@@ -86,29 +88,62 @@ async function syncAnalyticsReports(connection: ConnectionRow, kinds: AnalyticsR
   const progress = runProgress();
   const run = await startRun(connection.id, "analytics", scope, trigger);
   const diagnostic: AppStoreDiagnosticSummary = { version: 1, checkpoint: "request", checkpointAt: new Date().toISOString(), source: "analytics", scope, trigger, counters: {}, reports: [], before: {}, after: {}, issues: [] };
-  const localByReport = new Map<string, { processingDate: string; latestData: string }>();
-  const checkpoint = async (stage: string, fields: Record<string, unknown> = {}) => {
+  const checkpoint = async (stage: AppStoreDiagnosticSummary["checkpoint"], _fields: Record<string, unknown> = {}) => {
     diagnostic.checkpoint = stage;
     diagnostic.checkpointAt = new Date().toISOString();
     diagnostic.counters = { apps: progress.apps, requests: progress.requests, reportsSelected: progress.reportsSelected, instancesDiscovered: progress.instancesDiscovered, instancesProcessed: progress.instancesProcessed, imported: progress.instancesImported, skipped: progress.instancesSkipped, waiting: progress.instancesWaiting, failed: progress.instancesFailed, segmentsDownloaded: progress.segmentsDownloaded, parsedRows: progress.parsedRows, mappedRows: progress.mappedRows };
-    if (typeof fields.appId === "number" && typeof fields.reportKind === "string") {
-      const index = diagnostic.reports.findIndex((item) => item.appId === fields.appId && item.reportKind === fields.reportKind && item.accessType === mode);
-      const local = localByReport.get(`${fields.appId}:${fields.reportKind}`);
-      const previous = index >= 0 ? diagnostic.reports[index] : { appId: fields.appId, reportKind: fields.reportKind, accessType: mode === "ongoing" ? "ONGOING" : "ONE_TIME_SNAPSHOT", state: stage, appleProcessingDate: null, localProcessingDate: local?.processingDate ?? null, latestData: local?.latestData ?? null };
-      const entry = { ...previous, state: stage, ...(typeof fields.processingDate === "string" ? { appleProcessingDate: fields.processingDate } : {}) };
-      if (index >= 0) diagnostic.reports[index] = entry; else diagnostic.reports.push(entry);
-    }
     await checkpointRun(run, structuredClone(diagnostic));
+  };
+  const reportState = (appId: number, reportKind: string, state: AppStoreDiagnosticReport["state"], appleProcessingDate?: string | null) => {
+    const existing = diagnostic.reports.find((item) => item.appId === appId && item.reportKind === reportKind && item.accessType === (mode === "ongoing" ? "ONGOING" : "ONE_TIME_SNAPSHOT"));
+    const report: AppStoreDiagnosticReport = {
+      appId,
+      reportKind,
+      accessType: mode === "ongoing" ? "ONGOING" : "ONE_TIME_SNAPSHOT",
+      state,
+      appleProcessingDate: appleProcessingDate === undefined ? existing?.appleProcessingDate ?? null : appleProcessingDate,
+      localProcessingDate: existing?.localProcessingDate ?? null,
+      latestData: existing?.latestData ?? null,
+    };
+    upsertDiagnosticReport(diagnostic.reports, report);
+  };
+  const refreshLocalReportFacts = (partitions: Awaited<ReturnType<typeof readAnalyticsPartitions>>) => {
+    const localReports = summarizeLocalReportPartitions(partitions);
+    const localByReport = new Map(localReports.map((summary) => [`${summary.appId}:${summary.reportKind}`, summary]));
+    for (const report of diagnostic.reports) {
+      const local = localByReport.get(`${report.appId}:${report.reportKind}`);
+      upsertDiagnosticReport(diagnostic.reports, {
+        ...report,
+        localProcessingDate: local?.localProcessingDate ?? null,
+        latestData: local?.latestData ?? null,
+      });
+    }
+    return localReports;
+  };
+  const localSnapshot = (partitions: Awaited<ReturnType<typeof readAnalyticsPartitions>>) => {
+    const reports = summarizeLocalReportPartitions(partitions);
+    return {
+      latestProcessingDate: reports.map((item) => item.localProcessingDate).sort().at(-1) ?? null,
+      latestBusinessDate: reports.map((item) => item.latestData).sort().at(-1) ?? null,
+      partitions: partitions.length,
+    };
   };
   await checkpoint("request");
   logEvent("info", "sync_started", runContext(run));
   const fail = (stage: string, message: string, fields: Record<string, unknown> = {}, code?: string) => {
     result.errors.push(message);
     diagnostic.issues.push({ severity: "error", stage, code: code ?? "failure", ...(typeof fields.appId === "number" ? { appId: fields.appId } : {}), ...(typeof fields.reportKind === "string" ? { reportKind: fields.reportKind } : {}) });
+    if (typeof fields.appId === "number" && typeof fields.reportKind === "string") reportState(fields.appId, fields.reportKind, "failed");
     logEvent("error", "report_failed", { ...runContext(run), ...fields, stage, ...(code ? { code } : {}), diagnostic: message });
   };
   const wait = (stage: string, reason: string, fields: Record<string, unknown> = {}) => {
     diagnostic.issues.push({ severity: "info", stage, code: reason, ...(typeof fields.appId === "number" ? { appId: fields.appId } : {}), ...(typeof fields.reportKind === "string" ? { reportKind: fields.reportKind } : {}) });
+    if (typeof fields.appId === "number" && typeof fields.reportKind === "string") {
+      const state: AppStoreDiagnosticReport["state"] = reason === "no_reports_generated" ? "no_reports"
+        : reason === "no_daily_instances" ? "no_daily_instances"
+          : reason === "segments_pending" ? "pending_segments" : "waiting";
+      reportState(fields.appId, fields.reportKind, state);
+    }
     recordWaiting(result, run, stage, reason, fields);
   };
   try {
@@ -118,12 +153,7 @@ async function syncAnalyticsReports(connection: ConnectionRow, kinds: AnalyticsR
       const apps = await analytics.enabledApps(connection.id);
       progress.apps = apps.length;
       const localBefore = await readAnalyticsPartitions(apps.map((app) => app.id));
-      for (const partition of localBefore) {
-        const key = `${partition.app_id}:${partition.report_kind}`;
-        const previous = localByReport.get(key);
-        if (!previous || partition.processing_date > previous.processingDate) localByReport.set(key, { processingDate: partition.processing_date, latestData: partition.date });
-      }
-      diagnostic.before = { latestProcessingDate: localBefore.map((item) => item.processing_date).sort().at(-1) ?? null, latestBusinessDate: localBefore.map((item) => item.date).sort().at(-1) ?? null, partitions: localBefore.length };
+      diagnostic.before = localSnapshot(localBefore);
       await checkpoint("request");
       if (!apps.length) wait("connection", "no_enabled_apps");
       for (const app of apps) {
@@ -137,7 +167,7 @@ async function syncAnalyticsReports(connection: ConnectionRow, kinds: AnalyticsR
           const matching = resources.filter((request) => request.attributes.accessType === expectedAccessType);
           const active = matching.filter((request) => !request.attributes.stoppedDueToInactivity);
           await checkpoint("request", { appId: app.id });
-          logEvent("info", "analytics_requests_discovered", { ...runContext(run), appId: app.id, count: matching.length, active: active.length, stopped: matching.length - active.length, accessType: expectedAccessType });
+          logEvent("debug", "analytics_requests_discovered", { ...runContext(run), appId: app.id, count: matching.length, active: active.length, stopped: matching.length - active.length, accessType: expectedAccessType });
           if (!matching.length) wait("request", "no_matching_request", { appId: app.id, accessType: expectedAccessType });
           else if (!active.length) wait("request", "requests_inactive", { appId: app.id, accessType: expectedAccessType });
         } catch (error) {
@@ -157,7 +187,7 @@ async function syncAnalyticsReports(connection: ConnectionRow, kinds: AnalyticsR
           progress.reportsDiscovered += reports.length;
           await checkpoint("catalog", { appId: app.id });
           const targetsFound = new Set(reports.map((report) => identifyStandardAnalyticsReport(report.attributes.name)).filter((kind): kind is AnalyticsReportKind => Boolean(kind)));
-          logEvent("info", "analytics_report_catalog", { ...runContext(run), appId: app.id, requestId: resource.id, accessType: resource.attributes.accessType, count: reports.length, targetsFound: [...targetsFound], targetsMissing: kinds.filter((kind) => !targetsFound.has(kind)) });
+          logEvent("debug", "analytics_report_catalog", { ...runContext(run), appId: app.id, requestId: resource.id, accessType: resource.attributes.accessType, count: reports.length, targetsFound: [...targetsFound], targetsMissing: kinds.filter((kind) => !targetsFound.has(kind)) });
           logEvent("debug", "analytics_report_catalog_targets", { ...runContext(run), appId: app.id, details: reports.map(({ attributes }) => ({ name: attributes.name, category: attributes.category })) });
           const selected = reports.flatMap((report) => {
             const kind = identifyStandardAnalyticsReport(report.attributes.name);
@@ -167,7 +197,7 @@ async function syncAnalyticsReports(connection: ConnectionRow, kinds: AnalyticsR
           if (!reports.length) {
             wait("report", "no_reports_generated", { appId: app.id, requestId: resource.id });
             for (const kind of kinds) {
-              diagnostic.reports.push({ appId: app.id, reportKind: kind, accessType: mode === "ongoing" ? "ONGOING" : "ONE_TIME_SNAPSHOT", state: "no_reports", appleProcessingDate: null, localProcessingDate: null, latestData: null });
+              reportState(app.id, kind, "no_reports", null);
               await checkpoint("catalog", { appId: app.id, reportKind: kind });
             }
           } else for (const kind of kinds) {
@@ -179,25 +209,25 @@ async function syncAnalyticsReports(connection: ConnectionRow, kinds: AnalyticsR
               const diagnostic = `unexpected_report_variant; expected=${definition.standardName}; received=${received.join(", ")}`;
               fail("report", diagnostic, { appId: app.id, requestId: resource.id, reportKind: kind, reason: "unexpected_report_variant", expected: definition.standardName, received }, "unexpected_report_variant");
             } else {
-              diagnostic.reports.push({ appId: app.id, reportKind: kind, accessType: mode === "ongoing" ? "ONGOING" : "ONE_TIME_SNAPSHOT", state: "waiting", appleProcessingDate: null, localProcessingDate: null, latestData: null });
+              reportState(app.id, kind, "waiting", null);
               await checkpoint("catalog", { appId: app.id, reportKind: kind });
               wait("report", "target_report_unavailable", { appId: app.id, requestId: resource.id, reportKind: kind });
             }
           }
           for (const { report, kind } of selected) {
+            reportState(app.id, kind, "current");
             await checkpoint("instance", { appId: app.id, reportKind: kind });
-            logEvent("info", "analytics_report_selected", { ...runContext(run), appId: app.id, requestId: resource.id, reportId: report.id, reportKind: kind, reportName: report.attributes.name });
+            logEvent("debug", "analytics_report_selected", { ...runContext(run), appId: app.id, requestId: resource.id, reportId: report.id, reportKind: kind, reportName: report.attributes.name });
             let instances;
             try { instances = (await client.listAnalyticsReportInstances(report.id)).filter((instance) => instance.attributes.granularity === "DAILY").sort((a, b) => a.attributes.processingDate.localeCompare(b.attributes.processingDate)); }
             catch (error) { fail("instance", reportDiagnostic(error), { appId: app.id, requestId: resource.id, reportId: report.id, reportKind: kind }, error instanceof AppStoreApiError ? error.code : undefined); continue; }
             progress.instancesDiscovered += instances.length;
+            reportState(app.id, kind, "current", instances.at(-1)?.attributes.processingDate ?? null);
             await checkpoint("instance", { appId: app.id, reportKind: kind, processingDate: instances.at(-1)?.attributes.processingDate });
-            logEvent("info", "analytics_instances_discovered", { ...runContext(run), appId: app.id, reportId: report.id, reportKind: kind, count: instances.length, earliestProcessingDate: instances[0]?.attributes.processingDate ?? null, latestProcessingDate: instances.at(-1)?.attributes.processingDate ?? null });
+            logEvent("debug", "analytics_instances_discovered", { ...runContext(run), appId: app.id, reportId: report.id, reportKind: kind, count: instances.length, earliestProcessingDate: instances[0]?.attributes.processingDate ?? null, latestProcessingDate: instances.at(-1)?.attributes.processingDate ?? null });
             if (!instances.length) {
               progress.instancesWaiting++;
-              const existing = diagnostic.reports.find((item) => item.appId === app.id && item.reportKind === kind && item.accessType === (mode === "ongoing" ? "ONGOING" : "ONE_TIME_SNAPSHOT"));
-              if (existing) existing.state = "no_daily_instances";
-              else diagnostic.reports.push({ appId: app.id, reportKind: kind, accessType: mode === "ongoing" ? "ONGOING" : "ONE_TIME_SNAPSHOT", state: "no_daily_instances", appleProcessingDate: null, localProcessingDate: null, latestData: null });
+              reportState(app.id, kind, "no_daily_instances", null);
               await checkpoint("instance", { appId: app.id, reportKind: kind });
               wait("instance", "no_daily_instances", { appId: app.id, reportKind: kind, report: analyticsReportDefinitions[kind].standardName });
             }
@@ -214,22 +244,20 @@ async function syncAnalyticsReports(connection: ConnectionRow, kinds: AnalyticsR
               if (oldImported && mode === "ongoing") {
                 result.skipped++;
                 progress.instancesSkipped++;
-                const diagnosticReport = diagnostic.reports.find((item) => item.appId === app.id && item.reportKind === kind && item.accessType === "ONGOING");
-                if (diagnosticReport) Object.assign(diagnosticReport, { state: "skipped", appleProcessingDate: instance.attributes.processingDate, localProcessingDate: instance.attributes.processingDate, latestData: instance.attributes.processingDate });
+                reportState(app.id, kind, "unchanged", instance.attributes.processingDate);
                 await checkpoint("verify", { ...instanceFields });
                 logEvent("debug", "analytics_instance_skipped", { ...runContext(run), ...instanceFields, reason: "old_instance_imported", segmentCount: manifests.length });
                 continue;
               }
-              logEvent("info", "analytics_instance_started", { ...runContext(run), ...instanceFields });
+              logEvent("debug", "analytics_instance_started", { ...runContext(run), ...instanceFields });
               let listed;
               try { listed = await client.listAnalyticsReportSegments(instance.id); }
               catch (error) { progress.instancesFailed++; fail("segment", reportDiagnostic(error), { ...instanceFields }, error instanceof AppStoreApiError ? error.code : undefined); continue; }
-              logEvent("info", "analytics_segments_discovered", { ...runContext(run), ...instanceFields, count: listed.length });
+              logEvent("debug", "analytics_segments_discovered", { ...runContext(run), ...instanceFields, count: listed.length });
               if (listed.length > 0 && listed.length === manifests.length && listed.every((segment) => manifests.some((manifest) => manifest.apple_segment_id === segment.id && manifest.checksum === segment.attributes.checksum.toLowerCase()))) {
                 result.skipped++;
                 progress.instancesSkipped++;
-                const diagnosticReport = diagnostic.reports.find((item) => item.appId === app.id && item.reportKind === kind && item.accessType === (mode === "ongoing" ? "ONGOING" : "ONE_TIME_SNAPSHOT"));
-                if (diagnosticReport) Object.assign(diagnosticReport, { state: "skipped", appleProcessingDate: instance.attributes.processingDate, localProcessingDate: instance.attributes.processingDate, latestData: instance.attributes.processingDate });
+                reportState(app.id, kind, "unchanged", instance.attributes.processingDate);
                 await checkpoint("verify", { ...instanceFields });
                 logEvent("debug", "analytics_instance_skipped", { ...runContext(run), ...instanceFields, reason: "segments_unchanged", segmentCount: listed.length });
                 continue;
@@ -255,7 +283,7 @@ async function syncAnalyticsReports(connection: ConnectionRow, kinds: AnalyticsR
                   wait("segment", "segments_pending", instanceFields);
                 } else {
                   progress.instancesFailed++;
-                  const stage = error instanceof AnalyticsInstanceError ? error.stage : "segment";
+        const stage = error instanceof AnalyticsInstanceError ? (error.stage === "parse" ? "parse" : "download") : "download";
                   const fields = { ...instanceFields, ...(error instanceof AnalyticsInstanceError && error.segmentId ? { segmentId: error.segmentId } : {}) };
                   await checkpoint(stage, instanceFields);
                   fail(stage, `${analyticsReportDefinitions[kind].standardName}; instance ${instance.id}; stage ${stage}; ${reportDiagnostic(error)}`, fields, error instanceof AppStoreReportError ? error.code : undefined);
@@ -264,15 +292,15 @@ async function syncAnalyticsReports(connection: ConnectionRow, kinds: AnalyticsR
               }
               progress.parsedRows += prepared.table.rows.length;
               await checkpoint("parse", { ...instanceFields, processingDate: prepared.processingDate });
-              logEvent("info", "analytics_instance_parsed", { ...runContext(run), ...instanceFields, segmentCount: prepared.segments.length, rowCount: prepared.table.rows.length, columnCount: prepared.table.headers.length, headers: prepared.table.headers });
+              logEvent("debug", "analytics_instance_parsed", { ...runContext(run), ...instanceFields, segmentCount: prepared.segments.length, rowCount: prepared.table.rows.length, columnCount: prepared.table.headers.length, headers: prepared.table.headers });
               let mapped;
               await checkpoint("map", { ...instanceFields, processingDate: prepared.processingDate });
               try { mapped = mapAnalyticsReport(kind, prepared.table, { appId: app.id, appleId: app.apple_id, instanceId: instance.id, processingDate: prepared.processingDate }); }
               catch (error) { progress.instancesFailed++; await checkpoint("map", { ...instanceFields, processingDate: prepared.processingDate }); fail("map", `${analyticsReportDefinitions[kind].standardName}; ${reportDiagnostic(error)}`, instanceFields, error instanceof AppStoreReportError ? error.code : undefined); continue; }
               progress.mappedRows += mapped.rows.length;
               await checkpoint("map", { ...instanceFields, processingDate: prepared.processingDate });
-              logEvent("info", "analytics_instance_mapped", { ...runContext(run), ...instanceFields, inputRows: prepared.table.rows.length, mappedRows: mapped.rows.length });
-              logEvent("info", "analytics_instance_commit_started", { ...runContext(run), ...instanceFields, rows: mapped.rows.length });
+              logEvent("debug", "analytics_instance_mapped", { ...runContext(run), ...instanceFields, inputRows: prepared.table.rows.length, mappedRows: mapped.rows.length });
+              logEvent("debug", "analytics_instance_commit_started", { ...runContext(run), ...instanceFields, rows: mapped.rows.length });
               const commitStartedAt = Date.now();
               await checkpoint("commit", { ...instanceFields, processingDate: prepared.processingDate });
               let outcome: "imported" | "skipped";
@@ -281,9 +309,9 @@ async function syncAnalyticsReports(connection: ConnectionRow, kinds: AnalyticsR
               result[outcome]++;
               if (outcome === "imported") progress.instancesImported++;
               else progress.instancesSkipped++;
-              diagnostic.reports.push({ appId: app.id, reportKind: kind, accessType: mode === "ongoing" ? "ONGOING" : "ONE_TIME_SNAPSHOT", state: outcome, appleProcessingDate: prepared.processingDate, localProcessingDate: prepared.processingDate, latestData: prepared.processingDate });
+              reportState(app.id, kind, outcome === "imported" ? "imported" : "unchanged", prepared.processingDate);
               await checkpoint("verify", { ...instanceFields, processingDate: prepared.processingDate });
-              logEvent("info", "analytics_instance_committed", { ...runContext(run), ...instanceFields, rows: mapped.rows.length, outcome, durationMs: Date.now() - commitStartedAt });
+              logEvent("debug", "analytics_instance_committed", { ...runContext(run), ...instanceFields, rows: mapped.rows.length, outcome, durationMs: Date.now() - commitStartedAt });
             }
           }
         }
@@ -291,7 +319,12 @@ async function syncAnalyticsReports(connection: ConnectionRow, kinds: AnalyticsR
     }
     result.status = reportSyncStatus(result);
     const localAfter = await readAnalyticsPartitions((await analytics.enabledApps(connection.id)).map((app) => app.id));
-    diagnostic.after = { latestProcessingDate: localAfter.map((item) => item.processing_date).sort().at(-1) ?? null, latestBusinessDate: localAfter.map((item) => item.date).sort().at(-1) ?? null, partitions: localAfter.length };
+    const localReportsAfter = refreshLocalReportFacts(localAfter);
+    diagnostic.after = localSnapshot(localAfter);
+    for (const report of diagnostic.reports) {
+      const local = localReportsAfter.find((item) => item.appId === report.appId && item.reportKind === report.reportKind);
+      upsertDiagnosticReport(diagnostic.reports, { ...report, localProcessingDate: local?.localProcessingDate ?? null, latestData: local?.latestData ?? null });
+    }
     if (result.waiting && result.imported + result.skipped > 0) diagnostic.issues.push({ severity: "warn", stage: "verify", code: "partial_coverage" });
     await checkpoint("finished");
     await finishReportRun(run, result, progress);
@@ -353,11 +386,11 @@ async function syncRevenueSources(connection: ConnectionRow, id: number, parsed:
           const salesDates = options.salesDates ?? Array.from({ length: Math.floor((Date.parse(to) - Date.parse(from)) / 86400000) + 1 }, (_, offset) => new Date(Date.parse(from) + offset * 86400000).toISOString().slice(0, 10));
           for (const date of salesDates) {
             if (date > latestDate) { recordWaiting(result, run, "report", "before_daily_publication", { date, latestDate }); continue; }
-            logEvent("info", options.backfill ? "backfill_progress" : "sales_report_started", { ...runContext(run), date });
+            logEvent("debug", options.backfill ? "backfill_progress" : "sales_report_started", { ...runContext(run), date });
             let bytes: Buffer | null;
             try { bytes = await client.downloadSalesReport(connection.vendor_number, date); }
             catch (error) { fail("download", reportDiagnostic(error), { date }, error instanceof AppStoreApiError ? error.code : undefined); continue; }
-            logEvent("info", "sales_report_downloaded", { ...runContext(run), date, compressedBytes: bytes?.byteLength ?? 0, noSales: bytes === null });
+            logEvent("debug", "sales_report_downloaded", { ...runContext(run), date, compressedBytes: bytes?.byteLength ?? 0, noSales: bytes === null });
             let table;
             let text = "";
             if (bytes) {
@@ -367,31 +400,31 @@ async function syncRevenueSources(connection: ConnectionRow, id: number, parsed:
               } catch (error) { fail("parse", reportDiagnostic(error), { date }, error instanceof AppStoreReportError ? error.code : undefined); continue; }
             } else table = { headers: [], rows: [] };
             progress.parsedRows += table.rows.length;
-            logEvent("info", "sales_report_parsed", { ...runContext(run), date, rowCount: table.rows.length, headers: table.headers });
+            logEvent("debug", "sales_report_parsed", { ...runContext(run), date, rowCount: table.rows.length, headers: table.headers });
             const checksum = bytes ? createHash("sha256").update(text).digest("hex") : "no-sales";
             let rows;
             try { rows = bytes ? mapSalesReport(table, id, date, checksum) : []; }
             catch (error) { fail("map", reportDiagnostic(error), { date }, error instanceof AppStoreReportError ? error.code : undefined); continue; }
             progress.mappedRows += rows.length;
-            logEvent("info", "sales_report_mapped", { ...runContext(run), date, inputRows: table.rows.length, mappedRows: rows.length });
+            logEvent("debug", "sales_report_mapped", { ...runContext(run), date, inputRows: table.rows.length, mappedRows: rows.length });
             const commitStartedAt = Date.now();
             let outcome: "imported" | "skipped";
             try { outcome = await facts.commitSalesReport(id, connection.updated_at, date, checksum, rows); }
             catch { fail("commit", "report_import_failed", { date }, "report_import_failed"); continue; }
             result[outcome]++;
-            logEvent("info", "sales_report_committed", { ...runContext(run), date, rows: rows.length, outcome, durationMs: Date.now() - commitStartedAt });
+            logEvent("debug", "sales_report_committed", { ...runContext(run), date, rows: rows.length, outcome, durationMs: Date.now() - commitStartedAt });
           }
         } else {
           const dimensions = { fiscalMonth, regionCode };
           if (options.backfill) logEvent("info", "backfill_progress", { ...runContext(run), ...dimensions });
-          logEvent("info", "finance_report_started", { ...runContext(run), ...dimensions });
+          logEvent("debug", "finance_report_started", { ...runContext(run), ...dimensions });
           let bytes: Buffer | null;
           let downloadFailed = false;
           try { bytes = await client.downloadFinanceReport(connection.vendor_number, fiscalMonth, regionCode); }
           catch (error) { fail("download", reportDiagnostic(error), dimensions, error instanceof AppStoreApiError ? error.code : undefined); bytes = null; downloadFailed = true; }
           if (bytes === null && !downloadFailed) recordWaiting(result, run, "report", "finance_unavailable", dimensions);
           if (bytes) {
-            logEvent("info", "finance_report_downloaded", { ...runContext(run), ...dimensions, compressedBytes: bytes.byteLength });
+            logEvent("debug", "finance_report_downloaded", { ...runContext(run), ...dimensions, compressedBytes: bytes.byteLength });
             let text: string;
             let table;
             try {
@@ -400,21 +433,21 @@ async function syncRevenueSources(connection: ConnectionRow, id: number, parsed:
             } catch (error) { fail("parse", reportDiagnostic(error), dimensions, error instanceof AppStoreReportError ? error.code : undefined); table = null; text = ""; }
             if (table) {
               progress.parsedRows += table.rows.length;
-              logEvent("info", "finance_report_parsed", { ...runContext(run), ...dimensions, rowCount: table.rows.length, headers: table.headers, trailerStatus: /^Total_Rows\t/m.test(text) ? "validated" : "absent" });
+              logEvent("debug", "finance_report_parsed", { ...runContext(run), ...dimensions, rowCount: table.rows.length, headers: table.headers, trailerStatus: /^Total_Rows\t/m.test(text) ? "validated" : "absent" });
               const checksum = createHash("sha256").update(text).digest("hex");
               let rows;
               try { rows = mapFinanceReport(table, id, fiscalMonth, regionCode, checksum); }
               catch (error) { fail("map", reportDiagnostic(error), dimensions, error instanceof AppStoreReportError ? error.code : undefined); rows = null; }
               if (rows) {
                 progress.mappedRows += rows.length;
-                logEvent("info", "finance_report_mapped", { ...runContext(run), ...dimensions, inputRows: table.rows.length, mappedRows: rows.length });
+                logEvent("debug", "finance_report_mapped", { ...runContext(run), ...dimensions, inputRows: table.rows.length, mappedRows: rows.length });
                 const commitStartedAt = Date.now();
                 let outcome: "imported" | "skipped" | null;
                 try { outcome = await facts.commitFinanceReport(id, connection.updated_at, fiscalMonth, regionCode, checksum, rows); }
                 catch { fail("commit", "report_import_failed", dimensions, "report_import_failed"); outcome = null; }
                 if (outcome) {
                   result[outcome]++;
-                  logEvent("info", "finance_report_committed", { ...runContext(run), ...dimensions, rows: rows.length, outcome, durationMs: Date.now() - commitStartedAt });
+                  logEvent("debug", "finance_report_committed", { ...runContext(run), ...dimensions, rows: rows.length, outcome, durationMs: Date.now() - commitStartedAt });
                 }
               }
             }

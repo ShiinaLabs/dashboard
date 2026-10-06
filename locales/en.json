@@ -991,7 +991,7 @@
     "allTerritories": "All Territories",
     "updated": "Updated",
     "coverage": "Coverage",
-    "partialCoverage": "Partial {{reportingApps}}/{{totalApps}} apps",
+    "partialCoverage": "Partial · {{reportingApps}}/{{totalApps}} apps · {{reportingAppDays}}/{{totalAppDays}} app-days",
     "partialTrendCoverage": "Partial coverage on {{days}} dates",
     "noEnabledApps": "Enable an app in Connections to get started.",
     "overview": "Overview",

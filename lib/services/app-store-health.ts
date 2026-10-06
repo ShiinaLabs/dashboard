@@ -6,6 +6,7 @@ import { readAnalyticsPartitions, readCommerceImportDates } from "../repositorie
 import { reportRunDisplayStatus } from "../../shared/app-store";
 import { analyticsCompleteThrough } from "./app-store-analytics-reporting";
 import * as analytics from "../repositories/app-store-analytics";
+import { hasAppleProcessingAhead } from "./app-store-diagnostics";
 
 type Viewer = { id: number; role: string };
 const DAY = 86_400_000;
@@ -65,7 +66,7 @@ export async function getAppStoreHealth(connectionId: number, viewer: Viewer, no
     const ongoing = requests.filter((request) => request.access_type === "ONGOING");
     const perAppStopped = apps.some((app) => { const rows = ongoing.filter((request) => request.app_id === app.id); return rows.length > 0 && !rows.some((request) => !request.stopped_due_to_inactivity); });
     const startedAt = ongoing.filter((request) => !request.stopped_due_to_inactivity).map((request) => Date.parse(request.created_at)).filter(Number.isFinite).sort((a, b) => a - b)[0];
-    const appleAhead = (run?.diagnostic_summary?.reports ?? []).some((item) => kinds.includes(item.reportKind) && item.appleProcessingDate && (!item.localProcessingDate || item.appleProcessingDate > item.localProcessingDate));
+    const appleAhead = hasAppleProcessingAhead(run?.diagnostic_summary?.reports ?? [], kinds);
     if (!latest && perAppStopped) { health.state = "action_required"; health.reason = "An Ongoing request stopped and has no active replacement"; }
     else if (!latest) {
       health.state = startedAt !== undefined && now - startedAt <= 72 * 60 * 60_000 ? "waiting" : "stale";

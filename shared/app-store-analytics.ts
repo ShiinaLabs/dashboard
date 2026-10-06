@@ -20,15 +20,22 @@ export interface AppStoreAnalyticsMetrics {
   downloads: number | null;
   conversion: number | null;
 }
-export interface AppStoreMetricCoverage { state: "unknown" | "partial" | "complete"; reportingApps: number; totalApps: number }
+export interface AppStoreMetricCoverage {
+  state: "unknown" | "partial" | "complete";
+  reportingApps: number;
+  totalApps: number;
+  reportingAppDays: number;
+  totalAppDays: number;
+}
 export type AppStoreAnalyticsCoverage = Record<keyof AppStoreAnalyticsMetrics, AppStoreMetricCoverage>;
+export interface AppStoreAnalyticsSource { source: string; coverage: AppStoreAnalyticsCoverage }
 export interface AppStoreAnalyticsDashboard {
   updatedAt: string | null;
   completeThrough: string | null;
   overview: AppStoreAnalyticsMetrics;
   coverage: AppStoreAnalyticsCoverage;
   trend: ({ date: string; coverage: AppStoreAnalyticsCoverage } & AppStoreAnalyticsMetrics)[];
-  acquisition: ({ source: string } & AppStoreAnalyticsMetrics)[];
+  acquisition: (AppStoreAnalyticsSource & AppStoreAnalyticsMetrics)[];
   campaigns: ({ campaign: string; trend: { date: string; downloads: number | null }[] } & AppStoreAnalyticsMetrics)[];
   territories: string[];
 }

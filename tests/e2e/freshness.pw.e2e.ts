@@ -11,6 +11,7 @@ async function triggerVisibleRecovery(page: import("@playwright/test").Page) {
 }
 
 test("page freshness recovers on resume, coalesces lifecycle events and separates server from query failures", async ({ page }) => {
+  await page.clock.install();
   let healthCalls = 0;
   let graphQLCalls = 0;
   let failHealth = false;
@@ -31,6 +32,15 @@ test("page freshness recovers on resume, coalesces lifecycle events and separate
   await expect(page).toHaveURL(/\/app-store$/);
   await expect(page.getByRole("heading", { name: "App Store Analytics", level: 1 })).toBeVisible();
   await expect(page.getByRole("status", { name: /Dashboard server freshness: Updated/ })).toBeVisible();
+  const freshnessStatus = page.getByRole("status", { name: /Dashboard server freshness:/ });
+  await expect(freshnessStatus).toHaveAttribute("title", /Server checked .*; Data refreshed (?!—).+/);
+  const initialDataTime = (await freshnessStatus.getAttribute("title"))?.match(/Data refreshed (.+)$/)?.[1];
+  const beforeHeartbeatHealth = healthCalls;
+  const beforeHeartbeatGraphQL = graphQLCalls;
+  await page.clock.fastForward(60_000);
+  await expect.poll(() => healthCalls).toBeGreaterThan(beforeHeartbeatHealth);
+  expect(graphQLCalls).toBe(beforeHeartbeatGraphQL);
+  await expect.poll(async () => (await freshnessStatus.getAttribute("title"))?.match(/Data refreshed (.+)$/)?.[1]).toBe(initialDataTime);
 
   const beforeHealth = healthCalls;
   const beforeGraphQL = graphQLCalls;
@@ -39,18 +49,22 @@ test("page freshness recovers on resume, coalesces lifecycle events and separate
   await expect.poll(() => graphQLCalls).toBeGreaterThan(beforeGraphQL);
   await expect.poll(() => healthCalls - beforeHealth).toBe(1);
   await expect(page.getByRole("status", { name: /Dashboard server freshness: Updated/ })).toBeVisible();
+  await expect.poll(async () => (await freshnessStatus.getAttribute("title"))?.match(/Data refreshed (.+)$/)?.[1]).not.toBe(initialDataTime);
 
   failHealth = true;
-  await page.waitForTimeout(1600);
+  const freshBeforeHealthFailure = (await freshnessStatus.getAttribute("title"))?.match(/Data refreshed (.+)$/)?.[1];
+  await page.clock.fastForward(1600);
   await triggerVisibleRecovery(page);
   await expect(page.getByRole("status", { name: /Dashboard server freshness: Server unavailable/ })).toBeVisible();
+  await expect.poll(async () => (await freshnessStatus.getAttribute("title"))?.match(/Data refreshed (.+)$/)?.[1]).toBe(freshBeforeHealthFailure);
 
   failHealth = false;
   failGraphQL = true;
-  await page.waitForTimeout(1600);
+  await page.clock.fastForward(1600);
   await triggerVisibleRecovery(page);
   await expect(page.getByRole("status", { name: /Dashboard server freshness: Refresh failed/ })).toBeVisible();
   await expect(page.getByRole("status", { name: /Dashboard server freshness: Refresh failed/ })).toHaveAttribute("aria-label", /Dashboard server freshness: Refresh failed/);
+  await expect.poll(async () => (await freshnessStatus.getAttribute("title"))?.match(/Data refreshed (.+)$/)?.[1]).toBe(freshBeforeHealthFailure);
 
   failGraphQL = false;
   await page.evaluate(() => {
