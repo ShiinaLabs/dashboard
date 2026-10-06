@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AppStoreAnalyticsCoverage, AppStoreAnalyticsMetrics } from "@/shared/app-store-analytics";
+import type { AppStoreMetricCoverage } from "@/shared/app-store-analytics";
 import { useNow } from "@/lib/client/use-now";
 import { getTimezone } from "@/lib/client/datetime";
 import { dashboardDateRange } from "@/lib/client/dashboard-date";
@@ -25,12 +26,21 @@ function metricValue(value: number | null, percentage = false): string {
   return value === null ? "—" : percentage ? `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}%` : value.toLocaleString();
 }
 
+export function partialCoverageNotices(coverage: AppStoreAnalyticsCoverage): { family: "discovery" | "downloads"; coverage: AppStoreMetricCoverage }[] {
+  const discovery = coverage.impressions.state === "partial" ? coverage.impressions : coverage.views.state === "partial" ? coverage.views : null;
+  const downloads = coverage.downloads.state === "partial" ? coverage.downloads : coverage.firstTimeDownloads.state === "partial" ? coverage.firstTimeDownloads : null;
+  return [
+    ...(discovery ? [{ family: "discovery" as const, coverage: discovery }] : []),
+    ...(downloads ? [{ family: "downloads" as const, coverage: downloads }] : []),
+  ];
+}
+
 function MetricsTable({ rows, label }: { rows: ({ label: string; coverage?: AppStoreAnalyticsCoverage } & AppStoreAnalyticsMetrics)[]; label: string }) {
   const { t } = useTranslation();
   return <div className="overflow-x-auto rounded-lg border">
     <table className="w-full whitespace-nowrap text-sm">
       <thead className="bg-muted/50"><tr><th className="p-3 text-left font-medium">{label}</th>{["impressions", "views", "downloads", "conversion"].map((key) => <th key={key} className="p-3 text-right font-medium">{t(`appStoreAnalytics.metrics.${key}`)}</th>)}</tr></thead>
-      <tbody>{rows.map((row) => <tr key={row.label} className="border-t"><th scope="row" className="p-3 text-left font-normal"><span>{row.label}</span>{row.coverage && <div className="mt-1 space-y-0.5 text-xs text-amber-700">{[...new Set([row.coverage.impressions, row.coverage.views])].filter((coverage) => coverage.state === "partial").map((coverage) => <p key="discovery">{t("appStoreAnalytics.partialCoverage", { reportingApps: coverage.reportingApps, totalApps: coverage.totalApps, reportingAppDays: coverage.reportingAppDays, totalAppDays: coverage.totalAppDays })}</p>)}{[...new Set([row.coverage.downloads, row.coverage.firstTimeDownloads])].filter((coverage) => coverage.state === "partial").map((coverage) => <p key="downloads">{t("appStoreAnalytics.partialCoverage", { reportingApps: coverage.reportingApps, totalApps: coverage.totalApps, reportingAppDays: coverage.reportingAppDays, totalAppDays: coverage.totalAppDays })}</p>)}</div>}</th>{(["impressions", "views", "downloads", "conversion"] as const).map((key) => <td key={key} className="p-3 text-right tabular-nums">{metricValue(row[key], key === "conversion")}</td>)}</tr>)}</tbody>
+      <tbody>{rows.map((row) => <tr key={row.label} className="border-t"><th scope="row" className="p-3 text-left font-normal"><span>{row.label}</span>{row.coverage && <div className="mt-1 space-y-0.5 text-xs text-amber-700">{partialCoverageNotices(row.coverage).map(({ family, coverage }) => <p key={family}>{t("appStoreAnalytics.partialCoverage", { reportingApps: coverage.reportingApps, totalApps: coverage.totalApps, reportingAppDays: coverage.reportingAppDays, totalAppDays: coverage.totalAppDays })}</p>)}</div>}</th>{(["impressions", "views", "downloads", "conversion"] as const).map((key) => <td key={key} className="p-3 text-right tabular-nums">{metricValue(row[key], key === "conversion")}</td>)}</tr>)}</tbody>
     </table>
   </div>;
 }
