@@ -116,7 +116,7 @@ export class SyncActivity {
       } catch (e) {
         failedRepos++;
         const message = e instanceof Error ? e.message : String(e);
-        getLogger().warn(
+        getLogger().debug(
           "GitHub",
           "L1 @%s: release fetch failed for %s (%s)",
           account.screenName,
@@ -152,12 +152,7 @@ export class SyncActivity {
       }
     }
 
-    getLogger().info(
-      "GitHub",
-      "L1 @%s: release downloads refreshed (%d releases, %d repo failures)",
-      account.screenName,
-      updatedReleases,
-      failedRepos,
-    );
+    if (failedRepos) getLogger().warn("GitHub", "L1 @%s: release sync partial (%d releases saved, %d repos failed)", account.screenName, updatedReleases, failedRepos);
+    else getLogger().info("GitHub", "L1 @%s: release downloads refreshed (%d releases)", account.screenName, updatedReleases);
   }
 }

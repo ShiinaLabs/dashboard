@@ -1,4 +1,4 @@
-import { getLogger } from "../logger";
+import { logStructured } from "../logger";
 import { isMockMode } from "../config";
 import { listConnections, getLatestRunForSource, pruneFinishedRuns, recoverStaleRuns } from "../repositories/app-store";
 import { hasFinanceImport, readCommerceImportDates } from "../repositories/app-store-facts";
@@ -52,12 +52,12 @@ async function sourceDue(connection: { id: number; updated_at: string }, kind: "
 }
 
 export async function runAppStoreSchedulerTick(now = Date.now()) {
-  getLogger().debug("ASC", JSON.stringify({ event: "asc_scheduler_tick", at: new Date(now).toISOString() }));
+  logStructured("debug", "ASC", "asc_scheduler_tick", { at: new Date(now).toISOString() });
   if (isMockMode()) return;
   const recovered = await recoverStaleRuns(new Date(now - STALE_RUN_MS), new Date(now));
-  if (recovered) getLogger().warn("ASC", JSON.stringify({ event: "asc_stale_runs_recovered", count: recovered }));
+  if (recovered) logStructured("warn", "ASC", "asc_stale_runs_recovered", { count: recovered });
   const pruned = await pruneFinishedRuns(new Date(now - 180 * 86_400_000));
-  if (pruned) getLogger().info("ASC", JSON.stringify({ event: "asc_sync_runs_pruned", count: pruned, retentionDays: 180 }));
+  if (pruned) logStructured("info", "ASC", "asc_sync_runs_pruned", { count: pruned, retentionDays: 180 });
   const connections = (await listConnections()).filter((connection) => connection.is_active);
   for (const connection of connections) {
     const sources = [
@@ -70,10 +70,10 @@ export async function runAppStoreSchedulerTick(now = Date.now()) {
       const due = await sourceDue(connection, source.kind, source.scope, source.interval, now).catch(() => ({ due: false, lastRunAt: null }));
       if (!due.due) continue;
       const candidateFiscalMonths = source.kind === "finance" ? financeCandidateMonths(now) : undefined;
-      getLogger().info("ASC", JSON.stringify({ event: "asc_scheduler_due", connectionId: connection.id, source: source.kind, scope: source.scope, lastRunAt: due.lastRunAt, intervalMinutes: source.interval / 60_000, ...(candidateFiscalMonths ? { candidateFiscalMonths } : {}) }));
+      logStructured("info", "ASC", "asc_scheduler_due", { connectionId: connection.id, source: source.kind, scope: source.scope, lastRunAt: due.lastRunAt, intervalMinutes: source.interval / 60_000, ...(candidateFiscalMonths ? { candidateFiscalMonths } : {}) });
       try {
         if (source.kind === "analytics") {
-          await syncAppStoreAnalyticsForConnection(connection, { scope: source.scope as "acquisition" | "revenue", trigger: "scheduler" });
+          await syncAppStoreAnalyticsForConnection(connection, { scope: source.scope as "acquisition" | "revenue", trigger: "scheduler", mode: "ongoing" });
         } else if (source.kind === "sales") {
           const latestDate = latestSalesReportDate(new Date(now));
           const oldestDate = new Date(Date.parse(`${latestDate}T00:00:00Z`) - 29 * 86_400_000).toISOString().slice(0, 10);
@@ -81,33 +81,33 @@ export async function runAppStoreSchedulerTick(now = Date.now()) {
           const salesDates = salesCandidateDates(latestDate, imports.sales);
           if (!salesDates.length) continue;
           const month = new Date(now).toISOString().slice(0, 7);
-          await syncAppStoreRevenueForConnection(connection, { from: salesDates[0], to: latestDate, fiscalMonth: month, regionCode: "ZZ" }, { trigger: "scheduler", sources: [source.kind], salesDates });
+          await syncAppStoreRevenueForConnection(connection, { from: salesDates[0], to: latestDate, fiscalMonth: month, regionCode: "ZZ" }, { trigger: "scheduler", sources: [source.kind], mode: "ongoing", salesDates });
         } else {
           const latestDate = latestSalesReportDate(new Date(now));
           const from = new Date(Date.parse(`${latestDate}T00:00:00Z`) - 2 * 86400_000).toISOString().slice(0, 10);
           for (const fiscalMonth of candidateFiscalMonths ?? []) {
             try {
               if (await hasFinanceImport(connection.id, fiscalMonth, "ZZ")) {
-                getLogger().info("ASC", JSON.stringify({ event: "finance_month_skipped", connectionId: connection.id, fiscalMonth, regionCode: "ZZ", reason: "already_imported" }));
+                logStructured("debug", "ASC", "finance_month_skipped", { connectionId: connection.id, fiscalMonth, regionCode: "ZZ", reason: "already_imported" });
                 continue;
               }
             } catch (error) {
-              getLogger().warn("ASC", JSON.stringify({ event: "finance_import_lookup_failed", connectionId: connection.id, fiscalMonth, error: error instanceof Error ? error.name : "unknown" }));
+              logStructured("warn", "ASC", "finance_import_lookup_failed", { connectionId: connection.id, fiscalMonth, error: error instanceof Error ? error.name : "unknown" });
               continue;
             }
-            getLogger().info("ASC", JSON.stringify({ event: "finance_month_selected", connectionId: connection.id, fiscalMonth, regionCode: "ZZ" }));
+            logStructured("info", "ASC", "finance_month_selected", { connectionId: connection.id, fiscalMonth, regionCode: "ZZ" });
             try {
-              await syncAppStoreRevenueForConnection(connection, { from, to: latestDate, fiscalMonth, regionCode: "ZZ" }, { trigger: "scheduler", sources: ["finance"] });
+              await syncAppStoreRevenueForConnection(connection, { from, to: latestDate, fiscalMonth, regionCode: "ZZ" }, { trigger: "scheduler", sources: ["finance"], mode: "ongoing" });
             } catch (error) {
               if (!(error instanceof Error && error.message.includes("already running"))) {
-                getLogger().warn("ASC", JSON.stringify({ event: "asc_scheduler_source_failed", connectionId: connection.id, source: "finance", scope: source.scope, fiscalMonth, error: error instanceof Error ? error.name : "unknown" }));
+                logStructured("warn", "ASC", "asc_scheduler_source_failed", { connectionId: connection.id, source: "finance", scope: source.scope, fiscalMonth, error: error instanceof Error ? error.name : "unknown" });
               }
             }
           }
         }
       } catch (error) {
         if (!(error instanceof Error && error.message.includes("already running"))) {
-          getLogger().warn("ASC", JSON.stringify({ event: "asc_scheduler_source_failed", connectionId: connection.id, source: source.kind, scope: source.scope, error: error instanceof Error ? error.name : "unknown" }));
+          logStructured("warn", "ASC", "asc_scheduler_source_failed", { connectionId: connection.id, source: source.kind, scope: source.scope, error: error instanceof Error ? error.name : "unknown" });
         }
       }
     }
@@ -117,14 +117,14 @@ export async function runAppStoreSchedulerTick(now = Date.now()) {
 function schedule() {
   if (!g.__ascSchedulerStarted) return;
   g.__ascSchedulerTimer = setTimeout(() => {
-    void runAppStoreSchedulerTick().catch((error) => getLogger().error("ASC", JSON.stringify({ event: "asc_scheduler_tick_failed", error: error instanceof Error ? error.name : "unknown" }))).finally(schedule);
+    void runAppStoreSchedulerTick().catch((error) => logStructured("error", "ASC", "asc_scheduler_tick_failed", { error: error instanceof Error ? error.name : "unknown" })).finally(schedule);
   }, TICK_MS);
 }
 
 export function startAppStoreScheduler() {
   if (g.__ascSchedulerStarted) return;
   g.__ascSchedulerStarted = true;
-  getLogger().info("ASC", JSON.stringify({ event: "asc_scheduler_started", intervalMinutes: TICK_MS / 60_000 }));
+  logStructured("info", "ASC", "asc_scheduler_started", { intervalMinutes: TICK_MS / 60_000 });
   schedule();
 }
 

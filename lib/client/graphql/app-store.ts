@@ -13,8 +13,8 @@ const connectionQuery = /* GraphQL */ `
     appStore { connection(id: $id) {
       connection { id name issuer_id key_id vendor_number private_key_configured is_active created_at updated_at }
       apps { id connection_id apple_id bundle_id sku name is_enabled created_at updated_at }
-      recentSyncRuns { id connection_id kind scope trigger status started_at finished_at duration_ms error_message }
-      lastSuccessfulSync { id connection_id kind scope trigger status started_at finished_at duration_ms error_message }
+      recentSyncRuns { id connection_id kind scope trigger status started_at finished_at duration_ms error_message diagnostic_summary { version checkpoint checkpointAt source scope trigger counters { name value } reports { appId reportKind accessType state appleProcessingDate localProcessingDate latestData } before { name value } after { name value } issues { severity stage code appId reportKind } } }
+      lastSuccessfulSync { id connection_id kind scope trigger status started_at finished_at duration_ms error_message diagnostic_summary { version checkpoint checkpointAt source scope trigger counters { name value } reports { appId reportKind accessType state appleProcessingDate localProcessingDate latestData } before { name value } after { name value } issues { severity stage code appId reportKind } } }
       health { connection { state lastSync latestData completeThrough reason } analytics { state lastSync latestData completeThrough reason } revenueAnalytics { state lastSync latestData completeThrough reason } sales { state lastSync latestData completeThrough reason } finance { state lastSync latestData completeThrough reason } }
       analyticsStatus { enabledApps state snapshot ongoing latestData completeThrough message lastSync { id connection_id kind scope trigger status started_at finished_at duration_ms error_message } }
     } }
@@ -38,7 +38,8 @@ const analyticsPage = /* GraphQL */ `
       analytics(from: $from, to: $to, appId: $appId, territory: $territory) {
         updatedAt completeThrough
         overview { impressions views firstTimeDownloads downloads conversion }
-        trend { date impressions views firstTimeDownloads downloads conversion }
+        coverage { impressions { state reportingApps totalApps } views { state reportingApps totalApps } firstTimeDownloads { state reportingApps totalApps } downloads { state reportingApps totalApps } conversion { state reportingApps totalApps } }
+        trend { date impressions views firstTimeDownloads downloads conversion coverage { impressions { state reportingApps totalApps } views { state reportingApps totalApps } firstTimeDownloads { state reportingApps totalApps } downloads { state reportingApps totalApps } conversion { state reportingApps totalApps } } }
         acquisition { source impressions views firstTimeDownloads downloads conversion }
         campaigns { campaign impressions views firstTimeDownloads downloads conversion trend { date downloads } }
         territories

@@ -37,7 +37,7 @@ export async function prepareAnalyticsInstance(
   client: AppStoreConnectClient,
   instance: AnalyticsReportInstance,
   listedSegments: AnalyticsReportSegment[],
-  options: { requiredHeaders?: readonly string[]; onProgress?: (event: AnalyticsInstanceProgress) => void } = {},
+  options: { requiredHeaders?: readonly string[]; onProgress?: (event: AnalyticsInstanceProgress) => void | Promise<void> } = {},
 ): Promise<PreparedAnalyticsInstance> {
   if (instance.attributes.granularity !== "DAILY") throw new AppStoreReportError("unsupported_granularity", "Only DAILY analytics reports are supported");
   const segmentIds = [...new Set(listedSegments.map((segment) => segment.id))];
@@ -53,10 +53,10 @@ export async function prepareAnalyticsInstance(
     if (resource.id !== id) throw new AppStoreReportError("invalid_segment", "Apple returned a different segment identity");
     let compressed: Buffer;
     const startedAt = Date.now();
-    options.onProgress?.({ stage: "segment_download_started", segmentId: id });
+    await options.onProgress?.({ stage: "segment_download_started", segmentId: id });
     try {
       compressed = await client.downloadAnalyticsSegment(resource);
-      options.onProgress?.({ stage: "segment_download_finished", segmentId: id, compressedBytes: compressed.byteLength, durationMs: Date.now() - startedAt });
+      await options.onProgress?.({ stage: "segment_download_finished", segmentId: id, compressedBytes: compressed.byteLength, durationMs: Date.now() - startedAt });
     } catch (error) { throw new AnalyticsInstanceError("download", id, error); }
     let text: string;
     try { text = await gunzipAnalyticsSegment(compressed); }

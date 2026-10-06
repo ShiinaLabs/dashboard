@@ -1,4 +1,4 @@
-export type AppStoreHealthState = "healthy" | "waiting" | "stale" | "action_required" | "error" | "never_run";
+export type AppStoreHealthState = "healthy" | "partial" | "waiting" | "stale" | "action_required" | "error" | "never_run";
 export interface AppStoreSourceHealth {
   state: AppStoreHealthState;
   lastSync: string | null;

@@ -6,6 +6,7 @@ import i18n from "@/lib/client/i18n";
 import { applyTheme, DEFAULT_SETTINGS, loadSettings, resolveTheme, saveSettings } from "@/lib/client/themes";
 import type { ThemeSettings } from "@/lib/client/themes";
 import { syncTimezoneCookie } from "@/lib/client/datetime";
+import { FreshnessController } from "@/lib/client/freshness";
 
 function matchSystemDark() {
   return window.matchMedia("(prefers-color-scheme: dark)");
@@ -64,10 +65,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider value={{ settings, setSettings }}>
-        <Toaster position="top-right" />
-        {children}
-      </ThemeProvider>
+      <FreshnessController>
+        <ThemeProvider value={{ settings, setSettings }}>
+          <Toaster position="top-right" />
+          {children}
+        </ThemeProvider>
+      </FreshnessController>
     </QueryClientProvider>
   );
 }

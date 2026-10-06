@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   listConnections: vi.fn(), getLatestRunForSource: vi.fn(), hasFinanceImport: vi.fn(), readCommerceImportDates: vi.fn(), recoverStaleRuns: vi.fn(), pruneFinishedRuns: vi.fn(), analytics: vi.fn(), revenue: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(),
 }));
 vi.mock("../lib/config", () => ({ isMockMode: () => false }));
-vi.mock("../lib/logger", () => ({ getLogger: () => mocks }));
+vi.mock("../lib/logger", () => ({ getLogger: () => mocks, logStructured: (level: "debug" | "info" | "warn" | "error", component: string, event: string, fields: Record<string, unknown>) => mocks[level](component, JSON.stringify({ event, ...fields })) }));
 vi.mock("../lib/repositories/app-store", () => ({ listConnections: mocks.listConnections, getLatestRunForSource: mocks.getLatestRunForSource, recoverStaleRuns: mocks.recoverStaleRuns, pruneFinishedRuns: mocks.pruneFinishedRuns }));
 vi.mock("../lib/repositories/app-store-facts", () => ({ hasFinanceImport: mocks.hasFinanceImport, readCommerceImportDates: mocks.readCommerceImportDates }));
 vi.mock("../lib/services/app-store-sync", () => ({ syncAppStoreAnalyticsForConnection: mocks.analytics, syncAppStoreRevenueForConnection: mocks.revenue }));
@@ -84,7 +84,7 @@ describe("ASC scheduler tick", () => {
     });
     await runAppStoreSchedulerTick(now);
     expect(mocks.analytics).toHaveBeenCalledTimes(1);
-    expect(mocks.analytics).toHaveBeenCalledWith(connection, { scope: "acquisition", trigger: "scheduler" });
+    expect(mocks.analytics).toHaveBeenCalledWith(connection, { scope: "acquisition", trigger: "scheduler", mode: "ongoing" });
     expect(mocks.revenue).not.toHaveBeenCalled();
   });
 
@@ -121,7 +121,8 @@ describe("ASC scheduler tick", () => {
     expect(mocks.revenue).not.toHaveBeenCalled();
     const events = mocks.info.mock.calls.map(([, line]) => JSON.parse(line));
     expect(events).toContainEqual(expect.objectContaining({ event: "asc_scheduler_due", source: "finance", candidateFiscalMonths: ["2026-09", "2026-08"] }));
-    expect(events.filter((event: { event?: string }) => event.event === "finance_month_skipped")).toHaveLength(2);
+    const debugEvents = mocks.debug.mock.calls.map(([, line]) => JSON.parse(line));
+    expect(debugEvents.filter((event: { event?: string }) => event.event === "finance_month_skipped")).toHaveLength(2);
   });
 
   it("requests only missing Finance months and logs the selected month", async () => {
@@ -129,10 +130,10 @@ describe("ASC scheduler tick", () => {
     await runFinanceOnlyTick();
 
     expect(mocks.revenue).toHaveBeenCalledTimes(1);
-    expect(mocks.revenue).toHaveBeenCalledWith(connection, expect.objectContaining({ fiscalMonth: "2026-08", regionCode: "ZZ" }), { trigger: "scheduler", sources: ["finance"] });
+    expect(mocks.revenue).toHaveBeenCalledWith(connection, expect.objectContaining({ fiscalMonth: "2026-08", regionCode: "ZZ" }), { trigger: "scheduler", sources: ["finance"], mode: "ongoing" });
     const events = mocks.info.mock.calls.map(([, line]) => JSON.parse(line));
-    expect(events).toContainEqual(expect.objectContaining({ event: "finance_month_skipped", fiscalMonth: "2026-09", reason: "already_imported" }));
     expect(events).toContainEqual(expect.objectContaining({ event: "finance_month_selected", fiscalMonth: "2026-08", regionCode: "ZZ" }));
+    expect(mocks.debug.mock.calls.map(([, line]) => JSON.parse(line))).toContainEqual(expect.objectContaining({ event: "finance_month_skipped", fiscalMonth: "2026-09", reason: "already_imported" }));
   });
 
   it("requests the latest missing month and leaves an unavailable report in waiting", async () => {

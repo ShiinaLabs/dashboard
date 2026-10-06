@@ -59,6 +59,14 @@ describe("Sales and Finance API binary reports", () => {
     expect(await client.downloadSalesReport("123", "2026-09-29")).toBeNull();
     await expect(client.downloadSalesReport("123", "2026-09-30")).rejects.toMatchObject({ status: 404 });
   });
+  it("treats explicit Finance no-results as no_data but preserves unrelated 404 failures", async () => {
+    const request = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json({ errors: [{ detail: "No results for the requested period" }] }, { status: 404 }))
+      .mockResolvedValueOnce(Response.json({ errors: [{ detail: "Finance report not found" }] }, { status: 404 }));
+    const client = new AppStoreConnectClient(tokens, request);
+    expect(await client.downloadFinanceReport("123", "2026-09", "ZZ")).toBeNull();
+    await expect(client.downloadFinanceReport("123", "2026-08", "ZZ")).rejects.toMatchObject({ status: 404 });
+  });
   describe.each(["sales", "finance"] as const)("%s Apple ErrorResponse diagnostics", (source) => {
     it.each([400, 403, 429])("preserves safe fields for HTTP %i and redacts every sent value", async (status) => {
       const vendor = "12345678", date = source === "sales" ? "2026-09-29" : "2026-09";

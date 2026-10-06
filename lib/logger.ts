@@ -50,6 +50,10 @@ export interface Logger {
   debug(component: string, msg: string, ...args: unknown[]): void;
 }
 
+export function logStructured(level: LogLevel, component: string, event: string, fields: Record<string, unknown> = {}) {
+  getLogger()[level](component, "%s", JSON.stringify({ event, ...fields }));
+}
+
 class FileLogger implements Logger {
   private dir: string;
   private level: LogLevel;

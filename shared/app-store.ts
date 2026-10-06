@@ -34,6 +34,21 @@ export interface AppStoreSyncRun {
   finished_at: string | null;
   duration_ms: number | null;
   error_message: string | null;
+  diagnostic_summary?: AppStoreDiagnosticSummary | null;
+}
+
+export interface AppStoreDiagnosticSummary {
+  version: 1;
+  checkpoint: string;
+  checkpointAt: string;
+  source: string;
+  scope: string | null;
+  trigger: "manual" | "scheduler";
+  counters: Array<{ name: string; value: string }>;
+  reports: Array<{ appId: number; reportKind: string; accessType: string; state: string; appleProcessingDate: string | null; localProcessingDate: string | null; latestData: string | null }>;
+  before: Array<{ name: string; value: string }>;
+  after: Array<{ name: string; value: string }>;
+  issues: Array<{ severity: "info" | "warn" | "error"; stage: string; code: string; appId?: number; reportKind?: string }>;
 }
 
 export interface AppStoreConnectionDetail {

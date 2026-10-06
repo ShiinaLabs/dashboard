@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { AppStoreTokenProvider } from "./AppStoreTokenProvider";
 import { downloadAnalyticsSegment, AppStoreReportError, MAX_SEGMENT_BYTES } from "./analytics-segment";
-import { getLogger } from "../../logger";
+import { logStructured } from "../../logger";
 
 const ORIGIN = "https://api.appstoreconnect.apple.com";
 const resourceId = z.string().min(1).max(200);
@@ -95,13 +95,13 @@ export class AppStoreConnectClient {
         const response = await this.request(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
         if (!RETRYABLE_STATUSES.has(response.status) || attempt > maxRetries) return response;
         const delay = retryAfterMs(response.headers.get("retry-after"), RETRY_DELAYS_MS[attempt - 1]);
-        getLogger().warn("ASC", JSON.stringify({ event: "asc_api_retry", source, operation, status: response.status, attempt, retryAfterMs: delay }));
+        logStructured("debug", "ASC", "asc_api_retry", { source, operation, status: response.status, attempt, retryAfterMs: delay });
         await response.body?.cancel().catch(() => undefined);
         await wait(delay);
       } catch (error) {
         if (!transientNetworkFailure(error) || attempt > maxRetries) throw error;
         const delay = RETRY_DELAYS_MS[attempt - 1];
-        getLogger().warn("ASC", JSON.stringify({ event: "asc_api_retry", source, operation, status: "network_error", attempt, retryAfterMs: delay }));
+        logStructured("debug", "ASC", "asc_api_retry", { source, operation, status: "network_error", attempt, retryAfterMs: delay });
         await wait(delay);
       }
     }
@@ -184,8 +184,13 @@ export class AppStoreConnectClient {
       } finally { await reader.cancel().catch(() => undefined); }
       const bytes = Buffer.concat(chunks, size);
       if (!response.ok) {
-        // Only an explicit no-sales response is empty; missing/unavailable reports remain failures.
-        if (path === "/v1/salesReports" && response.status === 404 && /(?:there (?:were|are) no sales|no sales for the (?:date|period))/i.test(bytes.toString("utf8"))) return null;
+        // Only an explicit Apple business-empty response is treated as no data.
+        if (response.status === 404) {
+          const message = bytes.toString("utf8");
+          const noSales = /(?:there (?:were|are) no sales|no sales for the (?:date|period))/i.test(message);
+          const noFinanceRows = /(?:no (?:sales|financial )?results for (?:the )?(?:requested )?(?:date|period)|no data for the (?:requested )?(?:date|period)|no reports? available for (?:the )?(?:requested )?(?:date|period))/i.test(message);
+          if ((path === "/v1/salesReports" && noSales) || (path === "/v1/financeReports" && (noSales || noFinanceRows))) return null;
+        }
         let body: unknown;
         try { body = JSON.parse(bytes.toString("utf8")); } catch { body = null; }
         throw appleApiError(response.status, body, [...Object.values(filters), token], `Apple report request failed (${response.status})`);

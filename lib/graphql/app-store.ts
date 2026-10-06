@@ -17,17 +17,24 @@ export const appStoreTypeDefs = /* GraphQL */ `
   type AppStoreAppOption { id: Int!, name: String! }
   type ASCConnection { id: Int!, name: String!, issuer_id: String!, key_id: String!, vendor_number: String, private_key_configured: Boolean!, is_active: Boolean!, created_at: String!, updated_at: String! }
   type ASCApp { id: Int!, connection_id: Int!, apple_id: String!, bundle_id: String!, sku: String!, name: String!, is_enabled: Boolean!, created_at: String!, updated_at: String! }
-  type ASCSyncRun { id: Int!, connection_id: Int!, kind: String!, scope: String, trigger: String!, status: String!, started_at: String!, finished_at: String, duration_ms: Int, error_message: String }
+  type ASCDiagnosticCounter { name: String!, value: String! }
+  type ASCDiagnosticReport { appId: Int!, reportKind: String!, accessType: String!, state: String!, appleProcessingDate: String, localProcessingDate: String, latestData: String }
+  type ASCDiagnosticIssue { severity: String!, stage: String!, code: String!, appId: Int, reportKind: String }
+  type ASCDiagnosticValue { name: String!, value: String! }
+  type ASCDiagnosticSummary { version: Int!, checkpoint: String!, checkpointAt: String!, source: String!, scope: String, trigger: String!, counters: [ASCDiagnosticCounter!]!, reports: [ASCDiagnosticReport!]!, before: [ASCDiagnosticValue!]!, after: [ASCDiagnosticValue!]!, issues: [ASCDiagnosticIssue!]! }
+  type ASCSyncRun { id: Int!, connection_id: Int!, kind: String!, scope: String, trigger: String!, status: String!, started_at: String!, finished_at: String, duration_ms: Int, error_message: String, diagnostic_summary: ASCDiagnosticSummary }
   type ASCConnectionPage { connection: ASCConnection!, apps: [ASCApp!]!, recentSyncRuns: [ASCSyncRun!]!, lastSuccessfulSync: ASCSyncRun, health: ASCHealth!, analyticsStatus: ASCAnalyticsStatus! }
   type ASCHealthItem { state: String!, lastSync: String, latestData: String, completeThrough: String, reason: String }
   type ASCHealth { connection: ASCHealthItem!, analytics: ASCHealthItem!, revenueAnalytics: ASCHealthItem!, sales: ASCHealthItem!, finance: ASCHealthItem! }
   type ASCAnalyticsStatus { enabledApps: Int!, state: String!, snapshot: String!, ongoing: String!, latestData: String, completeThrough: String, lastSync: ASCSyncRun, message: String }
   type AppStoreAnalyticsMetrics { impressions: Int, views: Int, firstTimeDownloads: Int, downloads: Int, conversion: Float }
-  type AppStoreAnalyticsPoint { date: String!, impressions: Int, views: Int, firstTimeDownloads: Int, downloads: Int, conversion: Float }
   type AppStoreAnalyticsSource { source: String!, impressions: Int, views: Int, firstTimeDownloads: Int, downloads: Int, conversion: Float }
   type AppStoreAnalyticsCampaign { campaign: String!, impressions: Int, views: Int, firstTimeDownloads: Int, downloads: Int, conversion: Float, trend: [AppStoreCampaignPoint!]! }
   type AppStoreCampaignPoint { date: String!, downloads: Int }
-  type AppStoreAnalyticsReport { updatedAt: String, completeThrough: String, overview: AppStoreAnalyticsMetrics!, trend: [AppStoreAnalyticsPoint!]!, acquisition: [AppStoreAnalyticsSource!]!, campaigns: [AppStoreAnalyticsCampaign!]!, territories: [String!]! }
+  type AppStoreMetricCoverage { state: String!, reportingApps: Int!, totalApps: Int! }
+  type AppStoreAnalyticsCoverage { impressions: AppStoreMetricCoverage!, views: AppStoreMetricCoverage!, firstTimeDownloads: AppStoreMetricCoverage!, downloads: AppStoreMetricCoverage!, conversion: AppStoreMetricCoverage! }
+  type AppStoreAnalyticsPoint { date: String!, impressions: Int, views: Int, firstTimeDownloads: Int, downloads: Int, conversion: Float, coverage: AppStoreAnalyticsCoverage! }
+  type AppStoreAnalyticsReport { updatedAt: String, completeThrough: String, overview: AppStoreAnalyticsMetrics!, coverage: AppStoreAnalyticsCoverage!, trend: [AppStoreAnalyticsPoint!]!, acquisition: [AppStoreAnalyticsSource!]!, campaigns: [AppStoreAnalyticsCampaign!]!, territories: [String!]! }
 
   type RevenueAmounts { currency: String!, proceeds: String, sales: String }
   type RevenuePoint { date: String!, currency: String!, proceeds: String, sales: String }
@@ -44,6 +51,11 @@ export const appStoreTypeDefs = /* GraphQL */ `
 `;
 
 export const appStoreResolvers = {
+  ASCDiagnosticSummary: {
+    counters: (parent: { counters: Record<string, number> }) => Object.entries(parent.counters ?? {}).map(([name, value]) => ({ name, value: String(value) })),
+    before: (parent: { before: Record<string, string | number | null> }) => Object.entries(parent.before ?? {}).map(([name, value]) => ({ name, value: value === null ? "—" : String(value) })),
+    after: (parent: { after: Record<string, string | number | null> }) => Object.entries(parent.after ?? {}).map(([name, value]) => ({ name, value: value === null ? "—" : String(value) })),
+  },
   Query: { appStore: () => ({}) },
   AppStoreQuery: {
     enabledApps: (_parent: unknown, _args: unknown, context: GraphQLContext) => listEnabledAnalyticsApps(context.user),

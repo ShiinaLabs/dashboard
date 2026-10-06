@@ -95,8 +95,9 @@ describe("GitHub L1 issue/PR split (new arch, mock client, no PG)", () => {
       insertAssetSnapshot: async () => {},
     };
     const warn = vi.fn();
+    const debug = vi.fn();
     vi.spyOn(await import("../lib/logger"), "getLogger").mockReturnValue({
-      info: vi.fn(), warn, error: vi.fn(), debug: vi.fn(),
+      info: vi.fn(), warn, error: vi.fn(), debug,
     } as any);
 
     const uc = new SyncActivity(repo as any, fakeFetcher as any, undefined, mockClient as any, write as any);
@@ -104,13 +105,14 @@ describe("GitHub L1 issue/PR split (new arch, mock client, no PG)", () => {
 
     expect(releases).toHaveLength(1);
     expect(releases[0].total_downloads).toBe(5);
-    expect(warn).toHaveBeenCalledWith(
+    expect(debug).toHaveBeenCalledWith(
       "GitHub",
       "L1 @%s: release fetch failed for %s (%s)",
       "alice",
       expect.any(String),
       expect.any(String),
     );
+    expect(warn).toHaveBeenCalledWith("GitHub", "L1 @%s: release sync partial (%d releases saved, %d repos failed)", "alice", 1, 1);
     warn.mockRestore();
   });
 

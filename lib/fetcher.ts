@@ -75,11 +75,11 @@ function extractTweet(tweetObj: any, accountId: number) {
 
 export async function fetchAccount(account: AccountRow) {
   if (!account.is_active) {
-    getLogger().info(LOG_TAG, "@%s: inactive, skipping", account.screen_name);
+    getLogger().debug(LOG_TAG, "@%s: inactive, skipping", account.screen_name);
     return 0;
   }
   if (runningXAccounts.has(account.id)) {
-    getLogger().info(LOG_TAG, "@%s: already running, skipping", account.screen_name);
+    getLogger().debug(LOG_TAG, "@%s: already running, skipping", account.screen_name);
     return 0;
   }
   runningXAccounts.add(account.id);

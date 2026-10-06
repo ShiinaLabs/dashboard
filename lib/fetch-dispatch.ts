@@ -60,7 +60,7 @@ export async function dispatchFetch(account: AccountRow, trigger: FetchTrigger =
   }
 
   if (activeDispatches.has(account.id)) {
-    getLogger().info("FetchRun", "Account %s is already fetching; request skipped", account.id);
+      getLogger().debug("FetchRun", "Account %s is already fetching; request skipped", account.id);
     return { status: "skipped", reason: "already-running" };
   }
 

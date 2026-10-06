@@ -10,6 +10,7 @@ import type { AppStoreAnalyticsStatus } from "@/shared/app-store-analytics";
 
 type Viewer = { id: number; role: string };
 const setupInFlight = new Set<number>();
+const FIRST_REPORT_GRACE_MS = 72 * 60 * 60 * 1000;
 
 export function analyticsErrorMessage(error: unknown): string {
   if (error instanceof AppStoreApiError) {
@@ -28,19 +29,34 @@ export async function getAppStoreAnalyticsStatus(connectionId: number, viewer: V
   await authorizedConnection(connectionId, viewer);
   const apps = await analytics.enabledApps(connectionId);
   const [requests, runs, allPartitions] = await Promise.all([analytics.requestsForApps(apps.map((app) => app.id)), analytics.analyticsRuns(connectionId), readAnalyticsPartitions(apps.map((app) => app.id))]);
-  const ongoingReady = apps.length > 0 && apps.every((app) => requests.some((request) => request.app_id === app.id && request.access_type === "ONGOING" && !request.stopped_due_to_inactivity));
+  const ongoingRequests = requests.filter((request) => request.access_type === "ONGOING");
+  const ongoingReady = apps.length > 0 && apps.every((app) => ongoingRequests.some((request) => request.app_id === app.id && !request.stopped_due_to_inactivity));
   const snapshotReady = apps.length > 0 && apps.every((app) => requests.some((request) => request.app_id === app.id && request.access_type === "ONE_TIME_SNAPSHOT"));
   const partitions = allPartitions.filter((p) => p.report_kind === "discovery" || p.report_kind === "downloads");
   const lastSync = runs[0] ?? null;
   const lastStatus = lastSync ? reportRunDisplayStatus(lastSync) : null;
-  const state = lastStatus === "error" ? "error" : lastStatus === "partial" ? "partial" : lastStatus === "waiting" ? "waiting" : partitions.length ? "active" : !requests.length ? "not_configured" : "waiting";
+  const hasData = partitions.length > 0;
+  const stoppedWithoutReplacement = apps.some((app) => {
+    const appRequests = ongoingRequests.filter((request) => request.app_id === app.id);
+    return appRequests.length > 0 && !appRequests.some((request) => !request.stopped_due_to_inactivity);
+  });
+  const oldestActiveCreatedAt = ongoingRequests.filter((request) => !request.stopped_due_to_inactivity).map((request) => Date.parse(request.created_at)).filter(Number.isFinite).sort((a, b) => a - b)[0];
+  const withinGrace = oldestActiveCreatedAt !== undefined && Date.now() - oldestActiveCreatedAt <= FIRST_REPORT_GRACE_MS;
+  const hasPartialWaiting = Boolean(lastSync?.error_message?.startsWith("report_waiting: "));
+  const state: AppStoreAnalyticsStatus["state"] = lastStatus === "error" ? "error"
+    : lastStatus === "partial" ? "partial"
+      : stoppedWithoutReplacement && !ongoingReady ? "action_required"
+        : hasData ? hasPartialWaiting || lastStatus === "waiting" ? "partial" : "active"
+          : !requests.length ? "not_configured"
+            : ongoingReady && withinGrace ? "waiting" : "stale";
   const dates = partitions.map((p) => p.date).sort();
   return {
     enabledApps: apps.length, state,
     snapshot: snapshotReady ? "ready" : requests.length ? "pending" : "unavailable",
     ongoing: ongoingReady ? "active" : requests.length ? "pending" : "unavailable",
     // Freshness is not inferred from setup/sync wall time, or from a manifest alone.
-    latestData: dates.at(-1) ?? null, completeThrough: dates.length ? analyticsCompleteThrough(partitions, apps.map((a) => a.id), ["discovery", "downloads"], dates[0], dates.at(-1)!) : null, lastSync, message: lastSync?.error_message ?? null,
+    latestData: dates.at(-1) ?? null, completeThrough: dates.length ? analyticsCompleteThrough(partitions, apps.map((a) => a.id), ["discovery", "downloads"], dates[0], dates.at(-1)!) : null, lastSync: lastSync ? { ...lastSync, diagnostic_summary: undefined } : null,
+    message: state === "stale" && !hasData ? "No Analytics data is available after the 72-hour first-report grace period" : state === "action_required" ? "An Ongoing request stopped and has no active replacement" : lastSync?.error_message ?? null,
   };
 }
 

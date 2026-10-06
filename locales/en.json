@@ -93,6 +93,7 @@
     "health": {
       "heading": "Fetch health",
       "healthy": "Healthy",
+      "partial": "Partial",
       "stale": "Stale",
       "failed": "Failed / partial",
       "capabilityGap": "Capability gaps",
@@ -937,6 +938,7 @@
       },
       "state": {
         "healthy": "Healthy",
+        "partial": "Partial",
         "waiting": "Waiting",
         "stale": "Stale",
         "action_required": "Action required",
@@ -965,12 +967,14 @@
     "setup": "Set up Analytics",
     "settingUp": "Setting up…",
     "operationError": "Analytics operation failed",
-    "waitingHelp": "Apple usually generates the first ongoing reports within 24–48 hours.",
+    "waitingHelp": "The first Ongoing report can take up to 72 hours. After that, missing data is marked stale.",
     "state": {
       "not_configured": "Not configured",
       "waiting": "Waiting for Apple report data",
       "active": "Active",
       "partial": "Partial",
+      "stale": "Stale",
+      "action_required": "Action required",
       "error": "Error"
     },
     "requestState": {
@@ -986,6 +990,9 @@
     "territory": "Territory",
     "allTerritories": "All Territories",
     "updated": "Updated",
+    "coverage": "Coverage",
+    "partialCoverage": "Partial {{reportingApps}}/{{totalApps}} apps",
+    "partialTrendCoverage": "Partial coverage on {{days}} dates",
     "noEnabledApps": "Enable an app in Connections to get started.",
     "overview": "Overview",
     "acquisition": "Acquisition",

@@ -1,5 +1,6 @@
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { app_store_apps, app_store_connections, app_store_sync_runs } from "@/db/schema";
+import type { AppStoreDiagnosticSummary } from "@/db/schema/app-store";
 import { getDb } from "../db/connection";
 import { isMockMode } from "../config";
 import type { DiscoveredApp } from "../infra/app-store/AppStoreConnectClient";
@@ -92,7 +93,7 @@ export async function startRun(connectionId: number, kind: RunRow["kind"] = "met
   const values = { connection_id: connectionId, kind, scope, trigger, status: "running" as const, started_at: new Date().toISOString() };
   if (isMockMode()) {
     if (mockRuns.some((row) => row.connection_id === connectionId && row.kind === kind && row.scope === scope && row.status === "running")) throw new AppStoreSyncBusyError();
-    const run = { ...values, id: mockRuns.length + 1, finished_at: null, duration_ms: null, error_message: null };
+    const run = { ...values, id: mockRuns.length + 1, finished_at: null, duration_ms: null, error_message: null, diagnostic_summary: null };
     mockRuns.push(run);
     return { ...run };
   }
@@ -156,6 +157,15 @@ export async function finishRun(run: RunRow, status: "success" | "partial" | "er
   const changes = { status, finished_at: now, duration_ms: Date.parse(now) - Date.parse(run.started_at), error_message: message };
   if (isMockMode()) { Object.assign(mockRuns.find((row) => row.id === run.id)!, changes); return; }
   await getDb().update(app_store_sync_runs).set(changes).where(eq(app_store_sync_runs.id, run.id));
+}
+
+export async function checkpointRun(run: RunRow, diagnostic: AppStoreDiagnosticSummary) {
+  if (isMockMode()) {
+    const current = mockRuns.find((row) => row.id === run.id);
+    if (current) current.diagnostic_summary = diagnostic;
+    return;
+  }
+  await getDb().update(app_store_sync_runs).set({ diagnostic_summary: diagnostic }).where(eq(app_store_sync_runs.id, run.id));
 }
 
 /** Commit connection changes, discovered apps and success telemetry atomically. */

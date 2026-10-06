@@ -5,6 +5,7 @@ import { enabledApps } from "../repositories/app-store-analytics";
 import { readAnalyticsPartitions, readCommerceImportDates } from "../repositories/app-store-facts";
 import { reportRunDisplayStatus } from "../../shared/app-store";
 import { analyticsCompleteThrough } from "./app-store-analytics-reporting";
+import * as analytics from "../repositories/app-store-analytics";
 
 type Viewer = { id: number; role: string };
 const DAY = 86_400_000;
@@ -16,10 +17,11 @@ export function classifyAppStoreSourceHealth(run: { status: "running" | "success
   const message = run.error_message ?? "";
   if (/status=(401|403)|vendor_required|invalid_private_key|permission/i.test(message)) return { state: "action_required", lastSync, latestData, completeThrough: null, reason: message || "Apple permission or connection settings need attention" };
   if (run.status === "running") return { state: "waiting", lastSync, latestData, completeThrough: null, reason: "A sync is currently running" };
-  if (/^(?:report_waiting|waiting):\s*/.test(message)) return { state: "waiting", lastSync, latestData, completeThrough: null, reason: message.replace(/^(?:report_waiting|waiting):\s*/, "") || "Apple has not made a report available yet" };
+  if (/^waiting:\s*/.test(message)) return { state: "waiting", lastSync, latestData, completeThrough: null, reason: message.replace(/^waiting:\s*/, "") || "Apple has not made a report available yet" };
   const displayStatus = reportRunDisplayStatus(run);
   if (displayStatus === "waiting") return { state: "waiting", lastSync, latestData, completeThrough: null, reason: message.replace(/^(?:report_waiting|waiting):\s*/, "") || "Apple has not made a report available yet" };
-  if (displayStatus === "error" || displayStatus === "partial") return { state: "error", lastSync, latestData, completeThrough: null, reason: message || "The latest sync failed" };
+  if (displayStatus === "error") return { state: "error", lastSync, latestData, completeThrough: null, reason: message || "The latest sync failed" };
+  if (displayStatus === "partial") return { state: "partial", lastSync, latestData, completeThrough: null, reason: message || "The latest sync was partial" };
   if (!latestData) return { state: "waiting", lastSync, latestData, completeThrough: null, reason: "No imported report partition is available yet" };
   const dataTime = Date.parse(`${latestData}T00:00:00Z`);
   return { state: now - dataTime > maxAge ? "stale" : "healthy", lastSync, latestData, completeThrough: latestData, reason: now - Date.parse(lastSync) > maxAge ? "No recent sync has completed" : null };
@@ -36,7 +38,7 @@ export async function getAppStoreHealth(connectionId: number, viewer: Viewer, no
     getLatestRunForSource(connectionId, "finance", "revenue"),
     readCommerceImportDates(connectionId),
   ]);
-  const partitions = await readAnalyticsPartitions(apps.map((app) => app.id));
+  const [partitions, requests] = await Promise.all([readAnalyticsPartitions(apps.map((app) => app.id)), analytics.requestsForApps(apps.map((app) => app.id))]);
   const metadataAction = metadata?.error_message && /status=(401|403)|\b(401|403)\b|invalid_private_key|permission|forbidden|unauthorized/i.test(metadata.error_message);
   const connectionHealth: AppStoreSourceHealth = !connection.is_active
     ? empty("action_required", "This connection is disabled")
@@ -58,17 +60,31 @@ export async function getAppStoreHealth(connectionId: number, viewer: Viewer, no
   const revenueFirst = firstPartition(["purchases", "subscriptionState", "subscriptionEvent"]);
   const acquisitionComplete = acquisitionFirst ? analyticsCompleteThrough(partitions, apps.map((app) => app.id), ["discovery", "downloads"], acquisitionFirst > windowStart ? acquisitionFirst : windowStart, today) : null;
   const revenueComplete = revenueFirst ? analyticsCompleteThrough(partitions, apps.map((app) => app.id), ["purchases", "subscriptionState", "subscriptionEvent"], revenueFirst > windowStart ? revenueFirst : windowStart, today) : null;
-  const analyticsHealth = (run: typeof acquisitionRun, latest: string | null, complete: string | null) => {
+  const analyticsHealth = (run: typeof acquisitionRun, latest: string | null, complete: string | null, kinds: string[]) => {
     const health = classifyAppStoreSourceHealth(run, complete, 5 * DAY, now);
-    if (latest && !complete && health.state === "waiting" && health.reason === "No imported report partition is available yet") health.reason = "Analytics reports do not yet provide complete-through coverage";
+    const ongoing = requests.filter((request) => request.access_type === "ONGOING");
+    const perAppStopped = apps.some((app) => { const rows = ongoing.filter((request) => request.app_id === app.id); return rows.length > 0 && !rows.some((request) => !request.stopped_due_to_inactivity); });
+    const startedAt = ongoing.filter((request) => !request.stopped_due_to_inactivity).map((request) => Date.parse(request.created_at)).filter(Number.isFinite).sort((a, b) => a - b)[0];
+    const appleAhead = (run?.diagnostic_summary?.reports ?? []).some((item) => kinds.includes(item.reportKind) && item.appleProcessingDate && (!item.localProcessingDate || item.appleProcessingDate > item.localProcessingDate));
+    if (!latest && perAppStopped) { health.state = "action_required"; health.reason = "An Ongoing request stopped and has no active replacement"; }
+    else if (!latest) {
+      health.state = startedAt !== undefined && now - startedAt <= 72 * 60 * 60_000 ? "waiting" : "stale";
+      health.reason = health.state === "waiting" ? "Waiting for the first Ongoing report (72-hour grace period)" : "No Analytics data is available after the 72-hour first-report grace period";
+    } else if (appleAhead) { health.state = "stale"; health.reason = "Apple has newer processing data than the local import"; }
+    else if (health.state === "waiting") {
+      health.state = complete ? (now - Date.parse(`${complete}T00:00:00Z`) > 5 * DAY ? "stale" : "healthy") : "partial";
+      health.reason = complete ? null : "Existing Analytics data is available, but complete-through coverage is incomplete";
+    }
+    else if (!complete) { health.state = "partial"; health.reason = "Analytics reports do not yet provide complete-through coverage"; }
+    else if (run?.error_message?.startsWith("report_waiting: ")) { health.state = "partial"; health.reason = "Some required reports are still waiting; imported data remains available"; }
     return { ...health, latestData: latest, completeThrough: complete };
   };
   const sales = commerceImports.sales.sort().at(-1) ?? null;
   const finance = commerceImports.finance.sort().at(-1) ?? null;
   const result: AppStoreHealth = {
     connection: connectionHealth,
-    analytics: analyticsHealth(acquisitionRun, acquisition, acquisitionComplete),
-    revenueAnalytics: analyticsHealth(revenueRun, revenueAnalytics, revenueComplete),
+    analytics: analyticsHealth(acquisitionRun, acquisition, acquisitionComplete, ["discovery", "downloads"]),
+    revenueAnalytics: analyticsHealth(revenueRun, revenueAnalytics, revenueComplete, ["purchases", "subscriptionState", "subscriptionEvent"]),
     sales: classifyAppStoreSourceHealth(salesRun, sales, 4 * DAY, now),
     finance: classifyAppStoreSourceHealth(financeRun, finance ? `${finance}-01` : null, 50 * DAY, now),
   };

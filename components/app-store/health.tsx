@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import type { AppStoreHealth, AppStoreHealthState } from "@/shared/app-store-health";
 
 const sources = ["connection", "analytics", "revenueAnalytics", "sales", "finance"] as const;
-const states: AppStoreHealthState[] = ["healthy", "waiting", "stale", "action_required", "error", "never_run"];
+const states: AppStoreHealthState[] = ["healthy", "partial", "waiting", "stale", "action_required", "error", "never_run"];
 
 export function AppStoreHealthPanel({ data }: { data: AppStoreHealth }) {
   const { t } = useTranslation();

@@ -93,6 +93,7 @@
     "health": {
       "heading": "抓取健康",
       "healthy": "正常",
+      "partial": "部分覆盖",
       "stale": "过期",
       "failed": "失败 / 部分",
       "capabilityGap": "能力缺口",
@@ -937,6 +938,7 @@
       },
       "state": {
         "healthy": "正常",
+        "partial": "部分覆盖",
         "waiting": "等待数据",
         "stale": "已过期",
         "action_required": "需要处理",
@@ -965,12 +967,14 @@
     "setup": "设置 Analytics",
     "settingUp": "正在设置…",
     "operationError": "Analytics 操作失败",
-    "waitingHelp": "Apple 通常在 24–48 小时内生成首批持续报告。",
+    "waitingHelp": "Apple 首次生成 Ongoing 报告最长可能需要 72 小时；超时后会标记为数据过期。",
     "state": {
       "not_configured": "未配置",
       "waiting": "等待 Apple 报告数据",
       "active": "正常",
       "partial": "部分成功",
+      "stale": "数据已过期",
+      "action_required": "需要处理",
       "error": "错误"
     },
     "requestState": {
@@ -986,6 +990,9 @@
     "territory": "地区",
     "allTerritories": "所有地区",
     "updated": "更新时间",
+    "coverage": "覆盖范围",
+    "partialCoverage": "部分覆盖 {{reportingApps}}/{{totalApps}} 个应用",
+    "partialTrendCoverage": "有 {{days}} 天为部分覆盖",
     "noEnabledApps": "请先在连接中启用应用。",
     "overview": "概览",
     "acquisition": "获客",

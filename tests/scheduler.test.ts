@@ -10,6 +10,7 @@ const fetchRedditAccount = vi.fn();
 const fetchRedditPublicAccount = vi.fn();
 const dispatchFetch = vi.fn();
 const updateAccount = vi.fn().mockResolvedValue(undefined);
+const loggerMocks = vi.hoisted(() => ({ info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() }));
 
 vi.mock("../lib/services/accounts", () => ({
   getActiveAccounts,
@@ -44,11 +45,7 @@ vi.mock("../lib/repositories/account-fetch-state", () => ({
 }));
 
 vi.mock("../lib/logger", () => ({
-  getLogger: () => ({
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  }),
+  getLogger: () => loggerMocks,
 }));
 
 describe("scheduler", () => {
@@ -58,6 +55,16 @@ describe("scheduler", () => {
     // Default: the account has no per-level state, so every level counts as
     // never-fetched and L0 is the first due one.
     vi.mocked(getAccountFetchState).mockResolvedValue([]);
+  });
+
+  it("keeps no-level-due scheduler events out of INFO", async () => {
+    const account = { id: 45, owner_id: 1, screen_name: "up-to-date", platform: "twitter", user_id: null, auth_token: "token", fetch_interval: 30, is_active: 1, last_fetched_at: new Date().toISOString(), error_message: null, instance_url: null, auth_type: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+    getActiveAccounts.mockResolvedValue([account]);
+    vi.mocked(getAccountFetchState).mockResolvedValue(["l0", "l1", "l2"].map((level) => ({ level, lastFetchedAt: new Date().toISOString() })) as never);
+    const { runCycleOnceForTests } = await import("../lib/scheduler");
+    await runCycleOnceForTests();
+    expect(loggerMocks.info.mock.calls.some(([, message]) => String(message).includes("no level due"))).toBe(false);
+    expect(loggerMocks.debug.mock.calls.some(([, message]) => String(message).includes("no level due"))).toBe(true);
   });
 
   it("skips accounts that were disabled after the active snapshot was loaded", async () => {

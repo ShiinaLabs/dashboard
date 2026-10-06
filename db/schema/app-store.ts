@@ -1,4 +1,4 @@
-import { boolean, index, integer, pgTable, serial, text, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgTable, serial, text, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { users } from "./users";
 
@@ -39,7 +39,22 @@ export const app_store_sync_runs = pgTable("app_store_sync_runs", {
   finished_at: text("finished_at"),
   duration_ms: integer("duration_ms"),
   error_message: text("error_message"),
+  diagnostic_summary: jsonb("diagnostic_summary").$type<AppStoreDiagnosticSummary | null>(),
 }, (table) => [index("idx_app_store_sync_runs_connection_started").on(table.connection_id, table.started_at.desc())]);
+
+export interface AppStoreDiagnosticSummary {
+  version: 1;
+  checkpoint: string;
+  checkpointAt: string;
+  source: string;
+  scope: string | null;
+  trigger: "manual" | "scheduler";
+  counters: Record<string, number>;
+  reports: Array<{ appId: number; reportKind: string; accessType: string; state: string; appleProcessingDate: string | null; localProcessingDate: string | null; latestData: string | null }>;
+  before: Record<string, string | number | null>;
+  after: Record<string, string | number | null>;
+  issues: Array<{ severity: "info" | "warn" | "error"; stage: string; code: string; appId?: number; reportKind?: string }>;
+}
 
 export const app_store_analytics_requests = pgTable("app_store_analytics_requests", {
   id: serial("id").primaryKey(),

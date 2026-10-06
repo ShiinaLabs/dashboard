@@ -14,7 +14,7 @@ vi.mock("../lib/services/accounts", async (importOriginal) => {
 });
 vi.mock("../lib/config", () => ({ isMockMode: () => false, isMockFetcherMode: () => false }));
 vi.mock("../lib/logger", () => ({
-  getLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
+  getLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
 }));
 vi.mock("../lib/fetcher", () => ({ fetchAccount: vi.fn() }));
 vi.mock("../lib/fetchers/github", () => ({ fetchGithubAccount: vi.fn() }));

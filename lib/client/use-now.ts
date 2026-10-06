@@ -8,7 +8,12 @@ function emitChange() {
   for (const listener of listeners) listener();
 }
 
-setInterval(emitChange, 60_000);
+if (typeof window !== "undefined") {
+  setInterval(emitChange, 60_000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") emitChange(); });
+  window.addEventListener("pageshow", emitChange);
+  window.addEventListener("focus", emitChange);
+}
 
 export function useNow(): number {
   return useSyncExternalStore(

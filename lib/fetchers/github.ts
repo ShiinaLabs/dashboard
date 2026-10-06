@@ -59,11 +59,11 @@ const runningAccounts = new Set<number>();
 
 export async function fetchGithubAccount(account: AccountRow) {
   if (!account.is_active) {
-    getLogger().info("GitHub", "@%s: inactive, skipping", account.screen_name);
+    getLogger().debug("GitHub", "@%s: inactive, skipping", account.screen_name);
     return false;
   }
   if (runningAccounts.has(account.id)) {
-    getLogger().info("GitHub", "@%s: already running, skipping", account.screen_name);
+    getLogger().debug("GitHub", "@%s: already running, skipping", account.screen_name);
     return false;
   }
   runningAccounts.add(account.id);
@@ -101,6 +101,8 @@ export async function fetchGithubAccount(account: AccountRow) {
     const today = new Date().toISOString().slice(0, 10);
     let trafficError: string | null = null;
     let releaseError: string | null = null;
+    let trafficFailed = 0;
+    let releaseFailed = 0;
     let issueSplitError: string | null = null;
     const issueSplits = new Map<number, { issues: number; pullRequests: number }>();
 
@@ -170,16 +172,16 @@ export async function fetchGithubAccount(account: AccountRow) {
       for (const repo of repos) {
         repoCount++;
         const err = await fetchRepoTraffic(account.id, repo.id, repo.full_name, token);
-        if (err && !trafficError) trafficError = err;
+        if (err) { trafficFailed++; if (!trafficError) trafficError = err; getLogger().debug("GitHub", "@%s: traffic work item failed for %s", username, repo.full_name); }
         const releaseErr = await fetchRepoReleases(account.id, repo.id, repo.full_name, token);
-        if (releaseErr && !releaseError) releaseError = releaseErr;
+        if (releaseErr) { releaseFailed++; if (!releaseError) releaseError = releaseErr; getLogger().debug("GitHub", "@%s: release work item failed for %s", username, repo.full_name); }
         if (repoCount % 5 === 0 || repoCount === repos.length) {
           getLogger().info("GitHub", "@%s: traffic + releases %d/%d done", username, repoCount, repos.length);
         }
         await sleep(200);
       }
       if (trafficError) {
-        getLogger().warn("GitHub", "@%s: traffic fetch issue — %s", username, trafficError);
+        getLogger().warn("GitHub", "@%s: traffic sync partial (requested=%d saved=%d failed=%d)", username, repos.length, Math.max(0, repos.length - trafficFailed), trafficFailed);
         capabilityGaps.push({ capability: "github_traffic", message: trafficError });
       } else {
         getLogger().info("GitHub", "@%s: traffic + releases fetched", username);
@@ -192,6 +194,7 @@ export async function fetchGithubAccount(account: AccountRow) {
       });
     }
     if (releaseError) {
+      getLogger().warn("GitHub", "@%s: release sync partial (requested=%d saved=%d failed=%d)", username, repos.length, Math.max(0, repos.length - releaseFailed), releaseFailed);
       capabilityGaps.push({ capability: "github_releases", message: releaseError });
     }
     if (issueSplitError) {

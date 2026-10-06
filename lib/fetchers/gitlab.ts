@@ -101,17 +101,18 @@ const runningGitlabAccounts = new Set<number>();
 
 export async function fetchGitlabAccount(account: AccountRow) {
   if (!account.is_active) {
-    getLogger().info("GitLab", "%s: inactive, skipping", account.screen_name);
+    getLogger().debug("GitLab", "%s: inactive, skipping", account.screen_name);
     return 0;
   }
   if (runningGitlabAccounts.has(account.id)) {
-    getLogger().info("GitLab", "%s: already running, skipping", account.screen_name);
+    getLogger().debug("GitLab", "%s: already running, skipping", account.screen_name);
     return 0;
   }
   runningGitlabAccounts.add(account.id);
   const apiBase = getApiBase(account);
   const token = account.auth_token;
   const errorMessages: string[] = [];
+  let failedReleaseProjects = 0;
   let recordedCoreData = false;
 
   try {
@@ -207,6 +208,7 @@ export async function fetchGitlabAccount(account: AccountRow) {
           // and just track the total download count on the release.
         }
       } catch (e: unknown) {
+        failedReleaseProjects++;
         errorMessages.push(`Releases for ${p.name}: ${e instanceof Error ? e.message : String(e)}`);
       }
 
@@ -259,6 +261,7 @@ export async function fetchGitlabAccount(account: AccountRow) {
 
     const capabilityGaps: Array<{ capability: string; message?: string }> = [];
     if (errorMessages.some((message) => message.startsWith("Releases"))) {
+      getLogger().warn("GitLab", "%s: release sync partial (requested=%d saved=%d failed=%d)", account.screen_name, projects.length, Math.max(0, projects.length - failedReleaseProjects), failedReleaseProjects);
       capabilityGaps.push({
         capability: "gitlab_releases",
         message: errorMessages.filter((message) => message.startsWith("Releases")).join("; "),

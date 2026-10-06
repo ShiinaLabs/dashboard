@@ -84,7 +84,7 @@ test("Overview cold load and delayed client navigation use server data without b
   });
   page.on("request", (request) => {
     const path = new URL(request.url()).pathname;
-    if (path.startsWith("/api/") && path !== "/api/auth/me") applicationRequests.push(path);
+    if (path.startsWith("/api/") && path !== "/api/auth/me" && path !== "/api/health") applicationRequests.push(path);
   });
   await establishMockSession(page);
   await page.goto("/overview");

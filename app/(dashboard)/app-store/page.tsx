@@ -10,6 +10,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AppStoreAnalyticsMetrics } from "@/shared/app-store-analytics";
+import { useNow } from "@/lib/client/use-now";
+import { getTimezone } from "@/lib/client/datetime";
+import { dashboardDateRange } from "@/lib/client/dashboard-date";
 
 const titleKey = "nav.appStoreAnalytics" satisfies PageTitleKey;
 export const meta = pageMeta(titleKey);
@@ -37,8 +40,9 @@ export default function AppStoreAnalyticsPage() {
   const [appId, setAppId] = useState("all");
   const [range, setRange] = useState(7);
   const [territory, setTerritory] = useState("all");
-  const [today] = useState(() => new Date().toISOString().slice(0, 10));
-  const from = new Date(Date.parse(today) - (range - 1) * 86400000).toISOString().slice(0, 10);
+  const now = useNow();
+  const timezone = getTimezone();
+  const { from, to: today } = dashboardDateRange(now, timezone, range);
   const page = useQuery({
     queryKey: ["app-store-analytics-page", appId, from, today, territory],
     queryFn: ({ signal }) => getAppStoreAnalyticsPage({ from, to: today, appId: appId === "all" ? undefined : Number(appId), territory: territory === "all" ? undefined : territory }, signal),
@@ -72,8 +76,9 @@ export default function AppStoreAnalyticsPage() {
     <Tabs defaultValue="overview">
       <TabsList><TabsTrigger value="overview">{t("appStoreAnalytics.overview")}</TabsTrigger><TabsTrigger value="acquisition">{t("appStoreAnalytics.acquisition")}</TabsTrigger><TabsTrigger value="campaigns">{t("appStoreAnalytics.campaigns")}</TabsTrigger></TabsList>
       <TabsContent value="overview" className="space-y-6 pt-4">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{metricKeys.map((key) => <Card key={key}><CardContent className="p-5"><p className="text-xs text-muted-foreground">{t(`appStoreAnalytics.metrics.${key}`)}</p><p className="mt-2 text-2xl font-semibold tabular-nums">{metricValue(metrics[key], key === "conversion")}</p></CardContent></Card>)}</div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{metricKeys.map((key) => { const coverage = data?.coverage[key]; return <Card key={key}><CardContent className="p-5"><p className="text-xs text-muted-foreground">{t(`appStoreAnalytics.metrics.${key}`)}</p><p className="mt-2 text-2xl font-semibold tabular-nums">{metricValue(metrics[key], key === "conversion")}</p>{coverage?.state === "partial" && <p className="mt-1 text-xs text-amber-600">{t("appStoreAnalytics.partialCoverage", { reportingApps: coverage.reportingApps, totalApps: coverage.totalApps })}</p>}</CardContent></Card>; })}</div>
         <Card><CardContent className="space-y-4 p-5"><h2 className="font-medium">{t("appStoreAnalytics.dailyTrend")}</h2>
+          {data?.trend.some((row) => metricKeys.some((key) => row.coverage[key].state === "partial")) && <p className="text-xs text-amber-600">{t("appStoreAnalytics.partialTrendCoverage", { days: new Set(data.trend.filter((row) => metricKeys.some((key) => row.coverage[key].state === "partial")).map((row) => row.date)).size })}</p>}
           {data?.trend.length ? <div className="h-64"><ResponsiveContainer width="100%" height="100%"><LineChart data={data.trend}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="date" tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} /><Tooltip formatter={(value) => value === null ? "—" : value} />{(["impressions", "views", "downloads"] as const).map((key, index) => <Line key={key} dataKey={key} name={t(`appStoreAnalytics.metrics.${key}`)} stroke={["var(--chart-1)", "var(--chart-2)", "var(--chart-3)"][index]} dot={false} connectNulls={false} />)}</LineChart></ResponsiveContainer></div> : <p className="text-sm text-muted-foreground">{t(page.isSuccess ? "appStoreAnalytics.noData" : "appStoreAnalytics.reportUnavailable")}</p>}
         </CardContent></Card>
         <section className="space-y-3"><h2 className="font-medium">{t("appStoreAnalytics.downloadsBySource")}</h2><MetricsTable label={t("appStoreAnalytics.source")} rows={(data?.acquisition ?? []).map((row) => ({ ...row, label: row.source }))} /></section>

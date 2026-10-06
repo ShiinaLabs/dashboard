@@ -2,6 +2,7 @@ import { isValidTimezone, TIMEZONE_COOKIE } from "../timezone";
 
 const STORAGE_KEY = "timezone";
 const TIMEZONE_COOKIE_MAX_AGE = 365 * 24 * 60 * 60;
+let observedBrowserTimezone: string | null = null;
 
 function readStoredTimezone(): string | null {
   try {
@@ -38,7 +39,16 @@ function writeTimezoneCookie(timezone: string) {
 
 export function getTimezone(): string {
   if (typeof window === "undefined") return "UTC";
-  return readStoredTimezone() ?? readTimezoneCookie() ?? getBrowserTimezone();
+  const stored = readStoredTimezone();
+  if (stored) return stored;
+  const browser = getBrowserTimezone();
+  if (observedBrowserTimezone !== null && observedBrowserTimezone !== browser) {
+    observedBrowserTimezone = browser;
+    writeTimezoneCookie(browser);
+    return browser;
+  }
+  observedBrowserTimezone ??= browser;
+  return readTimezoneCookie() ?? browser;
 }
 
 export function setTimezone(timezone: string) {
@@ -56,6 +66,7 @@ export function syncTimezoneCookie(): string {
   const storedTimezone = readStoredTimezone();
   const cookieTimezone = readTimezoneCookie();
   const timezone = storedTimezone ?? cookieTimezone ?? getBrowserTimezone();
+  observedBrowserTimezone = getBrowserTimezone();
   if (cookieTimezone !== timezone) writeTimezoneCookie(timezone);
   return timezone;
 }

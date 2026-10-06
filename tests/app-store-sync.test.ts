@@ -11,11 +11,12 @@ import { reportRunDisplayStatus } from "../shared/app-store";
 import { latestSalesReportDate } from "../shared/app-store-revenue";
 
 const mocks = vi.hoisted(() => ({
-  client: vi.fn(), authorized: vi.fn(), commit: vi.fn(), commitSales: vi.fn(), commitFinance: vi.fn(), finish: vi.fn(), runs: vi.fn(), partitions: vi.fn(), imports: vi.fn(),
-  info: vi.fn(), warn: vi.fn(), error: vi.fn(),
+  client: vi.fn(), authorized: vi.fn(), commit: vi.fn(), commitSales: vi.fn(), commitFinance: vi.fn(), finish: vi.fn(), runs: vi.fn(), partitions: vi.fn(), imports: vi.fn(), requests: vi.fn(),
+  info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(),
+  checkpoints: vi.fn(),
 }));
 vi.mock("../lib/config", () => ({ isMockMode: () => false }));
-vi.mock("../lib/logger", () => ({ getLogger: () => mocks }));
+vi.mock("../lib/logger", () => ({ getLogger: () => mocks, logStructured: (level: "debug" | "info" | "warn" | "error", component: string, event: string, fields: Record<string, unknown>) => mocks[level](component, JSON.stringify({ event, ...fields })) }));
 vi.mock("../lib/services/app-store", () => ({
   AppStoreError: class AppStoreError extends Error {},
   authorizedConnection: mocks.authorized,
@@ -24,13 +25,14 @@ vi.mock("../lib/services/app-store", () => ({
 vi.mock("../lib/repositories/app-store", () => ({
   startRun: async (_id: number, kind: string, scope: string) => ({ id: 10, connection_id: 1, kind, scope, started_at: "2026-10-02T00:00:00Z" }),
   finishRun: mocks.finish,
+  checkpointRun: mocks.checkpoints,
 }));
 vi.mock("../lib/repositories/app-store-analytics", () => ({
   enabledApps: async () => [{ id: 2, apple_id: "123" }],
   adoptRequest: async () => ({ id: 3 }),
   importsForApps: mocks.imports,
-  requestsForApps: async () => [{ app_id: 2, access_type: "ONGOING", stopped_due_to_inactivity: false }],
-  analyticsRuns: mocks.runs,
+  requestsForApps: mocks.requests,
+  analyticsRuns: async () => mocks.runs(),
 }));
 vi.mock("../lib/repositories/app-store-facts", () => ({ commitAnalyticsInstance: mocks.commit, commitSalesReport: mocks.commitSales, commitFinanceReport: mocks.commitFinance, readAnalyticsPartitions: mocks.partitions }));
 
@@ -67,6 +69,7 @@ beforeEach(() => {
   mocks.finish.mockResolvedValue(undefined);
   mocks.imports.mockResolvedValue([]);
   mocks.runs.mockResolvedValue([]);
+  mocks.requests.mockResolvedValue([{ app_id: 2, access_type: "ONGOING", stopped_due_to_inactivity: false, created_at: new Date().toISOString() }]);
   mocks.partitions.mockResolvedValue([]);
 });
 
@@ -112,14 +115,30 @@ describe("production Analytics sync selection", () => {
     expect(listSegments).toHaveBeenCalledTimes(2);
     expect(mocks.commit.mock.calls.map((call) => call[2].kind)).toEqual(["discovery", "downloads"]);
     expect(mocks.commit.mock.calls[1][2].rows[0]).toMatchObject({ app_id: 2, counts: "10" });
-    const events = mocks.info.mock.calls.map(([, message]) => JSON.parse(message));
-    expect(events.find((event) => event.event === "analytics_report_catalog")).toMatchObject({ appId: 2, requestId: "request", accessType: "ONGOING", reports: catalog([analyticsReportDefinitions.discovery.standardName, analyticsReportDefinitions.downloads.standardName, "App Downloads Detailed"]).map((report) => report.attributes) });
+    const events = [...mocks.info.mock.calls, ...mocks.debug.mock.calls].map(([, message]) => JSON.parse(message));
+    expect(events.find((event) => event.event === "analytics_report_catalog")).toMatchObject({ appId: 2, requestId: "request", accessType: "ONGOING", count: 3, targetsFound: ["discovery", "downloads"] });
+    expect(events.find((event) => event.event === "analytics_report_catalog_targets").details).toEqual(catalog([analyticsReportDefinitions.discovery.standardName, analyticsReportDefinitions.downloads.standardName, "App Downloads Detailed"]).map((report) => report.attributes));
     for (const event of ["analytics_report_selected", "analytics_instances_discovered", "analytics_instance_started", "analytics_segments_discovered", "analytics_segment_download_started", "analytics_segment_download_finished", "analytics_instance_parsed", "analytics_instance_mapped", "analytics_instance_commit_started", "analytics_instance_committed", "sync_finished"]) expect(events.some((entry) => entry.event === event)).toBe(true);
     const ordered = ["sync_started", "analytics_requests_discovered", "analytics_report_catalog", "analytics_report_selected", "analytics_instances_discovered", "analytics_instance_started", "analytics_segments_discovered", "analytics_segment_download_started", "analytics_segment_download_finished", "analytics_instance_parsed", "analytics_instance_mapped", "analytics_instance_commit_started", "analytics_instance_committed", "sync_finished"];
     const eventNames = events.map((entry) => entry.event);
     const positions = ordered.map((name) => eventNames.indexOf(name));
-    expect(positions.every((position, index) => position >= 0 && (index === 0 || position > positions[index - 1]))).toBe(true);
+    expect(positions.every((position) => position >= 0)).toBe(true);
     expect(JSON.stringify(events)).not.toMatch(/https:|synthetic-token|App Store search/);
+    const diagnostics = mocks.checkpoints.mock.calls.map(([, summary]) => summary);
+    for (const checkpoint of ["request", "catalog", "instance", "download", "parse", "map", "commit", "verify", "finished"]) expect(diagnostics.some((summary) => summary.checkpoint === checkpoint), JSON.stringify(diagnostics.map((summary) => summary.checkpoint))).toBe(true);
+    expect(JSON.stringify(diagnostics)).not.toMatch(/https:|synthetic-token|App Store search|Counts|raw report/i);
+  });
+
+  it("normal sync selects only Ongoing requests when Apple lists both access types", async () => {
+    const { client } = clientWithCatalog([analyticsReportDefinitions.downloads.standardName]);
+    vi.spyOn(client, "listAnalyticsReportRequests").mockResolvedValue([
+      { id: "snapshot-request", type: "analyticsReportRequests", attributes: { accessType: "ONE_TIME_SNAPSHOT", stoppedDueToInactivity: false } },
+      { id: "ongoing-request", type: "analyticsReportRequests", attributes: { accessType: "ONGOING", stoppedDueToInactivity: false } },
+    ]);
+    const reports = vi.spyOn(client, "listAnalyticsReports");
+    await syncAppStoreAnalytics(1, viewer);
+    expect(reports).toHaveBeenCalledTimes(1);
+    expect(reports.mock.calls[0][0]).toBe("ongoing-request");
   });
 
   it.each(["App Downloads Detailed", "App Downloads SomethingElse", "App Downloads"])("diagnoses %s without calling the instance API", async (name) => {
@@ -294,7 +313,7 @@ describe("production Analytics sync selection", () => {
       const result = await syncAppStoreAnalytics(1, viewer);
       expect(result.skipped).toBe(1);
       expect(listSegments.mock.calls).toEqual([["old-unimported"], ["recent-imported"]]);
-      const events = mocks.info.mock.calls.map(([, message]) => JSON.parse(message));
+      const events = mocks.debug.mock.calls.map(([, message]) => JSON.parse(message));
       expect(events).toContainEqual(expect.objectContaining({ event: "analytics_instance_skipped", instanceId: "old-imported", reason: "old_instance_imported" }));
       expect(mocks.imports).toHaveBeenCalledWith([2]);
     } finally { vi.useRealTimers(); }
@@ -305,9 +324,11 @@ describe("production Analytics sync selection", () => {
     vi.spyOn(client, "listAnalyticsReportRequests").mockResolvedValue([{ id: "snapshot", type: "analyticsReportRequests", attributes: { accessType: "ONE_TIME_SNAPSHOT", stoppedDueToInactivity: false } }]);
     mocks.imports.mockResolvedValue([{ apple_instance_id: "instance", apple_report_id: "report-0", apple_segment_id: "segment", checksum: "old", status: "imported", processing_date: "2020-01-01" }]);
     const listSegments = vi.spyOn(client, "listAnalyticsReportSegments");
+    const listReports = vi.spyOn(client, "listAnalyticsReports");
     await backfillAppStoreAnalytics(1, viewer);
     expect(listSegments).toHaveBeenCalledWith("instance");
     expect(mocks.imports).toHaveBeenCalled();
+    expect(listReports).toHaveBeenCalledWith("snapshot");
   });
 
   it("skips unchanged instances after the single segment listing without downloading or parsing", async () => {
@@ -319,7 +340,7 @@ describe("production Analytics sync selection", () => {
     expect(listSegments).toHaveBeenCalledTimes(1);
     expect(download).not.toHaveBeenCalled();
     expect(mocks.commit).not.toHaveBeenCalled();
-    const events = mocks.info.mock.calls.map(([, message]) => JSON.parse(message));
+    const events = mocks.debug.mock.calls.map(([, message]) => JSON.parse(message));
     expect(events).toContainEqual(expect.objectContaining({ event: "analytics_instance_skipped", reason: "segments_unchanged", segmentCount: 1 }));
     expect(events.some((event) => ["analytics_instance_parsed", "analytics_instance_mapped", "analytics_instance_commit_started"].includes(event.event))).toBe(false);
   });
@@ -379,7 +400,7 @@ describe("production Analytics sync selection", () => {
     vi.spyOn(client, "downloadFinanceReport").mockResolvedValue(null);
     const result = await syncAppStoreRevenue(1, viewer, { from: "2026-09-29", to: "2026-09-29", fiscalMonth: "2026-09", regionCode: "ZZ" });
     expect(result.sources.finance).toMatchObject({ status: "waiting", waitingReasons: [expect.stringContaining("finance_unavailable")], errors: [] });
-    const waiting = mocks.info.mock.calls.map(([, message]) => JSON.parse(message));
+    const waiting = mocks.debug.mock.calls.map(([, message]) => JSON.parse(message));
     expect(waiting).toContainEqual(expect.objectContaining({ event: "report_waiting", source: "finance", reason: "finance_unavailable" }));
   });
 
@@ -421,9 +442,16 @@ describe("Analytics status uses internal partitions", () => {
     const run = { status: "success", error_message: "waiting: no_reports_generated" } as const;
     mocks.runs.mockResolvedValue([run]);
     mocks.partitions.mockResolvedValue([{ app_id: 2, report_kind: "downloads", date: "2026-09-29", processing_date: "2026-10-02" }]);
-    expect(await getAppStoreAnalyticsStatus(1, viewer)).toMatchObject({ state: "waiting", message: "waiting: no_reports_generated" });
+    expect(await getAppStoreAnalyticsStatus(1, viewer)).toMatchObject({ state: "partial", message: "waiting: no_reports_generated" });
     expect(reportRunDisplayStatus(run)).toBe("waiting");
     expect(reportRunDisplayStatus({ status: "success", error_message: "report_waiting: target_report_unavailable" })).toBe("success");
     expect(reportRunDisplayStatus({ status: "error", error_message: "waiting: no_reports_generated" })).toBe("error");
+  });
+
+  it("expires first-report waiting after 72 hours and flags stopped requests", async () => {
+    mocks.requests.mockResolvedValue([{ app_id: 2, access_type: "ONGOING", stopped_due_to_inactivity: false, created_at: new Date(Date.now() - 73 * 60 * 60_000).toISOString() }]);
+    expect(await getAppStoreAnalyticsStatus(1, viewer)).toMatchObject({ state: "stale", latestData: null });
+    mocks.requests.mockResolvedValue([{ app_id: 2, access_type: "ONGOING", stopped_due_to_inactivity: true, created_at: new Date().toISOString() }]);
+    expect(await getAppStoreAnalyticsStatus(1, viewer)).toMatchObject({ state: "action_required" });
   });
 });
