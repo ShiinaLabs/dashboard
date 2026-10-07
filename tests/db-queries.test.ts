@@ -1969,7 +1969,7 @@ describe("independent App Store Connect foundation", () => {
         expect(await syncAppStoreRevenue(connection.id, viewer, { ...filters, from: "2026-10-01", to: "2026-10-02" })).toMatchObject({ sources: { sales: { status: "waiting", waiting: 2, imported: 0, errors: [] } } });
         expect(salesDownload).not.toHaveBeenCalled();
       } finally { clock.mockRestore(); }
-      const events = [...infoLog.mock.calls, ...errorLog.mock.calls, ...warnLog.mock.calls].map(([component, message]) => { expect(component).toBe("ASC"); return JSON.parse(message); });
+      const events = [...infoLog.mock.calls, ...errorLog.mock.calls, ...warnLog.mock.calls].map(([component, message, ...args]) => { expect(component).toBe("ASC"); return JSON.parse(message === "%s" ? String(args[0]) : message); });
       expect(events).toEqual(expect.arrayContaining([
         expect.objectContaining({ event: "sync_started", source: "finance", fiscalMonth: "2026-09" }),
         expect.objectContaining({ event: "report_failed", source: "finance", diagnostic: "Finance; fiscal month 2026-09; region ZZ; apple_report_error status=403 code=FORBIDDEN message=Insufficient report access" }),
