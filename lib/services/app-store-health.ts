@@ -56,7 +56,7 @@ export function classifyAppStoreAnalyticsHealth(input: {
   if (run && (run.status === "partial" || message.startsWith("report_waiting: "))) {
     return { state: "partial", lastSync, latestData, completeThrough, reason: message.replace(/^report_waiting:\s*/, "") || "The latest sync was partial" };
   }
-  if (!latestData && input.stoppedRequest) {
+  if (input.stoppedRequest) {
     return { state: "action_required", lastSync, latestData, completeThrough, reason: "An Ongoing request stopped and has no active replacement" };
   }
   if (!latestData) {

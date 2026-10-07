@@ -22,6 +22,7 @@ describe("ASC source health", () => {
     latestData?: string | null;
     completeThrough?: string | null;
     appleAhead?: boolean;
+    stoppedRequest?: boolean;
     firstRequestStartedAt?: number;
   } = {}) => classifyAppStoreAnalyticsHealth({
     run: run(options.status ?? "success", options.message ?? null),
@@ -30,7 +31,7 @@ describe("ASC source health", () => {
     maxAge: 5 * 86_400_000,
     now,
     appleAhead: options.appleAhead ?? false,
-    stoppedRequest: false,
+    stoppedRequest: options.stoppedRequest ?? false,
     firstRequestStartedAt: options.firstRequestStartedAt,
   });
 
@@ -51,5 +52,25 @@ describe("ASC source health", () => {
     expect(analyticsHealth({ appleAhead: true }).state).toBe("stale");
     expect(analyticsHealth({ completeThrough: "2026-09-20" }).state).toBe("stale");
     expect(analyticsHealth().state).toBe("healthy");
+  });
+
+  it.each([
+    ["no data", { latestData: null, completeThrough: null }],
+    ["fresh data", { latestData: "2026-10-01", completeThrough: "2026-10-01" }],
+    ["stale data", { latestData: "2026-09-20", completeThrough: "2026-09-20" }],
+    ["Apple processing ahead", { latestData: "2026-10-01", completeThrough: "2026-10-01", appleAhead: true }],
+  ] as const)("requires action for a stopped Ongoing request with %s", (_description, options) => {
+    expect(analyticsHealth({ ...options, stoppedRequest: true })).toMatchObject({
+      state: "action_required",
+      latestData: options.latestData,
+      completeThrough: options.completeThrough,
+      reason: "An Ongoing request stopped and has no active replacement",
+    });
+  });
+
+  it("does not let a stopped Ongoing request override running, error or partial run status", () => {
+    expect(analyticsHealth({ status: "running", stoppedRequest: true }).state).toBe("waiting");
+    expect(analyticsHealth({ status: "error", message: "unsupported_report_structure", stoppedRequest: true }).state).toBe("error");
+    expect(analyticsHealth({ status: "partial", message: "report failed", stoppedRequest: true }).state).toBe("partial");
   });
 });
