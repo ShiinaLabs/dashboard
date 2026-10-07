@@ -1232,6 +1232,18 @@ describe("github queries", () => {
     expect(contribs.length).toBe(1);
     expect(contribs[0].count).toBe(5);
   });
+
+  it("filters contributions by year while dates are stored as ISO text", async () => {
+    await githubQ.upsertGithubContributions(acctId, [
+      { date: "2025-12-31", count: 4, level: 1 },
+      { date: "2026-01-01", count: 6, level: 2 },
+      { date: "2026-12-31", count: 8, level: 3 },
+      { date: "2027-01-01", count: 10, level: 4 },
+    ]);
+
+    const contributions = await githubQ.getGithubContributions(acctId, 2026);
+    expect(contributions.map(({ date }) => date)).toEqual(["2026-01-01", "2026-12-31"]);
+  });
 });
 
 describe("gitlab queries", () => {

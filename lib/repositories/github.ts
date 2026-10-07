@@ -1,5 +1,5 @@
 // @ts-nocheck — Drizzle ORM types are complex
-import { eq, and, or, desc, sql, inArray, gte, type SQL } from "drizzle-orm";
+import { eq, and, or, desc, sql, inArray, gte, lt, type SQL } from "drizzle-orm";
 import { getDb } from "../db/connection";
 import { latestSnapshotRows } from "../utils/latest-snapshot";
 import { computeReleaseDownloadTimeline, type DownloadSnapshot } from "../utils/download-growth";
@@ -130,7 +130,9 @@ export async function getGithubTimeline(accountId: number, days = 30) {
 export async function getGithubContributions(accountId: number, yr?: number) {
   if (isMockMode()) return mock.githubContributions;
   const conditions: SQL<unknown>[] = [eq(github_contributions.account_id, accountId)];
-  if (yr) conditions.push(sql`EXTRACT(YEAR FROM ${github_contributions.date}) = ${String(yr)}`);
+  if (yr) {
+    conditions.push(gte(github_contributions.date, `${yr}-01-01`), lt(github_contributions.date, `${yr + 1}-01-01`));
+  }
   return getDb().select().from(github_contributions).where(and(...conditions)).orderBy(github_contributions.date);
 }
 
