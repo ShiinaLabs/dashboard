@@ -976,6 +976,34 @@ describe("twitter queries", () => {
     expect(result.data[0].full_text).toBe("Hello test");
   });
 
+  it("filters calendar rows by year from ISO text timestamps", async () => {
+    const days = ["2024-12-31", "2025-01-01", "2025-12-31", "2026-01-01"];
+    await Promise.all(days.map((day, index) => twitterQ.upsertTweet({
+      id: `calendar_year_${index}`,
+      account_id: acctId,
+      full_text: "calendar test",
+      created_at: `${day}T12:00:00Z`,
+      favorite_count: 0,
+      retweet_count: 0,
+      reply_count: 0,
+      view_count: 0,
+      bookmark_count: 0,
+      is_quote: 0,
+      is_reply: 0,
+      is_retweet: 0,
+      media_urls: "[]",
+      urls: "[]",
+      hashtags: "[]",
+      mentions: "[]",
+      lang: "en",
+    })));
+
+    expect(await twitterQ.getCalendarData(2025, [acctId])).toEqual([
+      { date: "2025-01-01", count: 1 },
+      { date: "2025-12-31", count: 1 },
+    ]);
+  });
+
   it("counts only non-reply non-retweet tweets in todayTweets", async () => {
     const today = new Date().toISOString();
 
@@ -1270,6 +1298,15 @@ describe("gitlab queries", () => {
     const contribs = await gitlabQ.getGitlabContributions(acctId);
     expect(contribs.length).toBe(1);
     expect(contribs[0].count).toBe(3);
+  });
+
+  it("filters contributions by year while dates are stored as ISO text", async () => {
+    await Promise.all(["2025-12-31", "2026-01-01", "2026-12-31", "2027-01-01"].map((date, index) =>
+      gitlabQ.upsertGitlabContribution({ account_id: acctId, date, count: index + 1 }),
+    ));
+
+    const contributions = await gitlabQ.getGitlabContributions(acctId, 2026);
+    expect(contributions.map(({ date }) => date)).toEqual(["2026-01-01", "2026-12-31"]);
   });
 });
 

@@ -1,5 +1,5 @@
 // @ts-nocheck — Drizzle ORM types are complex
-import { eq, and, desc, sql, count, inArray, gte, like, type SQL } from "drizzle-orm";
+import { eq, and, desc, sql, count, inArray, gte, lt, like, type SQL } from "drizzle-orm";
 import { getDb } from "../db/connection";
 import { tweets, user_stats } from "@/db/schema";
 import type { OverviewStats } from "../../shared/types";
@@ -172,7 +172,10 @@ export async function getTopTweets(metric: string, limit: number, accountIds?: n
 export async function getCalendarData(yr: number, accountIds?: number[]) {
   if (isMockMode()) return mock.calendarData;
   if (isExplicitEmpty(accountIds)) return [];
-  const conditions: SQL<unknown>[] = [sql`EXTRACT(YEAR FROM ${tweets.created_at}) = ${String(yr)}`];
+  const conditions: SQL<unknown>[] = [
+    gte(tweets.created_at, `${yr}-01-01`),
+    lt(tweets.created_at, `${yr + 1}-01-01`),
+  ];
   if (hasIds(accountIds)) conditions.push(inArray(tweets.account_id, accountIds));
   return getDb().select({
     date: sql`DATE(${tweets.created_at})`.as<string>(),
