@@ -1935,6 +1935,7 @@ describe("independent App Store Connect foundation", () => {
 
   it("imports Revenue with separate currencies, final fiscal settlements and independent missing-vendor failures", async () => {
     const infoLog = vi.spyOn(getLogger(), "info").mockImplementation(() => undefined);
+    const debugLog = vi.spyOn(getLogger(), "debug").mockImplementation(() => undefined);
     const errorLog = vi.spyOn(getLogger(), "error").mockImplementation(() => undefined);
     const warnLog = vi.spyOn(getLogger(), "warn").mockImplementation(() => undefined);
     const discovery = vi.spyOn(AppStoreConnectClient.prototype, "listApps").mockResolvedValue(apps);
@@ -1969,7 +1970,7 @@ describe("independent App Store Connect foundation", () => {
         expect(await syncAppStoreRevenue(connection.id, viewer, { ...filters, from: "2026-10-01", to: "2026-10-02" })).toMatchObject({ sources: { sales: { status: "waiting", waiting: 2, imported: 0, errors: [] } } });
         expect(salesDownload).not.toHaveBeenCalled();
       } finally { clock.mockRestore(); }
-      const events = [...infoLog.mock.calls, ...errorLog.mock.calls, ...warnLog.mock.calls].map(([component, message, ...args]) => { expect(component).toBe("ASC"); return JSON.parse(message === "%s" ? String(args[0]) : message); });
+      const events = [...infoLog.mock.calls, ...debugLog.mock.calls, ...errorLog.mock.calls, ...warnLog.mock.calls].map(([component, message, ...args]) => { expect(component).toBe("ASC"); return JSON.parse(message === "%s" ? String(args[0]) : message); });
       expect(events).toEqual(expect.arrayContaining([
         expect.objectContaining({ event: "sync_started", source: "finance", fiscalMonth: "2026-09" }),
         expect.objectContaining({ event: "report_failed", source: "finance", diagnostic: "Finance; fiscal month 2026-09; region ZZ; apple_report_error status=403 code=FORBIDDEN message=Insufficient report access" }),
@@ -1978,7 +1979,7 @@ describe("independent App Store Connect foundation", () => {
       ]));
       expect(JSON.stringify(events)).not.toContain("SECRET");
       expect(JSON.stringify(events)).not.toContain("123456");
-    } finally { for (const spy of [discovery, requests, salesDownload, financeDownload, infoLog, errorLog, warnLog]) spy.mockRestore(); }
+    } finally { for (const spy of [discovery, requests, salesDownload, financeDownload, infoLog, debugLog, errorLog, warnLog]) spy.mockRestore(); }
   });
 
   it("persists all five official fact types and replaces corrected Purchases without double counting", async () => {

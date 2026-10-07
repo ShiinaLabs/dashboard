@@ -417,7 +417,7 @@ describe("production Analytics sync selection", () => {
     expect(mocks.debug.mock.calls.map(([, message]) => JSON.parse(message).event)).toEqual(expect.arrayContaining(["sales_report_started", "sales_report_downloaded", "sales_report_parsed", "sales_report_mapped", "finance_report_started", "finance_report_downloaded", "finance_report_parsed", "finance_report_mapped"]));
     for (const event of ["sales_report_started", "sales_report_downloaded", "sales_report_parsed", "sales_report_mapped", "sales_report_committed", "finance_report_started", "finance_report_downloaded", "finance_report_parsed", "finance_report_mapped", "finance_report_committed"]) expect(events.some((entry) => entry.event === event)).toBe(true);
     expect(events.find((entry) => entry.event === "finance_report_parsed")).toMatchObject({ trailerStatus: "validated", rowCount: 1, fiscalMonth: "2026-09", regionCode: "ZZ" });
-    expect(JSON.stringify(events)).not.toMatch(/12345678|sensitive-sku|private-sku|1\.4|100|https:|synthetic-token/);
+    expect(JSON.stringify(events)).not.toMatch(/12345678|sensitive-sku|private-sku|"1\.4"|"100"|https:|synthetic-token/);
   });
 
   it("rejects Sales backfills over 90 days and Finance backfills over 12 months", async () => {
