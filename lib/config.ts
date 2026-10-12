@@ -25,11 +25,13 @@ export function logMaxFiles(): number {
   return Number(process.env.LOG_MAX_FILES) || 5;
 }
 
-// Content older than this window is not discovered/fetched/recomputed.
-// Shared by the X and Reddit fetchers. Set TWEET_WINDOW_DAYS to tune;
-// old data has no processing value.
+// Reddit content window. X has an independent 90-day discovery window.
 export function contentWindowDays(): number {
   return Number(process.env.TWEET_WINDOW_DAYS) || 90;
+}
+
+export function xContentWindowDays(): number {
+  return Number(process.env.X_TWEET_WINDOW_DAYS) || 90;
 }
 
 export function dataDir(): string {

@@ -106,7 +106,7 @@ export async function getTweets(page: number, limit: number, sort: string, order
     view_count: tweets.view_count,
   };
   const sortCol = allowed[sort] || tweets.created_at;
-  const sortOrder = order === "asc" ? sortCol : desc(sortCol);
+  const sortOrder = order === "asc" ? sortCol.nullsLast() : desc(sortCol).nullsLast();
   const [total] = await db.select({ count: count() }).from(tweets).where(whereClause);
   const data = await db.select().from(tweets).where(whereClause).orderBy(sortOrder).limit(limit).offset(offset);
   return { data, total: total.count, page, limit, totalPages: Math.ceil(total.count / limit) };
@@ -166,7 +166,7 @@ export async function getTopTweets(metric: string, limit: number, accountIds?: n
   };
   const col = allowed[metric] || tweets.favorite_count;
   const whereClause = hasIds(accountIds) ? inArray(tweets.account_id, accountIds) : undefined;
-  return getDb().select().from(tweets).where(whereClause).orderBy(desc(col)).limit(limit);
+  return getDb().select().from(tweets).where(whereClause).orderBy(desc(col).nullsLast()).limit(limit);
 }
 
 export async function getCalendarData(yr: number, accountIds?: number[]) {
@@ -186,15 +186,16 @@ export async function getCalendarData(yr: number, accountIds?: number[]) {
     .orderBy(sql`DATE(${tweets.created_at})`) as Promise<{ date: string; count: number }[]>;
 }
 
-export async function upsertTweet(tweet: { id: string; account_id: number; full_text: string; created_at: string; favorite_count: number; retweet_count: number; reply_count: number; view_count: number; bookmark_count: number; is_quote: number; is_reply: number; is_retweet: number; media_urls: string; urls: string; hashtags: string; mentions: string; lang: string }) {
+export async function upsertTweet(tweet: { id: string; account_id: number; full_text: string; created_at: string; favorite_count: number | null; retweet_count: number | null; reply_count: number | null; view_count: number | null; bookmark_count: number | null; is_quote: number; is_reply: number; is_retweet: number; media_urls: string; urls: string; hashtags: string; mentions: string; lang: string }) {
   await getDb().insert(tweets).values({ ...tweet, fetched_at: sql`NOW()` }).onConflictDoUpdate({
     target: tweets.id,
     set: {
-      favorite_count: tweet.favorite_count,
-      retweet_count: tweet.retweet_count,
-      reply_count: tweet.reply_count,
-      view_count: tweet.view_count,
-      bookmark_count: tweet.bookmark_count,
+      favorite_count: sql`COALESCE(EXCLUDED.favorite_count, ${tweets.favorite_count})`,
+      retweet_count: sql`COALESCE(EXCLUDED.retweet_count, ${tweets.retweet_count})`,
+      reply_count: sql`COALESCE(EXCLUDED.reply_count, ${tweets.reply_count})`,
+      view_count: sql`COALESCE(EXCLUDED.view_count, ${tweets.view_count})`,
+      bookmark_count: sql`COALESCE(EXCLUDED.bookmark_count, ${tweets.bookmark_count})`,
+      fetched_at: sql`NOW()`,
     },
   });
 }

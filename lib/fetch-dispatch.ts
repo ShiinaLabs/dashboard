@@ -14,6 +14,7 @@ import type { FetcherPort } from "./domain/ports";
 import type { CapabilityGap, FetchRunStatus, FetchTrigger } from "./fetch-health";
 import { isSupportedPlatform } from "./platforms";
 import { getPlatformFetchLevels } from "./application/scheduler/fetchPolicy";
+import { getPgPool } from "./db/connection";
 
 type CompletedRunStatus = Exclude<FetchRunStatus, "running">;
 
@@ -35,6 +36,46 @@ interface FetcherError extends Error {
 
 const activeDispatches = new Set<number>();
 
+async function acquireAccountLock(accountId: number, platform: string): Promise<(() => Promise<void>) | null> {
+  const pool = getPgPool();
+  if (!pool) return async () => undefined;
+  const connection = await pool.connect();
+  let slot: 0 | 1 | null = null;
+  try {
+    const firstSlot = await connection.query<{ locked: boolean }>("SELECT pg_try_advisory_lock(hashtext('dashboard-fetch-slot'), 0) AS locked");
+    slot = firstSlot.rows[0]?.locked ? 0 : null;
+    if (slot === null) {
+      const secondSlot = await connection.query<{ locked: boolean }>("SELECT pg_try_advisory_lock(hashtext('dashboard-fetch-slot'), 1) AS locked");
+      if (secondSlot.rows[0]?.locked) slot = 1;
+    }
+    if (slot === null) { connection.release(); return null; }
+    const result = await connection.query<{ account_locked: boolean; platform_locked: boolean }>(`SELECT
+      pg_try_advisory_lock(hashtext('dashboard-fetch-account'), $1) AS account_locked,
+      pg_try_advisory_lock(hashtext('dashboard-fetch-platform'), hashtext($2)) AS platform_locked`, [accountId, platform]);
+    if (!result.rows[0]?.account_locked || !result.rows[0]?.platform_locked) {
+      if (result.rows[0]?.account_locked) await connection.query("SELECT pg_advisory_unlock(hashtext('dashboard-fetch-account'), $1)", [accountId]);
+      if (result.rows[0]?.platform_locked) await connection.query("SELECT pg_advisory_unlock(hashtext('dashboard-fetch-platform'), hashtext($1))", [platform]);
+      await connection.query("SELECT pg_advisory_unlock(hashtext('dashboard-fetch-slot'), $1)", [slot]);
+      connection.release();
+      return null;
+    }
+    return async () => {
+      try {
+        await connection.query("SELECT pg_advisory_unlock(hashtext('dashboard-fetch-account'), $1)", [accountId]);
+        await connection.query("SELECT pg_advisory_unlock(hashtext('dashboard-fetch-platform'), hashtext($1))", [platform]);
+        await connection.query("SELECT pg_advisory_unlock(hashtext('dashboard-fetch-slot'), $1)", [slot]);
+      }
+      finally { connection.release(); }
+    };
+  } catch (error) {
+    await connection.query("SELECT pg_advisory_unlock(hashtext('dashboard-fetch-account'), $1)", [accountId]).catch(() => undefined);
+    await connection.query("SELECT pg_advisory_unlock(hashtext('dashboard-fetch-platform'), hashtext($1))", [platform]).catch(() => undefined);
+    if (slot !== null) await connection.query("SELECT pg_advisory_unlock(hashtext('dashboard-fetch-slot'), $1)", [slot]).catch(() => undefined);
+    connection.release();
+    throw error;
+  }
+}
+
 function normalizeResult(result: FetcherResult): {
   status: CompletedRunStatus;
   errorMessage: string | null;
@@ -53,7 +94,7 @@ function normalizeResult(result: FetcherResult): {
   return { status: "success", errorMessage: null, capabilityGaps: [] };
 }
 
-export async function dispatchFetch(account: AccountRow, trigger: FetchTrigger = "manual", level?: string): Promise<DispatchFetchResult> {
+export async function dispatchFetch(account: AccountRow, trigger: FetchTrigger = "manual", level?: string, onStarted?: () => void): Promise<DispatchFetchResult> {
   if (!isSupportedPlatform(account.platform)) {
     getLogger().warn("FetchRun", "Account %s has unsupported platform %s; fetch skipped", account.id, account.platform);
     return { status: "skipped", reason: "unsupported-platform" };
@@ -63,6 +104,15 @@ export async function dispatchFetch(account: AccountRow, trigger: FetchTrigger =
       getLogger().debug("FetchRun", "Account %s is already fetching; request skipped", account.id);
     return { status: "skipped", reason: "already-running" };
   }
+
+  let releaseLock: (() => Promise<void>) | null;
+  try {
+    releaseLock = await acquireAccountLock(account.id, account.platform);
+  } catch (error) {
+    getLogger().error("FetchRun", "Unable to coordinate account %s across instances: %s", account.id, error instanceof Error ? error.message : String(error));
+    return { status: "failed", errorMessage: "Unable to acquire the database fetch lock" };
+  }
+  if (!releaseLock) return { status: "skipped", reason: "already-running" };
 
   activeDispatches.add(account.id);
   try {
@@ -80,6 +130,8 @@ export async function dispatchFetch(account: AccountRow, trigger: FetchTrigger =
       );
     }
 
+    onStarted?.();
+
     // Do NOT advance last_fetched_at on dispatch start. That must wait until
     // the run actually succeeds (or is partial) so a failed run does not make
     // the account look freshly fetched.
@@ -87,6 +139,7 @@ export async function dispatchFetch(account: AccountRow, trigger: FetchTrigger =
     return await executeAndRecord(account, runId, trigger, level);
   } finally {
     activeDispatches.delete(account.id);
+    await releaseLock();
   }
 }
 
@@ -299,8 +352,8 @@ async function executeWithNewArch(account: AccountRow, level: string): Promise<F
   if (level === "l1") {
     const { PgReleaseWrite } = await import("./infra/drizzle/PgReleaseWrite");
     const uc = new SyncActivity(repoRepo, fetcher, undefined, client, new PgReleaseWrite());
-    await uc.execute(domainAccount);
-    return levelResult();
+    const activityGaps = await uc.execute(domainAccount);
+    return levelResult(activityGaps);
   }
   if (level === "l2") {
     const { SyncTelemetry } = await import("./application/usecases/SyncTelemetry");

@@ -41,7 +41,9 @@ vi.mock("../lib/fetch-dispatch", () => ({
 
 vi.mock("../lib/repositories/account-fetch-state", () => ({
   getAccountFetchState: vi.fn().mockResolvedValue([]),
+  getPlatformLastFetchFinishedAt: vi.fn().mockResolvedValue(null),
   upsertAccountFetchState: vi.fn().mockResolvedValue(undefined),
+  recordAccountFetchFailure: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../lib/logger", () => ({
@@ -52,8 +54,7 @@ describe("scheduler", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    // Default: the account has no per-level state, so every level counts as
-    // never-fetched and L0 is the first due one.
+    // Platform policy determines due levels; X only supports L1.
     vi.mocked(getAccountFetchState).mockResolvedValue([]);
   });
 
@@ -155,7 +156,7 @@ describe("scheduler", () => {
     const { runCycleOnceForTests } = await import("../lib/scheduler");
     await runCycleOnceForTests();
 
-    expect(upsertAccountFetchState).toHaveBeenCalledWith(31, "l0", expect.any(String));
+    expect(upsertAccountFetchState).toHaveBeenCalledWith(31, "l1", expect.any(String));
     expect(updateAccount).not.toHaveBeenCalledWith(31, expect.objectContaining({ last_fetched_at: expect.any(String) }));
   });
 
@@ -249,15 +250,14 @@ describe("scheduler", () => {
     vi.mocked(getAccountFetchState).mockResolvedValue([
       { level: "l0", lastFetchedAt: new Date().toISOString() },
     ] as never);
-    getAccountByIdWithCredential
-      .mockRejectedValueOnce(new Error("Stored credential cannot be decrypted; check ENCRYPTION_KEY"))
-      .mockResolvedValueOnce(healthyAccount);
+    getAccountByIdWithCredential.mockRejectedValueOnce(new Error("Stored credential cannot be decrypted; check ENCRYPTION_KEY"));
     dispatchFetch.mockResolvedValue({ status: "success" });
 
     const { runCycleOnceForTests } = await import("../lib/scheduler");
     await runCycleOnceForTests();
 
-    expect(dispatchFetch).toHaveBeenCalledWith(healthyAccount, "scheduler", "l1");
+    // The scheduler never overlaps two X accounts. The healthy account remains due for the next scan.
+    expect(dispatchFetch).not.toHaveBeenCalled();
     expect(updateAccount).toHaveBeenCalledWith(
       14,
       expect.objectContaining({ error_message: expect.stringContaining("cannot be decrypted") }),
@@ -329,6 +329,27 @@ describe("scheduler", () => {
     await runCycleOnceForTests();
 
     expect(dispatchFetch).toHaveBeenCalledWith(account, "scheduler", "l0");
+  });
+
+  it("lets GitHub start while X is still running and does not launch the same X account twice", async () => {
+    let finishX!: (value: { status: "success" }) => void;
+    const xAccount = { id: 51, platform: "twitter", is_active: 1, screen_name: "x" };
+    const githubAccount = { id: 52, platform: "github", is_active: 1, screen_name: "gh" };
+    getActiveAccounts.mockResolvedValue([xAccount, githubAccount]);
+    getAccountByIdWithCredential.mockImplementation(async (id: number) => id === 51 ? xAccount : githubAccount);
+    vi.mocked(getAccountFetchState).mockResolvedValue([]);
+    dispatchFetch.mockImplementation((account: { id: number }) => account.id === 51
+      ? new Promise(resolve => { finishX = resolve; })
+      : Promise.resolve({ status: "success" }));
+
+    const { runCycleOnceForTests } = await import("../lib/scheduler");
+    await runCycleOnceForTests({ waitForDispatches: false });
+    await vi.waitFor(() => expect(dispatchFetch).toHaveBeenCalledTimes(2));
+    expect(dispatchFetch).toHaveBeenCalledWith(xAccount, "scheduler", "l1");
+    expect(dispatchFetch).toHaveBeenCalledWith(githubAccount, "scheduler", "l0");
+    await runCycleOnceForTests({ waitForDispatches: false });
+    expect(dispatchFetch.mock.calls.filter(([account]) => (account as { id: number }).id === 51)).toHaveLength(1);
+    finishX({ status: "success" });
   });
 
   it("skips active accounts on unsupported platforms", async () => {

@@ -4,6 +4,12 @@ import { SyncTelemetry } from "../lib/application/usecases/SyncTelemetry";
 import { Stars, Forks } from "../lib/domain/repo";
 import type { RepoRepository } from "../lib/domain/ports";
 
+vi.mock("../lib/repositories/github", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../lib/repositories/github")>(),
+  insertGithubStats: vi.fn().mockResolvedValue(undefined),
+  upsertGithubContributions: vi.fn().mockResolvedValue(undefined),
+}));
+
 class InMemoryRepo implements RepoRepository {
   store = new Map<string, any>();
   snapshots: any[] = [];
@@ -17,6 +23,24 @@ class InMemoryRepo implements RepoRepository {
 const account = { id: 1, screenName: "alice", platform: "github" as const, ownerId: 1, instanceUrl: null, isActive: 1, authToken: "pat", authType: null };
 
 describe("GitHub L1 issue/PR split (new arch, mock client, no PG)", () => {
+  it("returns structured gaps for failed optional capabilities", async () => {
+    const repo = new InMemoryRepo();
+    const fakeFetcher = { fetchRepoMeta: async () => [{ type: "RepoMetaFetched" as const, repo: { accountId: 1, repoId: 1, fullName: "alice/r", stars: new Stars(1), forks: new Forks(1), isFork: 0, language: null, description: null, homepage: null, topics: "[]" } }] };
+    const mockClient = {
+      fetchUserStats: async () => ({ public_repos: 1, public_gists: 0, followers: 1, following: 1 }),
+      fetchContributions: async () => { throw new Error("contributions unavailable"); },
+      fetchIssueSplits: async () => { throw new Error("issue split unavailable"); },
+      fetchRepoReleases: async () => { throw new Error("releases unavailable"); },
+    };
+    const write = { upsertRelease: vi.fn(), findReleaseDbId: vi.fn(), replaceAssets: vi.fn(), insertAssetSnapshot: vi.fn() };
+    const uc = new SyncActivity(repo as any, fakeFetcher as any, undefined, mockClient as any, write as any);
+    await expect(uc.execute(account as any)).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ capability: "github.contributions" }),
+      expect.objectContaining({ capability: "github.issue_pr_split" }),
+      expect.objectContaining({ capability: "github.releases" }),
+    ]));
+  });
+
   it("does not throw when client returns empty splits (PGA-free path)", async () => {
     const repo = new InMemoryRepo();
     const fakeFetcher = { fetchRepoMeta: async () => [{ type: "RepoMetaFetched" as const, repo: { accountId: 1, repoId: 1, fullName: "alice/r", stars: new Stars(1), forks: new Forks(1), isFork: 0, language: null, description: null, homepage: null, topics: "[]" } }] };

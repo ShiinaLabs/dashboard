@@ -115,7 +115,7 @@ export function XSection({ stats, timeline, topLiked, xAccounts }: Props) {
             <div key={tweet.id} className="flex items-start gap-2 px-2.5 py-1.5 rounded-md bg-[var(--muted)] text-xs transition-colors hover:bg-[var(--border)]/50">
               <Heart size={12} className="text-[var(--chart-5)] mt-0.5 shrink-0" />
               <span className="line-clamp-1 flex-1">{tweet.full_text}</span>
-              <span className="text-[var(--muted-foreground)] shrink-0">{tweet.favorite_count.toLocaleString()}</span>
+              <span className="text-[var(--muted-foreground)] shrink-0">{tweet.favorite_count?.toLocaleString() ?? "—"}</span>
             </div>
           ))}
         </div>

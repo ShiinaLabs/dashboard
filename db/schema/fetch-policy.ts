@@ -15,6 +15,9 @@ export const accountFetchState = pgTable("account_fetch_state", {
   level: text("level").notNull(),
   lastFetchedAt: text("last_fetched_at"),
   nextDueAt: text("next_due_at"),
+  failureCount: integer("failure_count").notNull().default(0),
+  nextRetryAt: text("next_retry_at"),
+  lastErrorKind: text("last_error_kind"),
 }, (table) => ({
   uniq: uniqueIndex("idx_account_fetch_state_account_level").on(table.accountId, table.level),
 }));

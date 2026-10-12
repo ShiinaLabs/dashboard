@@ -66,4 +66,19 @@ describe("SyncXAccount (new arch, no real API)", () => {
       vi.useRealTimers();
     }
   });
+
+  it("does not persist a detail with an invalid publication time", async () => {
+    vi.useFakeTimers();
+    try {
+      const invalid = makeTweet("1");
+      const inner = invalid.tweet as Record<string, unknown>;
+      (inner.legacy as Record<string, unknown>).createdAt = "invalid";
+      const write = new InMemoryX();
+      const uc = new SyncXAccount(account as Account, new FakeXClient({ tweets: [invalid] }) as unknown as XClient, write);
+      const result = uc.execute();
+      await vi.runAllTimersAsync();
+      await expect(result).resolves.toMatchObject({ status: "failed", saved: 0, errors: 2 });
+      expect(write.tweets).toEqual([]);
+    } finally { vi.useRealTimers(); }
+  });
 });

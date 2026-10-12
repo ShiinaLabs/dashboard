@@ -1,35 +1,42 @@
 import type { XTweet } from "../../application/usecases/XWrite";
 
-export function toISO(createdAt: string | undefined): string {
-  if (!createdAt) return new Date().toISOString();
+export function toISO(createdAt: string | undefined): string | null {
+  if (!createdAt) return null;
   const d = new Date(createdAt);
-  return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+  return isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-export function parseViews(views: Record<string, unknown> | null | undefined): number {
-  if (!views) return 0;
-  return (views.count as number) || 0;
+export function parseViews(views: Record<string, unknown> | null | undefined): number | null {
+  return metric((views?.count));
 }
 
-export function extractTweet(tweetObj: Record<string, unknown> | undefined, accountId: number): XTweet | null {
+function metric(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+export function extractTweet(tweetObj: Record<string, unknown> | undefined, accountId: number, requestedId?: string): XTweet | null {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const t = (tweetObj?.tweet ?? tweetObj) as any;
   if (!t) return null;
   const legacy = t.legacy;
   if (!legacy) return null;
   const tid = String(legacy.idStr || t.restId || "");
-  if (!tid) return null;
+  if (!tid || (requestedId !== undefined && tid !== requestedId)) return null;
+  const createdAt = toISO(typeof legacy.createdAt === "string" ? legacy.createdAt : undefined);
+  if (!createdAt) return null;
   const views = tweetObj?.views || t.views;
+  const retweetCount = metric(legacy.retweetCount);
+  const quoteCount = metric(legacy.quoteCount);
   return {
     id: tid,
     account_id: accountId,
     full_text: legacy.fullText || "",
-    created_at: toISO(legacy.createdAt),
-    favorite_count: legacy.favoriteCount || 0,
-    retweet_count: (legacy.retweetCount || 0) + (legacy.quoteCount || 0),
-    reply_count: legacy.replyCount || 0,
+    created_at: createdAt,
+    favorite_count: metric(legacy.favoriteCount),
+    retweet_count: retweetCount === null || quoteCount === null ? null : retweetCount + quoteCount,
+    reply_count: metric(legacy.replyCount),
     view_count: parseViews(views),
-    bookmark_count: legacy.bookmarkCount || 0,
+    bookmark_count: metric(legacy.bookmarkCount),
     is_quote: legacy.isQuoteStatus && !legacy.inReplyToStatusIdStr ? 1 : 0,
     is_reply: legacy.inReplyToStatusIdStr ? 1 : 0,
     is_retweet: (legacy.fullText || "").startsWith("RT @") ? 1 : 0,

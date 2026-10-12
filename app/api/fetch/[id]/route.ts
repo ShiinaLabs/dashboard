@@ -29,6 +29,7 @@ async function POST(req: Request, params: Record<string, string>) {
   if (result.status === "credential-error") {
     return json({ error: "Stored credential cannot be decrypted; update the credential first" }, { status: 409 });
   }
+  if (result.status === "busy") return json({ error: "A fetch is already running or the fetch capacity is full; try again shortly" }, { status: 409 });
   if (result.status === "not-found") return json({ error: "Account not found" }, { status: 404 });
   return json({ ok: true, message: `Fetch started for @${result.screenName}` });
 }

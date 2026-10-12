@@ -61,11 +61,11 @@ export interface Tweet {
   account_id: number;
   full_text: string;
   created_at: string;
-  favorite_count: number;
-  retweet_count: number;
-  reply_count: number;
-  view_count: number;
-  bookmark_count: number;
+  favorite_count: number | null;
+  retweet_count: number | null;
+  reply_count: number | null;
+  view_count: number | null;
+  bookmark_count: number | null;
   is_quote: number;
   is_reply: number;
   is_retweet: number;

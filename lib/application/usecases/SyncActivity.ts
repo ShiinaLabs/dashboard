@@ -2,6 +2,7 @@
 import type { RepoRepository, FetcherPort, Clock } from "../../domain/ports";
 import type { Account } from "../../domain/account";
 import { getLogger } from "../../logger";
+import type { CapabilityGap } from "../../fetch-health";
 
 interface GithubActivityClient {
   fetchUserStats(username: string, token?: string): Promise<Record<string, unknown>>;
@@ -29,7 +30,7 @@ export class SyncActivity {
     private releaseWrite?: ReleaseWrite,
   ) {}
 
-  async execute(account: Account): Promise<void> {
+  async execute(account: Account): Promise<CapabilityGap[]> {
     const events = await this.fetcher.fetchRepoMeta(account);
     const repos = events.map((e) => e.repo);
     // Update timely counters
@@ -47,7 +48,10 @@ export class SyncActivity {
     }
     getLogger().info("GitHub", "L1 @%s: upsert %d repos + %d snapshots", account.screenName, repos.length, snapshots.length);
 
-    await this.syncReleaseDownloads(account, repos);
+    const gaps: CapabilityGap[] = [];
+    if (await this.syncReleaseDownloads(account, repos)) {
+      gaps.push({ capability: "github.releases", message: "One or more release lists could not be refreshed" });
+    }
 
     // Pure new: also refresh followers and contributions (L1 timely) to keep pulse audience compatible
     try {
@@ -55,6 +59,11 @@ export class SyncActivity {
       if (client && account.platform === "github") {
         const token = (account as unknown as { authToken?: string }).authToken ?? undefined;
         const stats = await client.fetchUserStats(account.screenName, token);
+        for (const field of ["public_repos", "public_gists", "followers", "following"]) {
+          if (typeof stats[field] !== "number" || !Number.isFinite(stats[field] as number) || (stats[field] as number) < 0) {
+            throw new Error(`GitHub user stats omitted a valid ${field} value`);
+          }
+        }
         const { insertGithubStats } = await import("../../repositories/github");
         await insertGithubStats({
           account_id: account.id,
@@ -63,15 +72,24 @@ export class SyncActivity {
           followers: (stats["followers"] as number) ?? 0,
           following: (stats["following"] as number) ?? 0,
         });
+      }
+    } catch (error) {
+      gaps.push({ capability: "github.user_stats", message: error instanceof Error ? error.message : String(error) });
+    }
+
+    try {
+      const client = this.githubClient;
+      if (client && account.platform === "github") {
+        const token = (account as unknown as { authToken?: string }).authToken ?? undefined;
         const contribs = await client.fetchContributions(account.screenName, token);
         if (contribs.length > 0) {
           const { upsertGithubContributions } = await import("../../repositories/github");
-          for (const c of contribs) {
-            await upsertGithubContributions(account.id, [c]);
-          }
+          for (const c of contribs) await upsertGithubContributions(account.id, [c]);
         }
       }
-    } catch { /* stats is best-effort, repos already updated */ }
+    } catch (error) {
+      gaps.push({ capability: "github.contributions", message: error instanceof Error ? error.message : String(error) });
+    }
 
     // Issue/PR split — precisely separate open_issues vs open_pull_requests (needs PAT).
     try {
@@ -80,6 +98,9 @@ export class SyncActivity {
         const token = (account as unknown as { authToken?: string }).authToken ?? undefined;
         const splitInput = repos.filter(r => r.fullName).map(r => ({ id: r.repoId, full_name: r.fullName }));
         const splits = await client.fetchIssueSplits(splitInput, token);
+        if (splits.size < splitInput.length) {
+          gaps.push({ capability: "github.issue_pr_split", message: `${splitInput.length - splits.size} repositories did not return issue/PR counts` });
+        }
         if (splits.size > 0) {
           const { getDb } = await import("../../db/connection");
           const { github_repos } = await import("@/db/schema");
@@ -92,13 +113,16 @@ export class SyncActivity {
           getLogger().info("GitHub", "L1 @%s: issue/PR split updated for %d repos", account.screenName, splits.size);
         }
       }
-    } catch { /* issue split best-effort; requires PAT, non-fatal */ }
+    } catch (error) {
+      gaps.push({ capability: "github.issue_pr_split", message: error instanceof Error ? error.message : String(error) });
+    }
+    return gaps;
   }
 
-  private async syncReleaseDownloads(account: Account, repos: Array<{ fullName: string; repoId: number }>): Promise<void> {
+  private async syncReleaseDownloads(account: Account, repos: Array<{ fullName: string; repoId: number }>): Promise<boolean> {
     const client = this.githubClient;
     const write = this.releaseWrite;
-    if (!client || !write || account.platform !== "github") return;
+    if (!client || !write || account.platform !== "github") return false;
 
     const token = (account as unknown as { authToken?: string }).authToken ?? undefined;
     const snapshotDate = new Date().toISOString();
@@ -134,25 +158,31 @@ export class SyncActivity {
         continue;
       }
       for (const release of releases) {
-        const totalDownloads = ((release.assets as Array<Record<string, unknown>>) || []).reduce((s: number, a: Record<string, unknown>) => s + ((a.download_count as number) || 0), 0);
-        await write.upsertRelease({
+        try {
+          const totalDownloads = ((release.assets as Array<Record<string, unknown>>) || []).reduce((s: number, a: Record<string, unknown>) => s + ((a.download_count as number) || 0), 0);
+          await write.upsertRelease({
           account_id: account.id, repo_id: repo.repoId, release_id: release.id as number,
           tag_name: (release.tag_name as string) || null, name: (release.name as string) || null, body: (release.body as string) || null,
           prerelease: release.prerelease ? 1 : 0, published_at: (release.published_at as string) || null, html_url: (release.html_url as string) || null, total_downloads: totalDownloads,
-        });
-        const releaseDbId = await write.findReleaseDbId(account.id, repo.repoId, release.id as number);
-        if (releaseDbId) {
-          await write.replaceAssets(releaseDbId, (release.assets as Array<Record<string, unknown>>) || []);
-          for (const asset of (release.assets as Array<Record<string, unknown>>) || []) {
-            const downloadCount = (asset.download_count as number) || 0;
-            await write.insertAssetSnapshot({ account_id: account.id, repo_id: repo.repoId, release_id: releaseDbId, asset_name: asset.name as string, download_count: downloadCount, snapshot_date: snapshotDate });
+          });
+          const releaseDbId = await write.findReleaseDbId(account.id, repo.repoId, release.id as number);
+          if (releaseDbId) {
+            await write.replaceAssets(releaseDbId, (release.assets as Array<Record<string, unknown>>) || []);
+            for (const asset of (release.assets as Array<Record<string, unknown>>) || []) {
+              const downloadCount = (asset.download_count as number) || 0;
+              await write.insertAssetSnapshot({ account_id: account.id, repo_id: repo.repoId, release_id: releaseDbId, asset_name: asset.name as string, download_count: downloadCount, snapshot_date: snapshotDate });
+            }
           }
+          updatedReleases++;
+        } catch (error) {
+          failedRepos++;
+          getLogger().warn("GitHub", "L1 @%s: release write failed for %s (%s)", account.screenName, fullName, error instanceof Error ? error.message : String(error));
         }
-        updatedReleases++;
       }
     }
 
     if (failedRepos) getLogger().warn("GitHub", "L1 @%s: release sync partial (%d releases saved, %d repos failed)", account.screenName, updatedReleases, failedRepos);
     else getLogger().info("GitHub", "L1 @%s: release downloads refreshed (%d releases)", account.screenName, updatedReleases);
+    return failedRepos > 0;
   }
 }

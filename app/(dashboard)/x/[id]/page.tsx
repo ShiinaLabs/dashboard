@@ -61,10 +61,10 @@ function TweetListItem({ tweet, screenName }: { tweet: XDetailTweet; screenName:
         <ExternalLink size={12} className="shrink-0 mt-1 text-[var(--muted-foreground)] hover-reveal-icon" />
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[var(--muted-foreground)]">
-        <span className="flex items-center gap-1"><Heart size={12} /> {tweet.favorite_count}</span>
-        <span className="flex items-center gap-1"><Repeat2 size={12} /> {tweet.retweet_count}</span>
-        <span className="flex items-center gap-1"><MessageSquare size={12} /> {tweet.reply_count}</span>
-        {tweet.view_count > 0 && <span className="flex items-center gap-1"><Eye size={12} /> {tweet.view_count}</span>}
+        <span className="flex items-center gap-1"><Heart size={12} /> {tweet.favorite_count ?? "—"}</span>
+        <span className="flex items-center gap-1"><Repeat2 size={12} /> {tweet.retweet_count ?? "—"}</span>
+        <span className="flex items-center gap-1"><MessageSquare size={12} /> {tweet.reply_count ?? "—"}</span>
+        <span className="flex items-center gap-1"><Eye size={12} /> {tweet.view_count ?? "—"}</span>
         <span>{formatDate(tweet.created_at)}</span>
       </div>
     </a>

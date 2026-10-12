@@ -21,7 +21,7 @@ export const xTypeDefs = /* GraphQL */ `
   }
   type XDailyTweet { date: String!, tweets_count: Int!, total_likes: Int!, total_retweets: Int!, total_replies: Int!, total_views: Int! }
   type XFollowerGrowth { date: String!, followers_count: Int!, following_count: Int!, tweet_count: Int! }
-  type XTweet { id: String!, account_id: Int!, full_text: String!, created_at: String!, favorite_count: Int!, retweet_count: Int!, reply_count: Int!, view_count: Int!, bookmark_count: Int!, is_quote: Int!, is_reply: Int!, is_retweet: Int!, media_urls: String!, urls: String!, hashtags: String!, mentions: String!, lang: String! }
+  type XTweet { id: String!, account_id: Int!, full_text: String!, created_at: String!, favorite_count: Int, retweet_count: Int, reply_count: Int, view_count: Int, bookmark_count: Int, is_quote: Int!, is_reply: Int!, is_retweet: Int!, media_urls: String!, urls: String!, hashtags: String!, mentions: String!, lang: String! }
   type XPaginatedTweets { data: [XTweet!]!, total: Int!, page: Int!, limit: Int!, totalPages: Int! }
 `;
 

@@ -175,10 +175,18 @@ export class GithubClient {
       "User-Agent": "dashboard",
     };
     if (token) headers.Authorization = `Bearer ${token}`;
-    const res = await this.fetchFn(
-      `https://api.github.com/repositories/${encodeURIComponent(String(githubId))}`,
-      { headers } as unknown as RequestInit,
-    );
+    const res = await withNetworkRetry(async () => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 30_000);
+      try {
+        return await this.fetchFn(
+          `https://api.github.com/repositories/${encodeURIComponent(String(githubId))}`,
+          { headers, signal: controller.signal } as unknown as RequestInit,
+        );
+      } finally {
+        clearTimeout(timer);
+      }
+    }, { label: "GitHub", attempts: 3 });
     if (!res.ok) {
       const body = await res.text?.().catch(() => "") ?? "";
       throw new Error(`GitHub repository ${res.status}: ${body.slice(0, 200)}`);
