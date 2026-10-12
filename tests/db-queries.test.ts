@@ -1929,7 +1929,7 @@ describe("independent App Store Connect foundation", () => {
       const app = (await appStoreRepo.getApps(connection.id))[0];
       await appStoreService.setAppEnabled(connection.id, app.id, viewer, { isEnabled: true });
       const request = await appStoreAnalyticsRepo.adoptRequest(app.id, { id: "typed-partition-request", type: "analyticsReportRequests", attributes: { accessType: "ONGOING", stoppedDueToInactivity: false } }, connection.updated_at);
-      const context = { appId: app.id, connectionId: connection.id, version: connection.updated_at, requestId: request.id, reportId: "report", reportName: "App Downloads Standard", reportCategory: "COMMERCE" };
+      const context = { appId: app.id, connectionId: connection.id, version: connection.updated_at, requestId: request.id, reportId: "report", reportName: "App Downloads Standard", reportCategory: "COMMERCE", accessType: request.access_type };
       const prepared = (instanceId: string, processingDate: string, counts: string, checksum: string) => ({ instanceId, processingDate, granularity: "DAILY" as const, segments: [{ id: "segment-1", checksum }, { id: "segment-2", checksum }], table: parseAnalyticsTsv(`Date\tApp Apple Identifier\tDownload Type\tSource Type\tTerritory\tCounts\n2026-09-29\t123\tFirst-time Download\tApp Store search\tUSA\t${counts}\n2026-09-29\t123\tRedownload\tApp Store search\tUSA\t2`) });
       const commit = async (p: ReturnType<typeof prepared>) => ascFacts.commitAnalyticsInstance(context, p, mapAnalyticsReport("downloads", p.table, { appId: app.id, appleId: "123", instanceId: p.instanceId, processingDate: p.processingDate }));
       const first = prepared("first", "2026-10-01", "10", "a".repeat(32));
@@ -1954,6 +1954,44 @@ describe("independent App Store Connect foundation", () => {
       expect(dashboard).toMatchObject({ updatedAt: "2026-09-29", completeThrough: null, overview: { firstTimeDownloads: 21, downloads: 23, impressions: null, conversion: null } });
       await appStoreService.setAppEnabled(connection.id, app.id, viewer, { isEnabled: false });
       await expect(commit(prepared("disabled", "2026-10-04", "1", "0".repeat(32)))).rejects.toBeInstanceOf(appStoreRepo.AppStoreConflictError);
+    } finally { discovery.mockRestore(); }
+  });
+
+  it("writes zero-activity coverage only for a complete ongoing daily instance and repairs history idempotently", async () => {
+    const discovery = vi.spyOn(AppStoreConnectClient.prototype, "listApps").mockResolvedValue(apps);
+    try {
+      const connection = await appStoreService.createConnection(viewer, input());
+      const app = (await appStoreRepo.getApps(connection.id))[0];
+      await appStoreService.setAppEnabled(connection.id, app.id, viewer, { isEnabled: true });
+      const ongoing = await appStoreAnalyticsRepo.adoptRequest(app.id, { id: "coverage-ongoing", type: "analyticsReportRequests", attributes: { accessType: "ONGOING", stoppedDueToInactivity: false } }, connection.updated_at);
+      const snapshot = await appStoreAnalyticsRepo.adoptRequest(app.id, { id: "coverage-snapshot", type: "analyticsReportRequests", attributes: { accessType: "ONE_TIME_SNAPSHOT", stoppedDueToInactivity: false } }, connection.updated_at);
+      const context = { appId: app.id, connectionId: connection.id, version: connection.updated_at, requestId: ongoing.id, reportId: "zero-downloads", reportName: "App Downloads Standard", reportCategory: "COMMERCE", accessType: ongoing.access_type };
+      const prepared = { instanceId: "ongoing-zero-instance", processingDate: "2026-10-13", granularity: "DAILY" as const, segments: [{ id: "zero-segment", checksum: "a".repeat(32) }], table: parseAnalyticsTsv("Date\tApp Apple Identifier\tDownload Type\tSource Type\tTerritory\tCounts\n") };
+      const mapped = mapAnalyticsReport("downloads", prepared.table, { appId: app.id, appleId: "123", instanceId: prepared.instanceId, processingDate: prepared.processingDate });
+      expect(mapped.rows).toEqual([]);
+      expect(await ascFacts.commitAnalyticsInstance(context, prepared, mapped)).toBe("imported");
+      expect((await ascFacts.readAnalyticsFacts([app.id])).partitions).toEqual(expect.arrayContaining([expect.objectContaining({ report_kind: "downloads", date: "2026-10-11", coverage_source: "daily_complete" })]));
+      expect((await ascFacts.readAnalyticsFacts([app.id])).downloads).toEqual([]);
+
+      const noSegments = { ...prepared, instanceId: "pending-zero-instance", segments: [] };
+      const pendingContext = { ...context, requestId: ongoing.id };
+      expect(await ascFacts.commitAnalyticsInstance(pendingContext, noSegments, mapped)).toBe("skipped");
+      const snapshotPrepared = { ...prepared, instanceId: "snapshot-zero-instance" };
+      const snapshotMapped = mapAnalyticsReport("downloads", snapshotPrepared.table, { appId: app.id, appleId: "123", instanceId: snapshotPrepared.instanceId, processingDate: snapshotPrepared.processingDate });
+      expect(await ascFacts.commitAnalyticsInstance({ ...context, requestId: snapshot.id, accessType: snapshot.access_type }, snapshotPrepared, snapshotMapped)).toBe("imported");
+      expect((await ascFacts.readAnalyticsFacts([app.id])).partitions.filter((row) => row.source_instance_id === snapshotPrepared.instanceId)).toEqual([]);
+
+      const insertImport = async (requestId: number, instanceId: string, processingDate: string) => getTestPool().query(
+        "INSERT INTO app_store_report_imports (app_id, analytics_request_id, report_name, report_category, apple_report_id, apple_instance_id, apple_segment_id, granularity, processing_date, checksum, status, imported_at) VALUES ($1, $2, 'App Store Purchases Standard', 'COMMERCE', 'purchase-report', $3, $4, 'DAILY', $5, $6, 'imported', $7)",
+        [app.id, requestId, instanceId, `${instanceId}-segment`, processingDate, "b".repeat(32), new Date().toISOString()],
+      );
+      await insertImport(ongoing.id, "history-ongoing", "2026-10-13");
+      await insertImport(snapshot.id, "history-snapshot", "2026-10-13");
+      const dryRun = await ascFacts.repairHistoricalOngoingDailyCoverage({ dryRun: true });
+      expect(dryRun).toMatchObject({ inserted: 0, candidates: 1, applications: [app.id], from: "2026-10-11", to: "2026-10-11" });
+      const applied = await ascFacts.repairHistoricalOngoingDailyCoverage({ dryRun: false });
+      expect(applied).toMatchObject({ inserted: 1, candidates: 1, applications: [app.id], from: "2026-10-11", to: "2026-10-11" });
+      expect(await ascFacts.repairHistoricalOngoingDailyCoverage({ dryRun: false })).toMatchObject({ inserted: 0, candidates: 0 });
     } finally { discovery.mockRestore(); }
   });
 
@@ -2050,7 +2088,7 @@ describe("independent App Store Connect foundation", () => {
       const commit = async (kind: AnalyticsReportKind, row: Record<string, string>, instanceId = kind, processingDate = "2026-10-02") => {
         const prepared = { instanceId, processingDate, granularity: "DAILY" as const, segments: [{ id: kind, checksum: "a".repeat(32) }], table: parseAnalyticsTsv(Object.keys(row).join("\t") + "\n" + Object.values(row).join("\t")) };
         const mapped = mapAnalyticsReport(kind, prepared.table, { appId: app.id, appleId: "123", instanceId, processingDate });
-        return ascFacts.commitAnalyticsInstance({ appId: app.id, connectionId: connection.id, version: connection.updated_at, requestId: request.id, reportId: kind, reportName: analyticsReportDefinitions[kind].standardName, reportCategory: "COMMERCE" }, prepared, mapped);
+        return ascFacts.commitAnalyticsInstance({ appId: app.id, connectionId: connection.id, version: connection.updated_at, requestId: request.id, reportId: kind, reportName: analyticsReportDefinitions[kind].standardName, reportCategory: "COMMERCE", accessType: request.access_type }, prepared, mapped);
       };
       for (const kind of Object.keys(rows) as AnalyticsReportKind[]) expect(await commit(kind, rows[kind])).toBe("imported");
       const analytics = await getAppStoreAnalyticsDashboard(viewer, { appId: app.id, from: common.Date, to: common.Date });

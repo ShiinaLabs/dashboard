@@ -5,6 +5,7 @@ import { isMockMode } from "../config";
 import { AppStoreConflictError } from "./app-store";
 import type { PreparedAnalyticsInstance } from "../infra/app-store/analytics-instance";
 import type { MappedAnalytics } from "../infra/app-store/report-mapping";
+import { finalizedDailyDate, historicalDailyCoverageCandidates } from "../infra/app-store/report-mapping";
 
 type Tx = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
 export const factTables = { discovery: s.app_store_discovery_daily, downloads: s.app_store_downloads_daily, purchases: s.app_store_purchases_daily, subscriptionState: s.app_store_subscription_state_daily, subscriptionEvent: s.app_store_subscription_event_daily };
@@ -24,16 +25,20 @@ async function insertFacts(tx: Tx, mapped: MappedAnalytics, date: string) {
     }
   }
 }
-export async function commitAnalyticsInstance(context: { appId: number; connectionId: number; version: string; requestId: number; reportId: string; reportName: string; reportCategory: string }, prepared: PreparedAnalyticsInstance, mapped: MappedAnalytics): Promise<"imported" | "skipped"> {
+export async function commitAnalyticsInstance(context: { appId: number; connectionId: number; version: string; requestId: number; reportId: string; reportName: string; reportCategory: string; accessType: "ONGOING" | "ONE_TIME_SNAPSHOT" }, prepared: PreparedAnalyticsInstance, mapped: MappedAnalytics): Promise<"imported" | "skipped"> {
   return getDb().transaction(async (tx) => {
     await lockConnection(tx, context.connectionId, context.version);
     const [app] = await tx.select().from(s.app_store_apps).where(eq(s.app_store_apps.id, context.appId)).for("update");
     const [request] = await tx.select().from(s.app_store_analytics_requests).where(eq(s.app_store_analytics_requests.id, context.requestId));
-    if (!app?.is_enabled || app.connection_id !== context.connectionId || request?.app_id !== app.id) throw new AppStoreConflictError();
+    if (!app?.is_enabled || app.connection_id !== context.connectionId || request?.app_id !== app.id || request.access_type !== context.accessType) throw new AppStoreConflictError();
     const imports = await tx.select().from(s.app_store_report_imports).where(and(eq(s.app_store_report_imports.app_id, app.id), eq(s.app_store_report_imports.apple_instance_id, prepared.instanceId)));
     if (imports.length === prepared.segments.length && prepared.segments.every((segment) => imports.some((r) => r.apple_segment_id === segment.id && r.checksum.toLowerCase() === segment.checksum.toLowerCase() && r.status === "imported"))) return "skipped";
     const partitions = await tx.select().from(s.app_store_report_partitions).where(and(eq(s.app_store_report_partitions.app_id, app.id), eq(s.app_store_report_partitions.report_kind, mapped.kind)));
     const dates = new Set([...mapped.rows.map((r) => r.date), ...partitions.filter((p) => p.source_instance_id === prepared.instanceId).map((p) => p.date)]);
+    const finalizedDate = context.accessType === "ONGOING" && prepared.granularity === "DAILY" && prepared.segments.length > 0
+      ? finalizedDailyDate(prepared.processingDate, mapped.kind)
+      : null;
+    if (finalizedDate) dates.add(finalizedDate);
     let replaced = false;
     for (const date of dates) {
       const old = partitions.find((p) => p.date === date);
@@ -43,7 +48,15 @@ export async function commitAnalyticsInstance(context: { appId: number; connecti
       const table = factTables[mapped.kind];
       await tx.delete(table).where(and(eq(table.app_id, app.id), eq(table.date, date)));
       await insertFacts(tx, mapped, date);
-      const partition = { app_id: app.id, report_kind: mapped.kind, date, granularity: "DAILY", source_instance_id: prepared.instanceId, processing_date: prepared.processingDate, updated_at: new Date().toISOString() };
+      const hasFacts = mapped.rows.some((row) => row.date === date);
+      const isFinalized = finalizedDate !== null && date <= finalizedDate;
+      if (!hasFacts && !isFinalized) {
+        if (old?.source_instance_id === prepared.instanceId) {
+          await tx.delete(s.app_store_report_partitions).where(and(eq(s.app_store_report_partitions.app_id, app.id), eq(s.app_store_report_partitions.report_kind, mapped.kind), eq(s.app_store_report_partitions.date, date), eq(s.app_store_report_partitions.granularity, "DAILY")));
+        }
+        continue;
+      }
+      const partition = { app_id: app.id, report_kind: mapped.kind, date, granularity: "DAILY", source_instance_id: prepared.instanceId, processing_date: prepared.processingDate, coverage_source: isFinalized ? "daily_complete" as const : "facts" as const, updated_at: new Date().toISOString() };
       await tx.insert(s.app_store_report_partitions).values(partition).onConflictDoUpdate({ target: [s.app_store_report_partitions.app_id, s.app_store_report_partitions.report_kind, s.app_store_report_partitions.date, s.app_store_report_partitions.granularity], set: partition });
     }
     await tx.delete(s.app_store_report_imports).where(and(eq(s.app_store_report_imports.app_id, app.id), eq(s.app_store_report_imports.apple_instance_id, prepared.instanceId)));
@@ -68,6 +81,59 @@ export async function readAnalyticsFacts(appIds: number[], range?: { from: strin
     db.select().from(s.app_store_report_partitions).where(filter(s.app_store_report_partitions)),
   ]);
   return { discovery, downloads, purchases, subscriptionState, subscriptionEvent, partitions };
+}
+
+export async function repairHistoricalOngoingDailyCoverage(options: { dryRun: boolean }) {
+  return getDb().transaction(async (tx) => {
+    const imports = await tx.select({
+      appId: s.app_store_report_imports.app_id,
+      requestId: s.app_store_report_imports.analytics_request_id,
+      reportName: s.app_store_report_imports.report_name,
+      reportId: s.app_store_report_imports.apple_report_id,
+      instanceId: s.app_store_report_imports.apple_instance_id,
+      granularity: s.app_store_report_imports.granularity,
+      processingDate: s.app_store_report_imports.processing_date,
+      status: s.app_store_report_imports.status,
+      importedAt: s.app_store_report_imports.imported_at,
+      accessType: s.app_store_analytics_requests.access_type,
+    }).from(s.app_store_report_imports).innerJoin(s.app_store_analytics_requests, eq(s.app_store_analytics_requests.id, s.app_store_report_imports.analytics_request_id))
+      .where(and(eq(s.app_store_report_imports.status, "imported"), eq(s.app_store_report_imports.granularity, "DAILY"), eq(s.app_store_analytics_requests.access_type, "ONGOING")));
+
+    const candidates = historicalDailyCoverageCandidates(imports);
+    if (!candidates.length) return { inserted: 0, candidates: 0, applications: [] as number[], from: null, to: null };
+
+    const appIds = [...new Set(candidates.map((candidate) => candidate.appId))];
+    const existing = await tx.select().from(s.app_store_report_partitions).where(inArray(s.app_store_report_partitions.app_id, appIds));
+    const rows = candidates.filter((candidate) => !existing.some((partition) => partition.app_id === candidate.appId && partition.report_kind === candidate.kind && partition.date === candidate.date));
+    const dateRange = rows.map((candidate) => candidate.date).sort();
+    if (options.dryRun) return { inserted: 0, candidates: rows.length, applications: [...new Set(rows.map((candidate) => candidate.appId))].sort((a, b) => a - b), from: dateRange[0] ?? null, to: dateRange.at(-1) ?? null };
+    let insertedCount = 0;
+    const affectedApps = new Set<number>();
+    const affectedDates: string[] = [];
+    for (const candidate of rows) {
+      const [inserted] = await tx.insert(s.app_store_report_partitions).values({
+        app_id: candidate.appId,
+        report_kind: candidate.kind,
+        date: candidate.date,
+        granularity: "DAILY",
+        source_instance_id: candidate.instanceId,
+        processing_date: candidate.processingDate,
+        coverage_source: "daily_complete",
+        updated_at: new Date().toISOString(),
+      }).onConflictDoNothing().returning({ id: s.app_store_report_partitions.id });
+      if (!inserted) continue;
+      insertedCount++;
+      affectedApps.add(candidate.appId);
+      affectedDates.push(candidate.date);
+    }
+    return {
+      inserted: insertedCount,
+      candidates: rows.length,
+      applications: [...affectedApps].sort((a, b) => a - b),
+      from: affectedDates.sort()[0] ?? null,
+      to: affectedDates.sort().at(-1) ?? null,
+    };
+  });
 }
 export async function commitSalesReport(connectionId: number, version: string, date: string, checksum: string, rows: (typeof s.app_store_sales_daily.$inferInsert)[]) {
   return getDb().transaction(async (tx) => {

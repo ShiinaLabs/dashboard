@@ -360,7 +360,7 @@ describe("production Analytics sync selection", () => {
   });
 
   it("skips unchanged instances after the single segment listing without downloading or parsing", async () => {
-    const { client, segment } = clientWithCatalog([analyticsReportDefinitions.downloads.standardName]);
+    const { client, segment } = clientWithCatalog([analyticsReportDefinitions.downloads.standardName], new Date().toISOString().slice(0, 10));
     mocks.imports.mockResolvedValue([{ apple_instance_id: "instance", apple_report_id: "report-0", apple_segment_id: "segment", checksum: segment.attributes.checksum, status: "imported" }]);
     const listSegments = vi.spyOn(client, "listAnalyticsReportSegments");
     const download = vi.spyOn(client, "downloadAnalyticsSegment");
@@ -463,7 +463,7 @@ describe("production Analytics sync selection", () => {
 
 describe("Analytics status uses internal partitions", () => {
   it("reports active and freshness from discovery/downloads without reading raw-name manifests", async () => {
-    mocks.partitions.mockResolvedValue(["discovery", "downloads"].map((report_kind) => ({ app_id: 2, report_kind, date: "2026-09-29", processing_date: "2026-10-02" })));
+    mocks.partitions.mockResolvedValue(["discovery", "downloads"].map((report_kind) => ({ app_id: 2, report_kind, date: "2026-09-29", processing_date: "2026-10-02", coverage_source: "daily_complete" })));
     expect(await getAppStoreAnalyticsStatus(1, viewer)).toMatchObject({ state: "active", latestData: "2026-09-29", completeThrough: "2026-09-29" });
     expect(mocks.imports).not.toHaveBeenCalled();
   });

@@ -97,6 +97,7 @@ export const app_store_report_partitions = pgTable("app_store_report_partitions"
   granularity: text("granularity").notNull(),
   source_instance_id: text("source_instance_id").notNull(),
   processing_date: text("processing_date").notNull(),
+  coverage_source: text("coverage_source").$type<"facts" | "daily_complete">().notNull().default("facts"),
   updated_at: text("updated_at").notNull().default(sql`NOW()`),
 }, (t) => [uniqueIndex("idx_app_store_report_partitions_partition").on(t.app_id, t.report_kind, t.date, t.granularity)]);
 

@@ -18,6 +18,7 @@
     "build:client": "RR_SKIP_SSR=1 NODE_OPTIONS=\"--max-old-space-size=512 --max-semi-space-size=8\" react-router build",
     "build:server": "RR_SKIP_CLIENT=1 NODE_OPTIONS=\"--max-old-space-size=192 --max-semi-space-size=8\" react-router build",
     "test:e2e": "playwright test",
+    "app-store:repair-coverage": "tsx scripts/repair-app-store-coverage.ts",
     "perf:query-plane": "node scripts/query-plane-perf.mjs",
     "perf:compression": "node scripts/check-compression.mjs",
     "perf:bundle": "node scripts/bundle-budget.mjs",

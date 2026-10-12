@@ -4,7 +4,7 @@ import { AppStoreError } from "./app-store";
 import { filterSchema, listEnabledAnalyticsApps, analyticsCompleteThrough } from "./app-store-analytics-reporting";
 import { listConnections, getApps } from "../repositories/app-store";
 import { readAnalyticsFacts, readCommerceFacts, readCommerceImportDates, readFinanceAppMappings } from "../repositories/app-store-facts";
-import { sumDecimals, salesAmount } from "../infra/app-store/report-mapping";
+import { sumDecimals, salesAmount, isFinalizedDailyPartition } from "../infra/app-store/report-mapping";
 import type { RevenueAmounts, RevenueDashboard } from "@/shared/app-store-revenue";
 
 type AmountRow = { currency: string | null; proceeds?: string | null; sales?: string | null };
@@ -41,8 +41,79 @@ function completeThroughFromDates(datesByConnection: Map<number, Set<string>>, c
   }
   return completeThrough;
 }
+
+function dateRange(from: string, to: string): string[] {
+  const dates: string[] = [];
+  for (let time = Date.parse(`${from}T00:00:00Z`); time <= Date.parse(`${to}T00:00:00Z`); time += 86_400_000) dates.push(new Date(time).toISOString().slice(0, 10));
+  return dates;
+}
+
+function appCoverage(partitions: { app_id: number; report_kind: string; date: string; processing_date: string; coverage_source?: string | null }[], appIds: number[], kind: "purchases" | "subscriptionEvent", date: string) {
+  const hasPartition = (appId: number) => partitions.some((partition) => partition.app_id === appId && partition.report_kind === kind && partition.date === date);
+  const hasFinalizedPartition = (appId: number) => partitions.some((partition) => partition.app_id === appId && partition.report_kind === kind && partition.date === date && isFinalizedDailyPartition(partition, kind));
+  return {
+    allReported: appIds.length > 0 && appIds.every(hasPartition),
+    allFinalized: appIds.length > 0 && appIds.every(hasFinalizedPartition),
+  };
+}
+
+export function purchaseDailyTrend(
+  rows: { app_id: number; date: string; currency: string; proceeds: string | null; sales: string | null }[],
+  partitions: { app_id: number; report_kind: string; date: string; processing_date: string; coverage_source?: string | null }[],
+  appIds: number[], from: string, to: string,
+): RevenueDashboard["trend"] {
+  const currencies = new Set(rows.flatMap((row) => row.currency ? [row.currency] : []));
+  if (partitions.some((partition) => partition.report_kind === "purchases" && appIds.includes(partition.app_id) && partition.date >= from && partition.date <= to)) currencies.add("USD");
+  return dateRange(from, to).flatMap((date) => [...currencies].sort().map((currency) => {
+    const coverage = appCoverage(partitions, appIds, "purchases", date);
+    if (!coverage.allReported) return { date, currency, proceeds: null, sales: null };
+    const daily = rows.filter((row) => row.date === date && row.currency === currency);
+    return daily.length
+      ? { date, currency, proceeds: sumDecimals(daily.map((row) => row.proceeds)), sales: sumDecimals(daily.map((row) => row.sales)) }
+      : coverage.allFinalized ? { date, currency, proceeds: "0", sales: "0" } : { date, currency, proceeds: null, sales: null };
+  }));
+}
+
+export function salesDailyTrend(
+  rows: { date: string; currency: string | null; proceeds?: string | null; sales?: string | null }[],
+  datesByConnection: Map<number, Set<string>>, connectionIds: number[], from: string, to: string,
+): RevenueDashboard["sales"]["trend"] {
+  const currencies = new Set(rows.flatMap((row) => row.currency ? [row.currency] : []));
+  return dateRange(from, to).flatMap((date) => [...currencies].sort().map((currency) => {
+    const covered = connectionIds.length > 0 && connectionIds.every((id) => datesByConnection.get(id)?.has(date));
+    if (!covered) return { date, currency, proceeds: null, sales: null };
+    const daily = rows.filter((row) => row.date === date && row.currency === currency);
+    return daily.length
+      ? { date, currency, proceeds: sumDecimals(daily.filter((row) => row.proceeds !== undefined).map((row) => row.proceeds ?? null)), sales: sumDecimals(daily.filter((row) => row.sales !== undefined).map((row) => row.sales ?? null)) }
+      : { date, currency, proceeds: "0", sales: "0" };
+  }));
+}
+
+export function subscriptionDailyTrend(
+  events: { app_id: number; date: string; event_grouping: string | null; counts: string | null }[],
+  partitions: { app_id: number; report_kind: string; date: string; processing_date: string; coverage_source?: string | null }[], appIds: number[], from: string, to: string,
+): RevenueDashboard["subscriptions"]["trend"] {
+  if (!events.some((row) => row.date >= from && row.date <= to) && !partitions.some((partition) => partition.report_kind === "subscriptionEvent" && appIds.includes(partition.app_id) && partition.date >= from && partition.date <= to)) return [];
+  const total = (rows: typeof events, groupings: string[], finalized: boolean) => {
+    const matching = rows.filter((row) => groupings.includes(row.event_grouping ?? ""));
+    return matching.length ? sumDecimals(matching.map((row) => row.counts)) : finalized ? "0" : null;
+  };
+  return dateRange(from, to).map((date) => {
+    const coverage = appCoverage(partitions, appIds, "subscriptionEvent", date);
+    if (!coverage.allReported) return { date, starts: null, renewals: null, churn: null };
+    const daily = events.filter((row) => row.date === date);
+    return {
+      date,
+      starts: total(daily, ["Offer Starts", "Paid Subscription Starts"], coverage.allFinalized),
+      renewals: total(daily, ["Renewals", "Offer Renewals"], coverage.allFinalized),
+      churn: total(daily, ["Voluntary Churn", "Involuntary Churn"], coverage.allFinalized),
+    };
+  });
+}
+
 function mockRevenueDashboard(f: z.infer<typeof filterSchema> & { fiscalMonth?: string }): RevenueDashboard {
   const app = "Demo App";
+  const mockAppIds = [101, 102];
   const dateAt = (daysAgo: number) => new Date(Date.parse(`${f.to}T00:00:00Z`) - daysAgo * 86400000).toISOString().slice(0, 10);
   const sampleDays = [
     { date: dateAt(6), units: "2", proceeds: "6.98", sales: "9.98", unitProceeds: "3.49", unitPrice: "4.99", payingUsers: "2" },
@@ -60,6 +131,32 @@ function mockRevenueDashboard(f: z.infer<typeof filterSchema> & { fiscalMonth?: 
     { date: dateAt(3), starts: "0", renewals: "3", churn: "0" },
     { date: dateAt(1), starts: "1", renewals: "0", churn: "1" },
   ].filter((row) => row.date >= f.from && row.date <= f.to);
+  const partitions: { app_id: number; report_kind: string; date: string; processing_date: string; source_instance_id: string; granularity: "DAILY"; coverage_source: "daily_complete"; updated_at: string }[] = [];
+  const salesDates = new Map([[1, new Set<string>()], [2, new Set<string>()]]);
+  for (const date of dateRange(f.from, f.to)) {
+    const published = date < f.to;
+    if (!published) continue;
+    for (const appId of mockAppIds) {
+      if (!(appId === 102 && date.endsWith("04"))) {
+        for (const report_kind of ["purchases", "subscriptionEvent"]) partitions.push({ app_id: appId, report_kind, date, processing_date: f.to, source_instance_id: `mock-${appId}-${report_kind}-${date}`, granularity: "DAILY", coverage_source: "daily_complete", updated_at: date });
+      }
+    }
+    salesDates.get(1)?.add(date);
+    if (!date.endsWith("05")) salesDates.get(2)?.add(date);
+  }
+  const purchaseRows = sampleDays.map((row) => ({ app_id: 101, date: row.date, currency: "USD", proceeds: row.proceeds, sales: row.sales }));
+  const purchaseTrend = purchaseDailyTrend(purchaseRows, partitions, mockAppIds, f.from, f.to);
+  const saleTrendRows = sampleDays.flatMap((row) => [
+    { date: row.date, currency: "USD", proceeds: salesAmount(row.units, row.unitProceeds) },
+    { date: row.date, currency: "USD", sales: salesAmount(row.units, row.unitPrice, true) },
+  ]);
+  const salesTrend = salesDailyTrend(saleTrendRows, salesDates, [1, 2], f.from, f.to);
+  const subscriptionEvents = eventTrend.flatMap((row) => [
+    ...(row.starts !== "0" ? [{ app_id: 101, date: row.date, event_grouping: "Paid Subscription Starts", counts: row.starts }] : []),
+    ...(row.renewals !== "0" ? [{ app_id: 101, date: row.date, event_grouping: "Renewals", counts: row.renewals }] : []),
+    ...(row.churn !== "0" ? [{ app_id: 101, date: row.date, event_grouping: "Voluntary Churn", counts: row.churn }] : []),
+  ]);
+  const subscriptionsTrend = subscriptionDailyTrend(subscriptionEvents, partitions, mockAppIds, f.from, f.to);
   const settlementMonth = f.fiscalMonth ?? (() => {
     const previousMonth = new Date(Date.parse(`${f.to}T00:00:00Z`));
     previousMonth.setUTCDate(1);
@@ -72,20 +169,20 @@ function mockRevenueDashboard(f: z.infer<typeof filterSchema> & { fiscalMonth?: 
   const sold = currencyAmounts(sampleDays.flatMap(saleAmounts));
   return {
     updatedAt: sampleDays.at(-1)?.date ?? null,
-    completeThrough: f.to,
+    completeThrough: analyticsCompleteThrough(partitions, mockAppIds, ["purchases"], f.from, f.to),
     overview: { amounts: purchased, units: sumDecimals(sampleDays.map((row) => row.units)), payingUsers: sumDecimals(sampleDays.map((row) => row.payingUsers)) },
-    trend: groups(sampleDays, (row) => row.date, "date", purchaseAmounts),
+    trend: purchaseTrend,
     byApp: sampleDays.length ? groups(sampleDays, () => app, "app", purchaseAmounts) : [],
     byTerritory: sampleDays.length ? groups(sampleDays, () => "US", "territory", purchaseAmounts) : [],
     sales: {
-      completeThrough: f.to,
+      completeThrough: completeThroughFromDates(salesDates, [1, 2], f.from, f.to),
       rows: sampleDays.map((row) => ({ date: row.date, app, item: "1234567890", sku: "demo-app", productType: "Auto-Renewable Subscription", units: row.units, unitProceeds: row.unitProceeds, unitPrice: row.unitPrice, proceeds: salesAmount(row.units, row.unitProceeds), proceedsCurrency: "USD", sales: salesAmount(row.units, row.unitPrice, true), salesCurrency: "USD", territory: "US" })),
-      amounts: sold, units: sumDecimals(sampleDays.map((row) => row.units)), trend: groups(sampleDays, (row) => row.date, "date", saleAmounts),
+      amounts: sold, units: sumDecimals(sampleDays.map((row) => row.units)), trend: salesTrend,
       byApp: sampleDays.length ? groups(sampleDays, () => app, "app", saleAmounts) : [], byTerritory: sampleDays.length ? groups(sampleDays, () => "US", "territory", saleAmounts) : [],
     },
     subscriptions: {
-      completeThrough: f.to, active: "24", starts: "3", conversions: "1", renewals: "3", voluntaryChurn: "1", involuntaryChurn: "0",
-      trend: eventTrend, bySubscription: [{ subscription: "Demo Plus Monthly", starts: "3", renewals: "3", churn: "1" }],
+      completeThrough: analyticsCompleteThrough(partitions, mockAppIds, ["subscriptionEvent"], f.from, f.to), active: "24", starts: "3", conversions: "1", renewals: "3", voluntaryChurn: "1", involuntaryChurn: "0",
+      trend: subscriptionsTrend, bySubscription: [{ subscription: "Demo Plus Monthly", starts: "3", renewals: "3", churn: "1" }],
     },
     settlements: f.territory && f.territory !== "US" ? [] : [{ fiscalMonth: settlementMonth, region: "US", currency: "USD", startDate: `${settlementMonth}-01`, endDate: monthEnd, earned: "38.42", units: "8" }],
     territories: ["US"],
@@ -148,15 +245,22 @@ export async function getAppStoreRevenueDashboard(viewer: { id: number; role: st
   const partitions = data.partitions.filter((p) => p.report_kind === "purchases");
   const subscriptionPartitions = data.partitions.filter((p) => p.report_kind === "subscriptionEvent");
   const dates = partitions.filter((p) => p.date >= f.from && p.date <= f.to).map((p) => p.date).sort();
+  const purchaseTrend = purchaseDailyTrend(purchases, data.partitions, selected.map((a) => a.id), f.from, f.to);
+  const salesTrendRows = sales.flatMap((row) => [
+    { date: row.report_date, currency: row.proceeds_currency, proceeds: salesAmount(row.units, row.developer_proceeds) },
+    { date: row.report_date, currency: row.customer_currency, sales: salesAmount(row.units, row.customer_price, true) },
+  ]);
+  const salesTrend = salesDailyTrend(salesTrendRows, new Map(salesImportDates.map(([connectionId, dates]) => [connectionId, new Set(dates)])), selectedConnectionIds, f.from, f.to);
+  const subscriptionsTrend = subscriptionDailyTrend(events, data.partitions, selected.map((a) => a.id), f.from, f.to);
   return {
     updatedAt: dates.at(-1) ?? null,
     completeThrough: analyticsCompleteThrough(partitions, selected.map((a) => a.id), ["purchases"], f.from, f.to),
     overview: { amounts: currencyAmounts(purchases.flatMap(purchaseAmounts)), units: sumDecimals(sales.map((r) => r.units)), payingUsers: reliablePayingUsers(purchases) },
-    trend: groups(purchases, (r) => r.date, "date", purchaseAmounts),
+    trend: purchaseTrend,
     byApp: groups(purchases, (r) => String(r.app_id), "app", purchaseAmounts).map((r) => ({ ...r, app: appName(Number(r.app)) })),
     byTerritory: groups(purchases, (r) => r.territory ?? "Unknown", "territory", purchaseAmounts),
-    sales: { completeThrough: salesCompleteThrough, rows: sales.map((r) => ({ date: r.report_date, app: appName(r.app_id), item: r.apple_identifier, sku: r.sku, productType: r.product_type, units: r.units, unitProceeds: r.developer_proceeds, unitPrice: r.customer_price, proceeds: salesAmount(r.units, r.developer_proceeds), proceedsCurrency: r.proceeds_currency, sales: salesAmount(r.units, r.customer_price, true), salesCurrency: r.customer_currency, territory: r.territory })), amounts: currencyAmounts(sales.flatMap(saleAmounts)), units: sumDecimals(sales.map((r) => r.units)), trend: groups(sales, (r) => r.report_date, "date", saleAmounts), byApp: groups(sales, (r) => String(r.app_id), "app", saleAmounts).map((r) => ({ ...r, app: appName(Number(r.app)) })), byTerritory: groups(sales, (r) => r.territory ?? "Unknown", "territory", saleAmounts) },
-    subscriptions: { completeThrough: analyticsCompleteThrough(subscriptionPartitions, selected.map((a) => a.id), ["subscriptionEvent"], f.from, f.to), active, ...eventMetrics(events), conversions: eventTotal(events, ["Paid Subscriptions from Offers"]), voluntaryChurn: eventTotal(events, ["Voluntary Churn"]), involuntaryChurn: eventTotal(events, ["Involuntary Churn"]), trend: [...new Set(events.map((r) => r.date))].sort().map((date) => ({ date, ...eventMetrics(events.filter((r) => r.date === date)) })), bySubscription: [...new Set(events.map((r) => r.subscription_id ?? "Unknown"))].sort().map((subscription) => ({ subscription: events.find((r) => r.subscription_id === subscription)?.subscription_name ?? subscription, ...eventMetrics(events.filter((r) => (r.subscription_id ?? "Unknown") === subscription)) })) },
+    sales: { completeThrough: salesCompleteThrough, rows: sales.map((r) => ({ date: r.report_date, app: appName(r.app_id), item: r.apple_identifier, sku: r.sku, productType: r.product_type, units: r.units, unitProceeds: r.developer_proceeds, unitPrice: r.customer_price, proceeds: salesAmount(r.units, r.developer_proceeds), proceedsCurrency: r.proceeds_currency, sales: salesAmount(r.units, r.customer_price, true), salesCurrency: r.customer_currency, territory: r.territory })), amounts: currencyAmounts(sales.flatMap(saleAmounts)), units: sumDecimals(sales.map((r) => r.units)), trend: salesTrend, byApp: groups(sales, (r) => String(r.app_id), "app", saleAmounts).map((r) => ({ ...r, app: appName(Number(r.app)) })), byTerritory: groups(sales, (r) => r.territory ?? "Unknown", "territory", saleAmounts) },
+    subscriptions: { completeThrough: analyticsCompleteThrough(subscriptionPartitions, selected.map((a) => a.id), ["subscriptionEvent"], f.from, f.to), active, ...eventMetrics(events), conversions: eventTotal(events, ["Paid Subscriptions from Offers"]), voluntaryChurn: eventTotal(events, ["Voluntary Churn"]), involuntaryChurn: eventTotal(events, ["Involuntary Churn"]), trend: subscriptionsTrend, bySubscription: [...new Set(events.map((r) => r.subscription_id ?? "Unknown"))].sort().map((subscription) => ({ subscription: events.find((r) => (r.subscription_id ?? "Unknown") === subscription)?.subscription_name ?? subscription, ...eventMetrics(events.filter((r) => (r.subscription_id ?? "Unknown") === subscription)) })) },
     settlements: settlementKeys.map((key) => {
       const [fiscalMonth, region, currency] = key.split("|");
       const rows = finances.filter((r) => r.fiscal_month === fiscalMonth && r.region_code === region && (r.currency ?? "") === currency);

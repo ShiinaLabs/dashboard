@@ -304,7 +304,7 @@ async function syncAnalyticsReports(connection: ConnectionRow, kinds: AnalyticsR
               const commitStartedAt = Date.now();
               await checkpoint("commit", { ...instanceFields, processingDate: prepared.processingDate });
               let outcome: "imported" | "skipped";
-              try { outcome = await facts.commitAnalyticsInstance({ appId: app.id, connectionId: connection.id, version: connection.updated_at, requestId: request.id, reportId: report.id, reportName: report.attributes.name, reportCategory: report.attributes.category }, prepared, mapped); }
+              try { outcome = await facts.commitAnalyticsInstance({ appId: app.id, connectionId: connection.id, version: connection.updated_at, requestId: request.id, reportId: report.id, reportName: report.attributes.name, reportCategory: report.attributes.category, accessType: request.access_type }, prepared, mapped); }
               catch (error) { progress.instancesFailed++; fail("commit", `${analyticsReportDefinitions[kind].standardName}; ${reportDiagnostic(error)}`, instanceFields, error instanceof AppStoreReportError ? error.code : "report_import_failed"); continue; }
               result[outcome]++;
               if (outcome === "imported") progress.instancesImported++;

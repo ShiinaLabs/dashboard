@@ -155,6 +155,37 @@ test("App Store Analytics tabs, app/date/territory filters and missing campaign 
 });
 
 
+test("App Store Analytics renders a 5 → 0 → 3 trend through a visible zero point", async ({ page }) => {
+  await page.route("**/api/graphql", (route) => {
+    const body = route.request().postDataJSON() as { query: string; variables: Record<string, unknown> };
+    if (!body.query.includes("query AppStoreAnalyticsPage")) return route.fallback();
+    const end = new Date(`${String(body.variables.to)}T00:00:00Z`);
+    const dates = [2, 1, 0].map((daysAgo) => new Date(end.getTime() - daysAgo * 86_400_000).toISOString().slice(0, 10));
+    const coverage = Object.fromEntries(["impressions", "views", "firstTimeDownloads", "downloads", "conversion"].map((key) => [key, { state: "complete", reportingApps: 1, totalApps: 1, reportingAppDays: 3, totalAppDays: 3 }])) as Record<string, { state: string; reportingApps: number; totalApps: number; reportingAppDays: number; totalAppDays: number }>;
+    const metrics = (impressions: number | null, downloads: number | null) => ({ impressions, views: null, firstTimeDownloads: null, downloads, conversion: null, coverage });
+    return route.fulfill({ json: { data: { appStore: { enabledApps: [{ id: 1, name: "Zero Trend App" }], analytics: {
+      updatedAt: dates[2], completeThrough: dates[0], overview: metrics(8, 8), coverage,
+      trend: [metrics(5, 5), metrics(0, 0), metrics(3, 3)].map((row, index) => ({ date: dates[index], ...row })),
+      acquisition: [], campaigns: [], territories: [],
+    } } } } });
+  });
+  await openConnections(page);
+  await page.getByRole("button", { name: "Business", exact: true }).click();
+  await page.getByRole("link", { name: "App Store Analytics", exact: true }).click();
+  const marker = page.getByTestId("zero-marker-downloads");
+  await expect(marker).toHaveCount(1);
+  const circle = await marker.boundingBox();
+  expect(circle).not.toBeNull();
+  const cx = await marker.getAttribute("cx");
+  const cy = await marker.getAttribute("cy");
+  const pathContainsZero = await page.locator(".recharts-line-curve").evaluateAll((paths, point) => paths.some((path) => path.getAttribute("d")?.includes(`${point.cx},${point.cy}`)), { cx, cy });
+  expect(pathContainsZero).toBe(true);
+  const chart = await page.locator(".recharts-wrapper").first().boundingBox();
+  expect(chart).not.toBeNull();
+  await page.mouse.move(chart!.x + chart!.width / 2, chart!.y + chart!.height / 2);
+  await expect(page.locator(".recharts-tooltip-wrapper")).toContainText("0");
+});
+
 test("Business Revenue has four tabs and retains separate currencies, nulls and final fiscal periods", async ({ page }) => {
   const amounts = [{ currency: "USD", proceeds: "1.4", sales: "2" }, { currency: "JPY", proceeds: "100", sales: "200" }];
   await page.route("**/api/graphql", (route) => {

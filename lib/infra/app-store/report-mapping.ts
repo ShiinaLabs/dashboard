@@ -15,6 +15,31 @@ export function identifyStandardAnalyticsReport(name: string): AnalyticsReportKi
   return (Object.keys(analyticsReportDefinitions) as AnalyticsReportKind[]).find((kind) => analyticsReportDefinitions[kind].standardName === name);
 }
 export const completionDays: Record<AnalyticsReportKind, number> = { discovery: 3, downloads: 2, purchases: 2, subscriptionState: 3, subscriptionEvent: 3 };
+export function finalizedDailyDate(processingDate: string, kind: AnalyticsReportKind): string {
+  if (!z.iso.date().safeParse(processingDate).success) throw new AppStoreReportError("invalid_processing_date", "Invalid report processing date");
+  const [year, month, day] = processingDate.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day - completionDays[kind])).toISOString().slice(0, 10);
+}
+export function isFinalizedDailyPartition(partition: { date: string; processing_date: string; coverage_source?: string | null }, _kind: AnalyticsReportKind): boolean {
+  return partition.coverage_source === "daily_complete";
+}
+export type HistoricalCoverageEvidence = { appId: number; reportName: string; instanceId: string; granularity: string; processingDate: string; accessType: string; status: string; importedAt: string | null };
+export function historicalDailyCoverageCandidates(imports: HistoricalCoverageEvidence[]) {
+  const candidates = new Map<string, { appId: number; kind: AnalyticsReportKind; date: string; instanceId: string; processingDate: string; importedAt: string }>();
+  for (const item of imports) {
+    const kind = identifyStandardAnalyticsReport(item.reportName);
+    if (!kind || item.accessType !== "ONGOING" || item.granularity !== "DAILY" || item.status !== "imported") continue;
+    const importedAt = item.importedAt ?? "";
+    let date: string;
+    try { date = finalizedDailyDate(item.processingDate, kind); } catch { continue; }
+    const key = `${item.appId}:${kind}:${date}`;
+    const previous = candidates.get(key);
+    if (!previous || item.processingDate > previous.processingDate || (item.processingDate === previous.processingDate && importedAt > previous.importedAt)) {
+      candidates.set(key, { appId: item.appId, kind, date, instanceId: item.instanceId, processingDate: item.processingDate, importedAt });
+    }
+  }
+  return [...candidates.values()].sort((a, b) => a.appId - b.appId || a.kind.localeCompare(b.kind) || a.date.localeCompare(b.date));
+}
 const SCALE = 10n ** 12n;
 export function decimal(value: string): string {
   if (!/^-?(?:\d{1,26}(?:\.\d{1,12})?|\.\d{1,12})$/.test(value)) throw new AppStoreReportError("invalid_decimal", "Invalid numeric report field");

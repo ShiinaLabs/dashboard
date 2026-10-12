@@ -175,6 +175,7 @@ const SCHEMA_COLUMNS = [
   { table: "account_fetch_state", ddl: "ADD COLUMN IF NOT EXISTS last_error_kind TEXT" },
   { table: "app_store_sync_runs", ddl: "ADD COLUMN IF NOT EXISTS scope TEXT" },
   { table: "app_store_sync_runs", ddl: "ADD COLUMN IF NOT EXISTS diagnostic_summary JSONB" },
+  { table: "app_store_report_partitions", ddl: "ADD COLUMN IF NOT EXISTS coverage_source TEXT NOT NULL DEFAULT 'facts'" },
   { table: "analytics_events", ddl: "ADD COLUMN IF NOT EXISTS utm_source TEXT NOT NULL DEFAULT ''" },
   { table: "analytics_events", ddl: "ADD COLUMN IF NOT EXISTS utm_medium TEXT NOT NULL DEFAULT ''" },
   { table: "analytics_events", ddl: "ADD COLUMN IF NOT EXISTS utm_campaign TEXT NOT NULL DEFAULT ''" },

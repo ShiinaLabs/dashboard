@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { mapAnalyticsReport, mapSalesReport, mapFinanceReport, decimal, sumDecimals, multiplyDecimals, salesAmount } from "../lib/infra/app-store/report-mapping";
+import { mapAnalyticsReport, mapSalesReport, mapFinanceReport, decimal, sumDecimals, multiplyDecimals, salesAmount, finalizedDailyDate, historicalDailyCoverageCandidates } from "../lib/infra/app-store/report-mapping";
 import { parseAnalyticsTsv } from "../lib/infra/app-store/analytics-tsv";
-import { currencyAmounts, reliablePayingUsers, activeSubscriptionSnapshot } from "../lib/services/app-store-revenue";
+import { currencyAmounts, reliablePayingUsers, activeSubscriptionSnapshot, purchaseDailyTrend, salesDailyTrend, subscriptionDailyTrend } from "../lib/services/app-store-revenue";
 import { analyticsCompleteThrough } from "../lib/services/app-store-analytics-reporting";
 import { reportDiagnostic } from "../lib/services/app-store-sync";
 import { latestSalesReportDate } from "../shared/app-store-revenue";
+import { zeroMarkerIndices } from "../lib/client/chart-zero-markers";
 const ctx = { appId: 1, appleId: "123", instanceId: "instance", processingDate: "2026-10-02" };
 function tsv(row: Record<string, string>) { return parseAnalyticsTsv(Object.keys(row).join("\t") + "\n" + Object.values(row).join("\t")); }
 const common = { Date: "2026-09-29", "App Apple Identifier": "123", Territory: "USA" };
@@ -21,7 +22,33 @@ describe("Sales daily publication date", () => {
     expect(latestSalesReportDate(new Date(now))).toBe(expected);
   });
 });
+describe("zero-point marker selection", () => {
+  it("marks isolated zeroes and samples long flat zero runs", () => {
+    expect([...zeroMarkerIndices([5, 0, 3])]).toEqual([1]);
+    expect([...zeroMarkerIndices([0])]).toEqual([0]);
+    expect([...zeroMarkerIndices(Array.from({ length: 16 }, () => 0))]).toEqual([0, 7, 14]);
+    expect([...zeroMarkerIndices([5, null, 3])]).toEqual([]);
+  });
+});
 describe("official Standard Analytics adapters (synthetic data)", () => {
+  it.each([
+    ["downloads", "2026-10-13", "2026-10-11"],
+    ["discovery", "2026-10-13", "2026-10-10"],
+    ["purchases", "2026-10-13", "2026-10-11"],
+    ["subscriptionEvent", "2026-01-02", "2025-12-30"],
+  ] as const)("derives the finalized UTC business date for %s", (kind, processingDate, expected) => {
+    expect(finalizedDailyDate(processingDate, kind)).toBe(expected);
+  });
+  it("repairs only successfully imported ongoing standard daily instances, never snapshots", () => {
+    const common = { appId: 7, reportName: "App Store Purchases Standard", granularity: "DAILY", processingDate: "2026-10-13", status: "imported", accessType: "ONGOING" };
+    expect(historicalDailyCoverageCandidates([
+      { ...common, instanceId: "old", importedAt: "2026-10-13T01:00:00Z" },
+      { ...common, instanceId: "new", importedAt: "2026-10-13T02:00:00Z" },
+      { ...common, instanceId: "snapshot", accessType: "ONE_TIME_SNAPSHOT", importedAt: "2026-10-13T03:00:00Z" },
+      { ...common, instanceId: "pending", status: "pending", importedAt: "2026-10-13T04:00:00Z" },
+      { ...common, instanceId: "unknown", reportName: "Purchases Custom", importedAt: "2026-10-13T05:00:00Z" },
+    ])).toEqual([{ appId: 7, kind: "purchases", date: "2026-10-11", instanceId: "new", processingDate: "2026-10-13", importedAt: "2026-10-13T02:00:00Z" }]);
+  });
   it("maps Discovery and Downloads without inventing campaigns or unique downloads", () => {
     const discovery = mapAnalyticsReport("discovery", tsv({ ...common, Event: "Impression", "Page Type": "No page", "Source Type": "App Store search", Counts: "10", "Unique Counts": "8", "Future Column": "extra" }), ctx);
     expect(discovery.rows[0]).toMatchObject({ app_id: 1, event: "Impression", counts: "10", unique_counts: "8", processing_date: ctx.processingDate });
@@ -48,6 +75,38 @@ describe("official Standard Analytics adapters (synthetic data)", () => {
     expect(() => mapAnalyticsReport("downloads", tsv({ ...common, "App Apple Identifier": "999", "Download Type": "First-time Download", "Source Type": "App Store search", Counts: "10" }), ctx)).toThrow("app_identity_mismatch");
   });
 });
+describe("coverage-aware revenue trends", () => {
+  it("builds purchase trends from per-app daily coverage, preserving zero and unknown dates", () => {
+    const partitions = ["2026-10-01", "2026-10-02", "2026-10-03"].map((date) => ({ app_id: 1, report_kind: "purchases", date, processing_date: "2026-10-13", coverage_source: "daily_complete" }));
+    const purchases = [
+      { app_id: 1, date: "2026-10-01", currency: "USD", proceeds: "5", sales: "6" },
+      { app_id: 1, date: "2026-10-03", currency: "USD", proceeds: "3", sales: "4" },
+    ];
+    expect(purchaseDailyTrend(purchases, partitions, [1], "2026-10-01", "2026-10-03").map((row) => row.proceeds)).toEqual(["5", "0", "3"]);
+    expect(purchaseDailyTrend(purchases, partitions.filter((row) => row.date !== "2026-10-02"), [1], "2026-10-01", "2026-10-03").map((row) => row.proceeds)).toEqual(["5", null, "3"]);
+    expect(purchaseDailyTrend([], partitions, [1], "2026-10-01", "2026-10-03").map((row) => row.proceeds)).toEqual(["0", "0", "0"]);
+    expect(purchaseDailyTrend(purchases, [...partitions, ...partitions.map((row) => ({ ...row, app_id: 2 })).filter((row) => row.date !== "2026-10-02")], [1, 2], "2026-10-01", "2026-10-03").map((row) => row.proceeds)).toEqual(["5", null, "3"]);
+    expect(purchaseDailyTrend([], [{ app_id: 1, report_kind: "purchases", date: "2026-10-11", processing_date: "2026-10-12" }], [1], "2026-10-11", "2026-10-11").map((row) => row.proceeds)).toEqual([null]);
+    const observed = [{ app_id: 1, report_kind: "purchases", date: "2026-10-01", processing_date: "2026-10-13", coverage_source: "facts" }];
+    expect(purchaseDailyTrend([{ app_id: 1, date: "2026-10-01", currency: "USD", proceeds: "5", sales: "6" }], observed, [1], "2026-10-01", "2026-10-01").map((row) => row.proceeds)).toEqual(["5"]);
+    expect(purchaseDailyTrend([], observed, [1], "2026-10-01", "2026-10-01").map((row) => row.proceeds)).toEqual([null]);
+  });
+  it("uses daily Sales imports and subscription-event partitions, not completeThrough, as coverage", () => {
+    const sales = salesDailyTrend([
+      { date: "2026-10-02", currency: "USD", proceeds: "5" },
+      { date: "2026-10-04", currency: "USD", proceeds: "3" },
+    ], new Map([[7, new Set(["2026-10-02", "2026-10-03", "2026-10-04"])]]), [7], "2026-10-01", "2026-10-04");
+    expect(sales.map((row) => row.proceeds)).toEqual([null, "5", "0", "3"]);
+    const partitions = ["2026-10-01", "2026-10-02", "2026-10-03"].map((date) => ({ app_id: 1, report_kind: "subscriptionEvent", date, processing_date: "2026-10-13", coverage_source: "daily_complete" }));
+    expect(subscriptionDailyTrend([{ app_id: 1, date: "2026-10-01", event_grouping: "Paid Subscription Starts", counts: "2" }], partitions, [1], "2026-10-01", "2026-10-03")).toEqual([
+      { date: "2026-10-01", starts: "2", renewals: "0", churn: "0" },
+      { date: "2026-10-02", starts: "0", renewals: "0", churn: "0" },
+      { date: "2026-10-03", starts: "0", renewals: "0", churn: "0" },
+    ]);
+    expect(subscriptionDailyTrend([], partitions.slice(1), [1], "2026-10-01", "2026-10-03")[0]).toMatchObject({ starts: null, renewals: null, churn: null });
+  });
+});
+
 describe("Sales and Finance (synthetic official schemas)", () => {
   it("keeps Sales unit prices and original customer/proceeds currencies", () => {
     const rows = mapSalesReport(tsv({ "Begin Date": "09/29/2026", "End Date": "09/29/2026", SKU: "synthetic", "Apple Identifier": "123", "Parent Identifier": "", "Product Type Identifier": "1", "Country Code": "JP", Units: "2.5", "Developer Proceeds": "0.70", "Currency of Proceeds": "USD", "Customer Price": "100", "Customer Currency": "JPY" }), 1, "2026-09-29", "hash");
@@ -91,9 +150,9 @@ describe("Sales and Finance (synthetic official schemas)", () => {
     expect(activeSubscriptionSnapshot([{ ...rows[1], state_grouping: "Future state" }], [1])).toBeNull();
     expect(activeSubscriptionSnapshot([{ ...rows[1], counts: null }], [1])).toBeNull();
   });
-  it("derives completeness from contiguous imported coverage and documented processing lag", () => {
-    const partitions = ["discovery", "downloads"].flatMap((report_kind) => ["2026-09-28", "2026-09-29"].map((date) => ({ app_id: 1, report_kind, date, processing_date: "2026-10-01" })));
-    expect(analyticsCompleteThrough(partitions, [1], ["discovery", "downloads"], "2026-09-28", "2026-09-30")).toBe("2026-09-28");
+  it("derives completeness only from contiguous verified completed daily coverage", () => {
+    const partitions = ["discovery", "downloads"].flatMap((report_kind) => ["2026-09-28", "2026-09-29"].map((date) => ({ app_id: 1, report_kind, date, processing_date: "2026-10-01", coverage_source: "daily_complete" })));
+    expect(analyticsCompleteThrough(partitions, [1], ["discovery", "downloads"], "2026-09-28", "2026-09-30")).toBe("2026-09-29");
     expect(analyticsCompleteThrough(partitions, [1, 2], ["discovery", "downloads"], "2026-09-28", "2026-09-30")).toBeNull();
   });
 });
