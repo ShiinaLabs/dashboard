@@ -79,12 +79,34 @@ test:
     - pnpm run typecheck
     - pnpm test
     - pnpm run build
-    - pnpm install --prod --frozen-lockfile --offline
-    - node --input-type=module -e "await import('@react-router/node')"
-    - mkdir -p .ci-runtime/app-build
-    - cp -a build/. .ci-runtime/app-build/
-    - tar -czf .ci-runtime/node_modules.tar.gz node_modules
-    - du -sh node_modules .ci-runtime/node_modules.tar.gz .ci-runtime/app-build
+    - |
+      set -eu
+      mkdir -p .ci-runtime/app-build
+      cp -a build/. .ci-runtime/app-build/
+
+      prod_dir="$(mktemp -d)"
+      trap 'rm -rf "$prod_dir"' EXIT
+      cp package.json pnpm-lock.yaml pnpm-workspace.yaml "$prod_dir/"
+      cp -a patches "$prod_dir/patches"
+
+      (
+        cd "$prod_dir"
+        pnpm install --prod --frozen-lockfile \
+          --child-concurrency=1 \
+          --network-concurrency=4
+        node --input-type=module -e '
+          import assert from "node:assert/strict";
+          const { default: argon2 } = await import("argon2");
+          const hash = await argon2.hash("isolated-ci-check");
+          assert.equal(await argon2.verify(hash, "isolated-ci-check"), true);
+          await import("pg");
+          await import("@react-router/node");
+        '
+        tar -czf "$CI_PROJECT_DIR/.ci-runtime/node_modules.tar.gz" node_modules
+        du -sh node_modules "$CI_PROJECT_DIR/.ci-runtime/node_modules.tar.gz"
+      )
+
+    - du -sh .ci-runtime/app-build
   artifacts:
     paths:
       - .ci-runtime/
