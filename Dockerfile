@@ -16,7 +16,7 @@ WORKDIR /app
 # compiles never run in parallel and spike memory.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY patches ./patches
-RUN pnpm install --frozen-lockfile --child-concurrency=1 --network-concurrency=4
+RUN pnpm install --frozen-lockfile
 
 # Copy source; build client + SSR in separate passes.
 # Type checking remains in CI because the full tsc pass has a higher memory
@@ -33,7 +33,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY patches ./patches
 COPY scripts/prune-runtime-dependencies.sh ./scripts/prune-runtime-dependencies.sh
-RUN pnpm install --prod --frozen-lockfile --child-concurrency=1 --network-concurrency=4 \
+RUN pnpm install --prod --frozen-lockfile \
   && sh ./scripts/prune-runtime-dependencies.sh ./node_modules
 
 # ── Stage 3: Distroless runtime ─────────────────────────────────────

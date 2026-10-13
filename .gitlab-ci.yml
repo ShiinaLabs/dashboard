@@ -92,9 +92,7 @@ test:
 
       (
         cd "$prod_dir"
-        pnpm install --prod --frozen-lockfile \
-          --child-concurrency=1 \
-          --network-concurrency=4
+        pnpm install --prod --frozen-lockfile
         sh "$CI_PROJECT_DIR/scripts/prune-runtime-dependencies.sh" node_modules
         node --input-type=module -e '
           import assert from "node:assert/strict";
