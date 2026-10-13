@@ -7,7 +7,7 @@ import { getOverviewReadModel } from "@/lib/services/overview";
 import { projectOverviewReadModel } from "@/lib/services/overview-projection";
 import type { OverviewPageData } from "@shared/overview-page";
 import { useTranslation } from "react-i18next";
-import { ArrowUpRight, Layers3, MessageSquareText, Star, Users } from "lucide-react";
+import { Layers3, MessageSquareText, Star, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
@@ -137,9 +137,6 @@ function OverviewContent({ data: pageData }: { data: OverviewPageData }) {
             {monitoredAccounts.length === 0 ? t("overview.description_addPrompt") : t("login.tagline")}
           </p>
         </div>
-        <Button asChild variant="outline" className="w-full shrink-0 sm:w-auto">
-          <Link to="/accounts">{t("nav.accounts")}<ArrowUpRight aria-hidden="true" /></Link>
-        </Button>
       </div>
 
       <section aria-label={t("overview.heading")} className="space-y-3">
