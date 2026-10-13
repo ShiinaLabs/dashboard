@@ -1,12 +1,12 @@
 # ── Stage 1: Build ─────────────────────────────────────────────────
-FROM node:22-bookworm-slim AS base
+FROM --platform=linux/amd64 reg.mikumikumi.xyz/mirror/node:24-bookworm-slim AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 # Keep every Node process on a tight heap so the memory-limited CI kaniko
 # container never sees a runaway V8 allocation. The React Router build is
-# split into client (330 MB heap) and SSR (160 MB heap) passes via the
-# patched @react-router/dev + RR_SKIP_* env vars; each script carries its
-# own NODE_OPTIONS which overrides this baseline.
+# split into client (512 MB heap) and SSR (192 MB heap) passes via the
+# patched @react-router/dev + RR_SKIP_* env vars; each script carries its own
+# NODE_OPTIONS which overrides this baseline.
 ENV NODE_OPTIONS=--max-old-space-size=256
 RUN corepack enable
 WORKDIR /app
@@ -19,22 +19,26 @@ COPY patches ./patches
 RUN pnpm install --frozen-lockfile --child-concurrency=1 --network-concurrency=4
 
 # Copy source; build client + SSR in separate passes.
-# Type checking is skipped here — Vite compilation already validates
-# types, and a full `tsc --noEmit` pass exceeds the container memory
-# budget. Run typecheck in CI instead.
+# Type checking remains in CI because the full tsc pass has a higher memory
+# requirement than the production build.
 COPY . .
 RUN pnpm build
 
-# ── Stage 2: Production runner ──────────────────────────────────────
-FROM node:22-bookworm-slim AS runner
+# ── Stage 2: Isolated production dependencies ───────────────────────
+FROM --platform=linux/amd64 reg.mikumikumi.xyz/mirror/node:24-bookworm-slim AS prod-deps
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 RUN corepack enable
 WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
+COPY scripts/prune-runtime-dependencies.sh ./scripts/prune-runtime-dependencies.sh
+RUN pnpm install --prod --frozen-lockfile --child-concurrency=1 --network-concurrency=4 \
+  && sh ./scripts/prune-runtime-dependencies.sh ./node_modules
 
-RUN groupadd --system --gid 1001 nodejs \
-  && useradd --system --uid 1001 --gid nodejs dashboard \
-  && mkdir -p /app/data/db /app/data/logs
+# ── Stage 3: Distroless runtime ─────────────────────────────────────
+FROM --platform=linux/amd64 gcr.io/distroless/nodejs24-debian13:nonroot@sha256:9eeb7f5887d0e239e78264b06f7f11d2e14be534050481803a9e4728fcdd278e AS runner
+WORKDIR /app
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
@@ -42,19 +46,13 @@ ENV PORT=3000
 ENV DATA_DIR=/app/data
 ENV NODE_OPTIONS=--max-old-space-size=256
 
-# Production dependencies only (native addons ship prebuilt binaries).
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY patches ./patches
-RUN pnpm install --prod --frozen-lockfile --child-concurrency=1 --network-concurrency=4
+COPY --from=prod-deps --chown=1001:1001 /app/node_modules ./node_modules
+COPY --from=base --chown=1001:1001 /app/build ./build
+COPY --from=base --chown=1001:1001 /app/public/a/t.js ./build/client/a/t.js
+COPY --from=base --chown=1001:1001 /app/server ./server
+COPY --from=base --chown=1001:1001 /app/package.json ./package.json
+COPY --chown=1001:1001 docker/runtime-data/ ./data/
 
-# React Router build output + minimal HTTP entry.
-COPY --from=base --chown=dashboard:nodejs /app/build ./build
-COPY --from=base --chown=dashboard:nodejs /app/public/a/t.js ./build/client/a/t.js
-COPY --from=base --chown=dashboard:nodejs /app/server ./server
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
+USER 1001:1001
 EXPOSE 3000
-
-CMD ["docker-entrypoint.sh"]
+CMD ["/app/server/index.mjs"]

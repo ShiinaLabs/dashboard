@@ -1,12 +1,7 @@
-# The GitLab test job runs the production build on every relevant branch and
-# passes it here as a short-lived artifact. Keep image assembly from rebuilding
-# the same React Router client and server bundles a second time in Kaniko.
-FROM reg.mikumikumi.xyz/mirror/node:22-bookworm-slim AS runner
+# The GitLab test job builds with Node 24 and passes production dependencies
+# and React Router assets here. This stage only assembles the runtime image.
+FROM --platform=linux/amd64 gcr.io/distroless/nodejs24-debian13:nonroot@sha256:9eeb7f5887d0e239e78264b06f7f11d2e14be534050481803a9e4728fcdd278e AS runner
 WORKDIR /app
-
-RUN groupadd --system --gid 1001 nodejs \
-  && useradd --system --uid 1001 --gid nodejs dashboard \
-  && mkdir -p /app/data/db /app/data/logs
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
@@ -14,17 +9,14 @@ ENV PORT=3000
 ENV DATA_DIR=/app/data
 ENV NODE_OPTIONS=--max-old-space-size=256
 
-# The test job prepares production dependencies and the React Router build.
 # ADD extracts the archive while preserving pnpm's relative symlinks into .pnpm.
-ADD --chown=dashboard:nodejs .ci-runtime/node_modules.tar.gz /app/
-COPY --chown=dashboard:nodejs .ci-runtime/app-build ./build
-COPY --chown=dashboard:nodejs package.json ./
-COPY --chown=dashboard:nodejs public/a/t.js ./build/client/a/t.js
-COPY --chown=dashboard:nodejs server ./server
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+ADD --chown=1001:1001 .ci-runtime/node_modules.tar.gz /app/
+COPY --chown=1001:1001 .ci-runtime/app-build ./build
+COPY --chown=1001:1001 package.json ./package.json
+COPY --chown=1001:1001 public/a/t.js ./build/client/a/t.js
+COPY --chown=1001:1001 server ./server
+COPY --chown=1001:1001 docker/runtime-data/ ./data/
 
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
+USER 1001:1001
 EXPOSE 3000
-
-CMD ["docker-entrypoint.sh"]
+CMD ["/app/server/index.mjs"]

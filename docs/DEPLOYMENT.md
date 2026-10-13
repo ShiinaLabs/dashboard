@@ -21,6 +21,8 @@ The compose stack includes:
 | `${DATA_HOST_DIR:-./data}` (bind mount) | `/app/data` | Logs (and legacy SQLite db/dumps) |
 | `pg_data` (named volume) | `/var/lib/postgresql/data` | PostgreSQL data |
 
+The runtime process uses UID 1001 and cannot change ownership of a mounted directory. Ensure `/app/data` mounts are writable by UID 1001 (or its configured group) before running the container; image directory ownership does not change bind mount or persistent volume permissions.
+
 ### Environment Variables
 
 Pass env vars via `.env` file or `docker-compose.yml` environment section. See [CONFIGURATION.md](CONFIGURATION.md) for all options.
@@ -37,9 +39,7 @@ docker compose build
 docker compose up -d
 ```
 
-The Dockerfile uses a multi-stage build:
-1. **Stage 1** (`node:22-bookworm-slim`): installs dependencies and builds React Router output (client + SSR in separate memory-bounded passes)
-2. **Stage 2** (`node:22-bookworm-slim`): installs production dependencies only, then runs `server/index.mjs` on port 3000 as a non-root user
+The Dockerfile uses Node.js 24 on Debian Bookworm Slim for build and isolated production dependency installation, then runs the application on the pinned official `gcr.io/distroless/nodejs24-debian13:nonroot` image. The Distroless image starts `server/index.mjs` directly as UID 1001; it has no shell-based entrypoint. The image prepares `/app/data/db` and `/app/data/logs` as UID 1001, while mounted volume permissions remain the responsibility of the deployment configuration.
 
 Type checking is intentionally skipped inside the Docker image build because the full `tsc --noEmit` pass exceeds the container memory budget; run typecheck in CI instead.
 
@@ -47,7 +47,7 @@ Type checking is intentionally skipped inside the Docker image build because the
 
 ### Prerequisites
 
-- Node.js 22.12+
+- Node.js 24
 - pnpm
 - PostgreSQL
 
@@ -110,7 +110,7 @@ pg_dump -U dashboard dashboard > backup.sql
 
 A GitLab CI pipeline (`.gitlab-ci.yml`) builds and deploys to a Kubernetes cluster:
 
-1. **Build**: Kaniko builds `Dockerfile.ci` with the mirrored `reg.mikumikumi.xyz/mirror/node:22-bookworm-slim` base image, then pushes to `reg.mikumikumi.xyz/kaoru/dashboard`
+1. **Build**: the test job uses the mirrored Node.js 24 Bookworm Slim image to build and package production dependencies; Kaniko assembles `Dockerfile.ci` on the pinned official Node.js 24 Distroless Debian 13 runtime, then pushes to `reg.mikumikumi.xyz/kaoru/dashboard`
 2. **Deploy**: kubectl updates the StatefulSet image
 
 ## Reverse Proxy
