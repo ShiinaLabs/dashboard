@@ -5,6 +5,7 @@ import { type OverviewStats, type TimelineData, type Tweet, type Account } from 
 import { MetricCard } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";
 import { SectionShell } from "@/components/domain/shared/SectionShell";
+import { TREND_SERIES_STYLE } from "@/components/chart-series-style";
 import { XIcon } from "@/components/BrandIcons";
 import { MessageSquare, Heart, Repeat2, Eye, TrendingUp } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from "recharts";
@@ -74,8 +75,8 @@ export function XSection({ stats, timeline, topLiked, xAccounts }: Props) {
                   <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} tickFormatter={(v: string) => v.slice(5)} />
                   <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={calcYAxisWidth(timeline!.dailyTweets, "total_likes", "total_retweets")} />
                   <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "12px" }} />
-                  <Area type="monotone" dataKey="total_likes" stroke="var(--chart-5)" fill="color-mix(in oklch, var(--chart-5) 12%, transparent)" name={t("overview.charts.likes")} />
-                  <Area type="monotone" dataKey="total_retweets" stroke="var(--chart-1)" fill="color-mix(in oklch, var(--chart-1) 12%, transparent)" name={t("overview.charts.retweets")} />
+                  <Area {...TREND_SERIES_STYLE} dataKey="total_likes" stroke="var(--chart-5)" fill="color-mix(in oklch, var(--chart-5) 12%, transparent)" name={t("overview.charts.likes")} />
+                  <Area {...TREND_SERIES_STYLE} dataKey="total_retweets" stroke="var(--chart-1)" fill="color-mix(in oklch, var(--chart-1) 12%, transparent)" name={t("overview.charts.retweets")} />
                 </AreaChart>
               </ResponsiveContainer>
               </div>
@@ -97,7 +98,7 @@ export function XSection({ stats, timeline, topLiked, xAccounts }: Props) {
                   <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} tickFormatter={(v: string) => v.slice(5)} />
                   <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={calcYAxisWidth(timeline!.dailyTweets, "total_views")} />
                   <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "12px" }} />
-                  <Area type="monotone" dataKey="total_views" stroke="var(--chart-2)" fill="color-mix(in oklch, var(--chart-2) 12%, transparent)" name={t("overview.charts.views")} />
+                  <Area {...TREND_SERIES_STYLE} dataKey="total_views" stroke="var(--chart-2)" fill="color-mix(in oklch, var(--chart-2) 12%, transparent)" name={t("overview.charts.views")} />
                 </AreaChart>
               </ResponsiveContainer>
               </div>

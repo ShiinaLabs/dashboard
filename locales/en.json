@@ -1,12 +1,12 @@
 {
   "timeRange": {
     "label": "Time range",
-    "7d": "7 days",
-    "14d": "14 days",
-    "30d": "30 days",
-    "90d": "3 months",
-    "180d": "6 months",
-    "1y": "1 year"
+    "7d": "7D",
+    "14d": "14D",
+    "30d": "30D",
+    "90d": "3M",
+    "180d": "6M",
+    "1y": "1Y"
   },
   "common": {
     "dashboard": "Data Hub",
@@ -124,10 +124,7 @@
       "noSites": "No websites are being tracked yet.",
       "setup": "Set up Web Analytics",
       "noTraffic": "No traffic recorded in this period.",
-      "moreSites": "+ {{count}} more sites",
-      "range7d": "7D",
-      "range30d": "30D",
-      "range90d": "90D"
+      "moreSites": "+ {{count}} more sites"
     },
     "bothPlatforms": "3 platforms",
     "platformX": "X",

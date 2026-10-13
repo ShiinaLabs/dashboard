@@ -15,15 +15,9 @@ import { HighlightCard } from "@/components/domain/shared/OverviewCards";
 import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";
 import { SectionShell } from "@/components/domain/shared/SectionShell";
-import { TimeRangeSelector } from "@/components/TimeRangeSelector";
+import { SHORT_TIME_RANGE_OPTIONS, TimeRangeSelector } from "@/components/TimeRangeSelector";
 import { ChartCardSkeleton } from "@/components/Skeleton";
 import { GithubIcon, GitlabIcon, RedditIcon, XIcon } from "@/components/BrandIcons";
-
-const TIME_OPTIONS = [
-  { value: 7, labelKey: "timeRange.7d" },
-  { value: 30, labelKey: "timeRange.30d" },
-  { value: 90, labelKey: "timeRange.90d" },
-];
 
 function signed(value: number) {
   return `${value > 0 ? "+" : ""}${value.toLocaleString()}`;
@@ -75,7 +69,7 @@ export function PulseSection({ initialData }: { initialData: PulseResponse }) {
     <SectionShell
       icon={<Activity size={16} />}
       title={t("overview.pulse.heading")}
-      action={<TimeRangeSelector value={days} onChange={setDays} options={TIME_OPTIONS} />}
+      action={<TimeRangeSelector value={days} onChange={setDays} options={SHORT_TIME_RANGE_OPTIONS} />}
     >
       {isLoading ? (
         <div className="space-y-2">

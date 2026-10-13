@@ -4,19 +4,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 interface Props {
   icon: ReactNode;
   title: string;
+  titleAction?: ReactNode;
   description?: string;
   action?: ReactNode;
   children: ReactNode;
 }
 
-export function SectionShell({ icon, title, description, action, children }: Props) {
+export function SectionShell({ icon, title, titleAction, description, action, children }: Props) {
   return (
     <Card className="min-w-0 gap-0 overflow-hidden rounded-lg border shadow-none" data-slot="insight-card">
       <CardHeader className="flex flex-col items-stretch gap-3 space-y-0 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           <span className="mt-0.5 text-muted-foreground [&_svg]:size-4 [&_svg]:stroke-[1.75]" aria-hidden="true">{icon}</span>
           <div className="min-w-0 space-y-1">
-            <CardTitle className="text-sm font-semibold leading-5">{title}</CardTitle>
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+              <CardTitle className="text-sm font-semibold leading-5">{title}</CardTitle>
+              {titleAction}
+            </div>
             {description && <CardDescription>{description}</CardDescription>}
           </div>
         </div>

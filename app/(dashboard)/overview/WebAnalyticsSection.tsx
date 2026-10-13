@@ -8,16 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";
 import { SectionShell } from "@/components/domain/shared/SectionShell";
-import { TimeRangeSelector } from "@/components/TimeRangeSelector";
+import { SHORT_TIME_RANGE_OPTIONS, TimeRangeSelector } from "@/components/TimeRangeSelector";
 import { compareAnalyticsPeriod } from "@/lib/client/analytics-comparison";
 import { getOverviewAnalyticsPortfolio } from "@/lib/client/graphql/overview";
 import type { AnalyticsPortfolio, AnalyticsRange } from "@/lib/client/analytics-graphql";
-
-const TIME_OPTIONS = [
-  { value: 7, labelKey: "overview.webAnalytics.range7d" },
-  { value: 30, labelKey: "overview.webAnalytics.range30d" },
-  { value: 90, labelKey: "overview.webAnalytics.range90d" },
-];
 
 function analyticsRange(days: number): AnalyticsRange {
   if (days === 30) return "DAYS_30";
@@ -47,16 +41,22 @@ export function WebAnalyticsSection({ initialData }: { initialData: AnalyticsPor
     return t("analytics.changeVsPrevious", { percentage: result.percentage });
   }
 
-  const action = <div className="flex flex-wrap items-center gap-2">
-    <TimeRangeSelector value={days} onChange={setDays} options={TIME_OPTIONS} />
-    <Button asChild variant="outline" size="sm">
-      <Link to="/analytics">{t("overview.webAnalytics.openAnalytics")}<ArrowUpRight aria-hidden="true" /></Link>
-    </Button>
-  </div>;
+  const titleAction = <Link
+    to="/analytics"
+    className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+  >
+    {t("overview.webAnalytics.openAnalytics")}
+    <ArrowUpRight className="size-3.5" aria-hidden="true" />
+  </Link>;
 
   return (
     <section aria-label={t("overview.webAnalytics.heading")}>
-      <SectionShell icon={<Globe2 />} title={t("overview.webAnalytics.heading")} action={action}>
+      <SectionShell
+        icon={<Globe2 />}
+        title={t("overview.webAnalytics.heading")}
+        titleAction={titleAction}
+        action={<TimeRangeSelector value={days} onChange={setDays} options={SHORT_TIME_RANGE_OPTIONS} />}
+      >
         {isPending ? (
           <div className="space-y-4">
             <MetricGrid className="sm:grid-cols-2 xl:grid-cols-4">

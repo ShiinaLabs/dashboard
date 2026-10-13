@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { ChartCard } from "@/components/domain/shared/ChartCard";
+import { TREND_SERIES_STYLE } from "@/components/chart-series-style";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -28,7 +29,7 @@ export function XFollowerGrowthChart({ data }: Props) {
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} tickFormatter={(v) => v.slice(5)} />
                 <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={calcYAxisWidth(data, "followers_count")} />
                 <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "12px" }} />
-                <Area type="monotone" dataKey="followers_count" stroke="var(--chart-3)" fill="color-mix(in oklch, var(--chart-3) 12%, transparent)" name={t("xDetail.followersCount")} />
+                <Area {...TREND_SERIES_STYLE} dataKey="followers_count" stroke="var(--chart-3)" fill="color-mix(in oklch, var(--chart-3) 12%, transparent)" name={t("xDetail.followersCount")} />
               </AreaChart>
             </ResponsiveContainer>
           </div>

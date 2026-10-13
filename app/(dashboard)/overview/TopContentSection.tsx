@@ -9,15 +9,9 @@ import { BarChart3, TrendingUp } from "lucide-react";
 import { SectionShell } from "@/components/domain/shared/SectionShell";
 import type { TopContentItem, TopContentResponse } from "@/shared/types";
 import { getOverviewTopContent } from "@/lib/client/graphql/overview";
-import { TimeRangeSelector } from "@/components/TimeRangeSelector";
+import { SHORT_TIME_RANGE_OPTIONS, TimeRangeSelector } from "@/components/TimeRangeSelector";
 import { ChartCardSkeleton } from "@/components/Skeleton";
 import { GithubIcon, GitlabIcon, RedditIcon, XIcon } from "@/components/BrandIcons";
-
-const TIME_OPTIONS = [
-  { value: 7, labelKey: "timeRange.7d" },
-  { value: 30, labelKey: "timeRange.30d" },
-  { value: 90, labelKey: "timeRange.90d" },
-];
 
 function PlatformIcon({ platform }: { platform: string }) {
   if (platform === "twitter") return <XIcon />;
@@ -42,7 +36,7 @@ export function TopContentSection({ initialData }: { initialData: TopContentResp
   const items = data?.items ?? [];
 
   return (
-    <SectionShell icon={<BarChart3 size={16} />} title={t("overview.topContent.heading")} action={<TimeRangeSelector value={days} onChange={setDays} options={TIME_OPTIONS} />}>
+    <SectionShell icon={<BarChart3 size={16} />} title={t("overview.topContent.heading")} action={<TimeRangeSelector value={days} onChange={setDays} options={SHORT_TIME_RANGE_OPTIONS} />}>
 
       {isLoading ? (
         <ChartCardSkeleton />

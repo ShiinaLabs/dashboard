@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { useIsMobile } from "@/lib/client/useIsMobile";
 import { calcYAxisWidth } from "@/lib/client/chart-utils";
+import { TREND_SERIES_STYLE } from "@/components/chart-series-style";
 
 interface SubredditDatum { subreddit: string; count: number }
 
@@ -57,8 +58,8 @@ export function RedditSection({ postKarma, commentKarma, totalPosts, totalCommen
                   <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} tickFormatter={(v: string) => v.slice(5)} />
                   <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={calcYAxisWidth(karmaTimeline, "post_karma", "comment_karma")} />
                   <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "12px" }} />
-                  <Line type="monotone" dataKey="post_karma" stroke="var(--chart-4)" name={t("overview.charts.redditPostKarma")} dot={false} />
-                  <Line type="monotone" dataKey="comment_karma" stroke="var(--chart-1)" name={t("overview.charts.redditCommentKarma")} dot={false} />
+                  <Line {...TREND_SERIES_STYLE} dataKey="post_karma" stroke="var(--chart-4)" name={t("overview.charts.redditPostKarma")} />
+                  <Line {...TREND_SERIES_STYLE} dataKey="comment_karma" stroke="var(--chart-1)" name={t("overview.charts.redditCommentKarma")} />
                 </LineChart>
               </ResponsiveContainer>
               </div>

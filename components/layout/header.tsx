@@ -45,8 +45,8 @@ export function Header() {
               : now - freshness.lastSuccessfulDataRefreshAt > 10 * 60_000 ? `Stale · ${Math.floor((now - freshness.lastSuccessfulDataRefreshAt) / 60_000)}m`
                 : `Updated ${dataRefreshed}`;
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b bg-background/95 px-4 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-6">
-      <SidebarTrigger variant="outline" className="size-9" aria-expanded={isOpen} aria-label={isOpen ? t("common.collapseSidebar") : t("common.expandSidebar")}>
+    <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-3 bg-background px-4 shadow-[inset_0_-1px_0_var(--border)] md:px-6">
+      <SidebarTrigger variant="outline" className="size-8" aria-expanded={isOpen} aria-label={isOpen ? t("common.collapseSidebar") : t("common.expandSidebar")}>
         <PanelLeft aria-hidden="true" />
       </SidebarTrigger>
       <Separator orientation="vertical" className="h-6" />

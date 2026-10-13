@@ -12,6 +12,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";
 import { ChartCard } from "@/components/domain/shared/ChartCard";
+import { TREND_SERIES_STYLE } from "@/components/chart-series-style";
 import { calcYAxisWidth } from "@/lib/client/chart-utils";
 import {
   ArrowLeft, Trash2, AlertCircle,
@@ -216,7 +217,7 @@ export default function XDetail() {
                   <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} tickFormatter={(v) => v.slice(5)} />
                   <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={calcYAxisWidth(timeline.dailyTweets, "total_views")} />
                   <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "12px" }} />
-                  <Area type="monotone" dataKey="total_views" stroke="var(--chart-2)" fill="color-mix(in oklch, var(--chart-2) 12%, transparent)" name={t("xDetail.views")} />
+                  <Area {...TREND_SERIES_STYLE} dataKey="total_views" stroke="var(--chart-2)" fill="color-mix(in oklch, var(--chart-2) 12%, transparent)" name={t("xDetail.views")} />
                 </AreaChart>
               </ResponsiveContainer>
               </div>
@@ -229,8 +230,8 @@ export default function XDetail() {
                   <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} tickFormatter={(v) => v.slice(5)} />
                   <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={calcYAxisWidth(timeline.dailyTweets, "total_likes", "total_retweets")} />
                   <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "12px" }} />
-                  <Area type="monotone" dataKey="total_likes" stroke="var(--chart-5)" fill="color-mix(in oklch, var(--chart-5) 12%, transparent)" name={t("xDetail.likes")} />
-                  <Area type="monotone" dataKey="total_retweets" stroke="var(--chart-1)" fill="color-mix(in oklch, var(--chart-1) 12%, transparent)" name={t("xDetail.retweets")} />
+                  <Area {...TREND_SERIES_STYLE} dataKey="total_likes" stroke="var(--chart-5)" fill="color-mix(in oklch, var(--chart-5) 12%, transparent)" name={t("xDetail.likes")} />
+                  <Area {...TREND_SERIES_STYLE} dataKey="total_retweets" stroke="var(--chart-1)" fill="color-mix(in oklch, var(--chart-1) 12%, transparent)" name={t("xDetail.retweets")} />
                 </AreaChart>
               </ResponsiveContainer>
               </div>

@@ -62,12 +62,12 @@ export function AppSidebar({ isAdmin, username, role, loggingOut, onLogout }: { 
   const userTooltip = [username || "—", role].filter(Boolean).join(" · ");
 
   return (
-    <Sidebar collapsible="icon" variant="inset" className="border-sidebar-border">
-      <SidebarHeader className="px-4 py-4">
+    <Sidebar collapsible="icon" variant="inset" className="border-sidebar-border pt-0">
+      <SidebarHeader className="h-16 shrink-0 justify-center px-4 py-0 group-data-[collapsible=icon]:px-0">
         <AppTitle />
       </SidebarHeader>
-      <SidebarSeparator />
-      <SidebarContent className="gap-2 px-2 py-3">
+      <SidebarSeparator className="-mt-px" />
+      <SidebarContent className="gap-2 px-2 pb-3 pt-2">
         <NavGroup items={mainItems} />
         <SidebarSeparator />
         <NavGroup items={connectionItems} />

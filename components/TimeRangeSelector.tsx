@@ -1,10 +1,14 @@
 import { useTranslation } from "react-i18next";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 
-const OPTIONS: { value: number; labelKey: string }[] = [
+export const SHORT_TIME_RANGE_OPTIONS: { value: number; labelKey: string }[] = [
   { value: 7, labelKey: "timeRange.7d" },
   { value: 30, labelKey: "timeRange.30d" },
   { value: 90, labelKey: "timeRange.90d" },
+];
+
+const OPTIONS: { value: number; labelKey: string }[] = [
+  ...SHORT_TIME_RANGE_OPTIONS,
   { value: 180, labelKey: "timeRange.180d" },
   { value: 365, labelKey: "timeRange.1y" },
 ];

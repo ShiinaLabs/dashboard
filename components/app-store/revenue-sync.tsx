@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { SHORT_TIME_RANGE_OPTIONS } from "@/components/TimeRangeSelector";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +43,7 @@ export function RevenueSyncPanel({ connectionId, isActive, vendorNumber, onEdit 
     {vendorNumber && <dl className="grid gap-3 text-sm sm:grid-cols-3"><div><dt className="text-muted-foreground">{t("appStore.vendorNumber")}</dt><dd>{vendorNumber}</dd></div>{["sales", "finance"].map((source) => <div key={source}><dt className="text-muted-foreground">{t(`revenue.sources.${source}`)}</dt><dd>{t("revenue.vendorReady")}</dd></div>)}</dl>}
     {!vendorNumber && <div className="space-y-2"><p className="text-sm text-muted-foreground">{t("revenue.setupRequired")}</p><Button variant="outline" onClick={onEdit}>{t("revenue.addVendor")}</Button></div>}
     <div className="flex flex-wrap items-end gap-3">
-      <div className="space-y-2"><Label>{t("revenue.salesDates")}</Label><div className="flex gap-1">{[7, 30, 90].map((days) => <Button key={days} size="sm" variant={range === days ? "secondary" : "ghost"} aria-pressed={range === days} onClick={() => setRange(days)}>{days}D</Button>)}</div></div>
+      <div className="space-y-2"><Label>{t("revenue.salesDates")}</Label><div className="flex gap-1">{SHORT_TIME_RANGE_OPTIONS.map(({ value: days, labelKey }) => <Button key={days} size="sm" variant={range === days ? "secondary" : "ghost"} aria-pressed={range === days} onClick={() => setRange(days)}>{t(labelKey)}</Button>)}</div></div>
       <div className="space-y-2"><Label htmlFor={`finance-month-${connectionId}`}>{t("revenue.fiscalMonth")}</Label><Input id={`finance-month-${connectionId}`} type="month" value={month} onChange={(e) => setMonth(e.target.value)} /></div>
       <Button disabled={busy || !isActive || !month} onClick={() => void sync()}>{t(busy ? "revenue.syncing" : "revenue.sync")}</Button>
     </div>

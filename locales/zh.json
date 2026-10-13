@@ -1,12 +1,12 @@
 {
   "timeRange": {
     "label": "时间范围",
-    "7d": "7 天",
-    "14d": "14 天",
-    "30d": "30 天",
-    "90d": "3 个月",
-    "180d": "6 个月",
-    "1y": "1 年"
+    "7d": "7D",
+    "14d": "14D",
+    "30d": "30D",
+    "90d": "3M",
+    "180d": "6M",
+    "1y": "1Y"
   },
   "common": {
     "dashboard": "数据聚合中心",
@@ -124,10 +124,7 @@
       "noSites": "尚未追踪任何网站。",
       "setup": "设置网站分析",
       "noTraffic": "该周期暂无网站流量。",
-      "moreSites": "另有 {{count}} 个网站",
-      "range7d": "7天",
-      "range30d": "30天",
-      "range90d": "90天"
+      "moreSites": "另有 {{count}} 个网站"
     },
     "bothPlatforms": "3 个平台",
     "platformX": "X",

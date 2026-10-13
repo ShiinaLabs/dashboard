@@ -61,7 +61,7 @@ function NavLinkItem({ entry, nested = false }: { entry: NavLinkEntry; nested?: 
       <SidebarMenuButton asChild isActive={active} tooltip={entry.label}>
         <Link to={entry.to} onClick={onNavigate} aria-current={active ? "page" : undefined}>
           <Icon aria-hidden="true" />
-          <span>{entry.label}</span>
+          <span className="group-data-[collapsible=icon]:sr-only">{entry.label}</span>
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -97,8 +97,8 @@ function NavTreeItem({ entry }: { entry: NavTreeEntry }) {
             }}
           >
             <Icon aria-hidden="true" />
-            <span>{entry.label}</span>
-            <ChevronDown className="ms-auto transition-transform group-data-[state=open]/collapsible:rotate-180" aria-hidden="true" />
+            <span className="group-data-[collapsible=icon]:sr-only">{entry.label}</span>
+            <ChevronDown className="ms-auto transition-transform group-data-[state=open]/collapsible:rotate-180 group-data-[collapsible=icon]:hidden" aria-hidden="true" />
           </SidebarMenuButton>
         </CollapsibleTrigger>
         <CollapsibleContent>

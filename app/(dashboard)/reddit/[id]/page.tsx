@@ -16,6 +16,7 @@ import { ChartCard } from "@/components/domain/shared/ChartCard";
 import { TriggerPanel } from "@/components/TriggerPanel";
 import { TimeRangeSelector } from "@/components/TimeRangeSelector";
 import { calcYAxisWidth } from "@/lib/client/chart-utils";
+import { TREND_SERIES_STYLE } from "@/components/chart-series-style";
 import { ArrowLeft, ArrowUpRight, Trash2, AlertCircle, ThumbsUp, MessageSquare, TrendingUp, FileText } from "lucide-react";
 import { useIsMobile } from "@/lib/client/useIsMobile";
 import { RedditIcon } from "@/components/BrandIcons";
@@ -176,8 +177,8 @@ export default function RedditDetail() {
                     <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} tickFormatter={(v) => v.slice(5)} />
                     <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={calcYAxisWidth(timeline, "post_karma", "comment_karma")} />
                     <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "12px" }} />
-                    <Line type="monotone" dataKey="post_karma" stroke="var(--chart-4)" name={t("redditDetail.postKarma")} dot={false} />
-                    <Line type="monotone" dataKey="comment_karma" stroke="var(--chart-1)" name={t("redditDetail.commentKarma")} dot={false} />
+                    <Line {...TREND_SERIES_STYLE} dataKey="post_karma" stroke="var(--chart-4)" name={t("redditDetail.postKarma")} />
+                    <Line {...TREND_SERIES_STYLE} dataKey="comment_karma" stroke="var(--chart-1)" name={t("redditDetail.commentKarma")} />
                   </LineChart>
                 </ResponsiveContainer>
                 </div>

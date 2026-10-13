@@ -19,6 +19,7 @@ import { calcYAxisWidth } from "@/lib/client/chart-utils";
 import { sumSelectedAssetDownloads } from "@/lib/utils/download-growth";
 import { ActionIcon, Button, Checkbox, TextInput } from "@/components/ui/form-controls";
 import { ChartCard } from "@/components/domain/shared/ChartCard";
+import { TREND_SERIES_STYLE } from "@/components/chart-series-style";
 import { useEntityTitle } from "@/lib/client/document-title";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
 
@@ -319,12 +320,11 @@ function ReleaseGrowthChart({ visibleReleases, growthData, growthDays, isPending
           />
           {visibleReleases.map((release) => (
             <Line
+              {...TREND_SERIES_STYLE}
               key={release.id}
-              type="monotone"
               dataKey={releaseKey(release.id)}
               name={release.tag_name || `#${release.release_id}`}
               stroke={COLORS[release.id % COLORS.length]}
-              strokeWidth={2}
               dot={{ r: 3 }}
               connectNulls
             />
@@ -532,7 +532,7 @@ export default function RepoDetail() {
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} tickFormatter={(v) => v.slice(5)} />
                 <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={calcYAxisWidth(snapshots, "stars")} />
                 <Tooltip contentStyle={CHART_TOOLTIP_CONTENT_STYLE} itemStyle={CHART_TOOLTIP_ITEM_STYLE} wrapperStyle={CHART_TOOLTIP_WRAPPER_STYLE} />
-                <Area type="monotone" dataKey="stars" stroke="var(--chart-3)" fill="color-mix(in oklch, var(--chart-3) 12%, transparent)" name={t("repoDetail.stars")} />
+                <Area {...TREND_SERIES_STYLE} dataKey="stars" stroke="var(--chart-3)" fill="color-mix(in oklch, var(--chart-3) 12%, transparent)" name={t("repoDetail.stars")} />
               </AreaChart>
             </ResponsiveContainer>
             </div>
@@ -636,7 +636,7 @@ export default function RepoDetail() {
                         <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={calcYAxisWidth(referrerHistoryChart, ...(referrers.slice(0, 10).map(r => r.referrer)))} />
                         <Tooltip contentStyle={CHART_TOOLTIP_CONTENT_STYLE} itemStyle={CHART_TOOLTIP_ITEM_STYLE} wrapperStyle={CHART_TOOLTIP_WRAPPER_STYLE} />
                         {referrers.slice(0, 10).map((ref, i) => (
-                          <Line key={ref.referrer} type="monotone" dataKey={ref.referrer} stroke={COLORS[i]} strokeWidth={2} dot={false} />
+                          <Line {...TREND_SERIES_STYLE} key={ref.referrer} dataKey={ref.referrer} stroke={COLORS[i]} />
                         ))}
                       </LineChart>
                     </ResponsiveContainer>
@@ -688,7 +688,7 @@ export default function RepoDetail() {
                         <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={calcYAxisWidth(pathHistoryChart, ...(paths.slice(0, 10).map(p => p.path)))} />
                         <Tooltip contentStyle={CHART_TOOLTIP_CONTENT_STYLE} itemStyle={CHART_TOOLTIP_ITEM_STYLE} wrapperStyle={CHART_TOOLTIP_WRAPPER_STYLE} />
                         {paths.slice(0, 10).map((p, i) => (
-                          <Line key={p.path} type="monotone" dataKey={p.path} stroke={COLORS[i]} strokeWidth={2} dot={false} />
+                          <Line {...TREND_SERIES_STYLE} key={p.path} dataKey={p.path} stroke={COLORS[i]} />
                         ))}
                       </LineChart>
                     </ResponsiveContainer>

@@ -12,6 +12,7 @@ import { AnalyticsDimensionCard } from "@/components/domain/analytics/AnalyticsD
 import { AnalyticsAtAGlance } from "@/components/domain/analytics/AnalyticsAtAGlance";
 import { AnalyticsWorldMap } from "@/components/domain/analytics/AnalyticsWorldMap";
 import { ChartCard } from "@/components/domain/shared/ChartCard";
+import { TREND_SERIES_STYLE } from "@/components/chart-series-style";
 import { MetricCard, MetricCardSkeleton } from "@/components/domain/shared/MetricCard";
 import { MetricGrid } from "@/components/domain/shared/MetricGrid";
 import { api } from "@/lib/api";
@@ -22,6 +23,7 @@ import { calcYAxisWidth } from "@/lib/client/chart-utils";
 import { useIsMobile } from "@/lib/client/useIsMobile";
 import { notifications } from "@/components/ui/notifications";
 import { pageMeta, type PageTitleKey, type TitleHandle } from "@/lib/page-titles";
+import { SHORT_TIME_RANGE_OPTIONS } from "@/components/TimeRangeSelector";
 
 const titleKey = "nav.analytics" satisfies PageTitleKey;
 export const meta = pageMeta(titleKey);
@@ -226,16 +228,25 @@ export default function WebAnalyticsPage() {
         {selectedSite && !showRenameForm ? <Button variant="outline" onClick={() => { setSiteName(selectedSite.name); setShowRenameForm(true); }}>{t("analytics.renameSite")}</Button> : null}
       </div> : null}
 
-      {sites.length > 0 ? <div className="flex items-center gap-1" role="group" aria-label={t("analytics.range")}>{([
-        ["DAYS_7", "7D"], ["DAYS_30", "30D"], ["DAYS_90", "90D"],
-      ] as const).map(([range, label]) => <Button
-        key={range}
-        type="button"
-        size="sm"
-        variant={selectedRange === range ? "default" : "outline"}
-        aria-pressed={selectedRange === range}
-        onClick={() => setSelectedRange(range)}
-      >{label}</Button>)}</div> : null}
+      {sites.length > 0 ? (
+        <div className="flex items-center gap-1" role="group" aria-label={t("analytics.range")}>
+          {SHORT_TIME_RANGE_OPTIONS.map(({ value, labelKey }) => {
+            const range = `DAYS_${value}` as AnalyticsRange;
+            return (
+              <Button
+                key={range}
+                type="button"
+                size="sm"
+                variant={selectedRange === range ? "default" : "outline"}
+                aria-pressed={selectedRange === range}
+                onClick={() => setSelectedRange(range)}
+              >
+                {t(labelKey)}
+              </Button>
+            );
+          })}
+        </div>
+      ) : null}
 
       {showForm ? <form className="grid gap-4 rounded-xl border bg-card p-5 sm:grid-cols-2" onSubmit={(event) => { event.preventDefault(); createSite.mutate({ name, host }); }}>
         <div className="space-y-2"><Label htmlFor="analytics-site-name">{t("analytics.name")}</Label><Input id="analytics-site-name" value={name} onChange={(event) => setName(event.target.value)} required /></div>
@@ -280,8 +291,8 @@ export default function WebAnalyticsPage() {
                     <XAxis dataKey="date" interval="preserveStartEnd" minTickGap={24} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} tickFormatter={(date: string) => date.slice(5)} />
                     <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={calcYAxisWidth(globalDashboard.timeline, "views", "visits")} />
                     <Tooltip labelFormatter={(date) => String(date)} contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "12px" }} />
-                    <Line type="monotone" dataKey="views" name={t("analytics.views")} stroke="var(--chart-1)" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="visits" name={t("analytics.visits")} stroke="var(--chart-2)" strokeWidth={2} dot={false} />
+                    <Line {...TREND_SERIES_STYLE} dataKey="views" name={t("analytics.views")} stroke="var(--chart-1)" />
+                    <Line {...TREND_SERIES_STYLE} dataKey="visits" name={t("analytics.visits")} stroke="var(--chart-2)" />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -376,9 +387,9 @@ export default function WebAnalyticsPage() {
                     labelFormatter={(date) => String(date)}
                     contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "12px" }}
                   />
-                  <Line type="monotone" dataKey="views" name={t("analytics.views")} stroke="var(--chart-1)" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="visitors" name={t("analytics.visitors")} stroke="var(--chart-2)" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="visits" name={t("analytics.visits")} stroke="var(--chart-3)" strokeWidth={2} dot={false} />
+                  <Line {...TREND_SERIES_STYLE} dataKey="views" name={t("analytics.views")} stroke="var(--chart-1)" />
+                  <Line {...TREND_SERIES_STYLE} dataKey="visitors" name={t("analytics.visitors")} stroke="var(--chart-2)" />
+                  <Line {...TREND_SERIES_STYLE} dataKey="visits" name={t("analytics.visits")} stroke="var(--chart-3)" />
                 </LineChart>
               </ResponsiveContainer>
               </div>

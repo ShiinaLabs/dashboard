@@ -6,6 +6,7 @@ import { getGitlabProjectPage } from "@/lib/client/graphql/platform-dashboards";
 import { formatDate } from "@/lib/client/datetime";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChartCard } from "@/components/domain/shared/ChartCard";
+import { TREND_SERIES_STYLE } from "@/components/chart-series-style";
 import { calcYAxisWidth } from "@/lib/client/chart-utils";
 import { Badge } from "@/components/ui/badge";
 import { TimeRangeSelector } from "@/components/TimeRangeSelector";
@@ -109,7 +110,7 @@ export default function ProjectDetail() {
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} tickFormatter={(v) => v.slice(5)} />
                 <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} width={calcYAxisWidth(snapshots, "stars")} />
                 <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "12px" }} />
-                <Area type="monotone" dataKey="stars" stroke="var(--chart-3)" fill="color-mix(in oklch, var(--chart-3) 12%, transparent)" name={t("projectDetail.stars")} />
+                <Area {...TREND_SERIES_STYLE} dataKey="stars" stroke="var(--chart-3)" fill="color-mix(in oklch, var(--chart-3) 12%, transparent)" name={t("projectDetail.stars")} />
               </AreaChart>
             </ResponsiveContainer>
             </div>
