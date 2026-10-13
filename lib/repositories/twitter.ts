@@ -1,5 +1,5 @@
 // @ts-nocheck — Drizzle ORM types are complex
-import { eq, and, desc, sql, count, inArray, gte, lt, like, type SQL } from "drizzle-orm";
+import { eq, and, asc, desc, sql, count, inArray, gte, lt, like, type SQL } from "drizzle-orm";
 import { getDb } from "../db/connection";
 import { tweets, user_stats } from "@/db/schema";
 import type { OverviewStats } from "../../shared/types";
@@ -106,7 +106,7 @@ export async function getTweets(page: number, limit: number, sort: string, order
     view_count: tweets.view_count,
   };
   const sortCol = allowed[sort] || tweets.created_at;
-  const sortOrder = order === "asc" ? sortCol.nullsLast() : desc(sortCol).nullsLast();
+  const sortOrder = sql`${order === "asc" ? asc(sortCol) : desc(sortCol)} NULLS LAST`;
   const [total] = await db.select({ count: count() }).from(tweets).where(whereClause);
   const data = await db.select().from(tweets).where(whereClause).orderBy(sortOrder).limit(limit).offset(offset);
   return { data, total: total.count, page, limit, totalPages: Math.ceil(total.count / limit) };
@@ -166,7 +166,7 @@ export async function getTopTweets(metric: string, limit: number, accountIds?: n
   };
   const col = allowed[metric] || tweets.favorite_count;
   const whereClause = hasIds(accountIds) ? inArray(tweets.account_id, accountIds) : undefined;
-  return getDb().select().from(tweets).where(whereClause).orderBy(desc(col).nullsLast()).limit(limit);
+  return getDb().select().from(tweets).where(whereClause).orderBy(sql`${desc(col)} NULLS LAST`).limit(limit);
 }
 
 export async function getCalendarData(yr: number, accountIds?: number[]) {

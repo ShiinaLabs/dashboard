@@ -976,6 +976,27 @@ describe("twitter queries", () => {
     expect(result.data[0].full_text).toBe("Hello test");
   });
 
+  it("sorts tweet metrics in both directions with unknown values after real zeroes", async () => {
+    const pool = getTestPool();
+    const { rows: accounts } = await pool.query(
+      "INSERT INTO accounts (owner_id, screen_name, platform, auth_token) SELECT owner_id, 'tweet_sort_test', 'twitter', 'tok' FROM accounts WHERE id = $1 RETURNING id",
+      [acctId],
+    );
+    const accountId = accounts[0].id;
+    await pool.query(
+      `INSERT INTO tweets (id, account_id, full_text, created_at, view_count) VALUES
+       ('sort_unknown', $1, 'unknown', '2024-01-01T00:00:00Z', NULL),
+       ('sort_zero', $1, 'zero', '2024-01-02T00:00:00Z', 0),
+       ('sort_five', $1, 'five', '2024-01-03T00:00:00Z', 5)`,
+      [accountId],
+    );
+    const ascending = await twitterQ.getTweets(1, 10, "view_count", "asc", undefined, [accountId]);
+    const descending = await twitterQ.getTweets(1, 10, "view_count", "desc", undefined, [accountId]);
+    expect(ascending.data.map((tweet) => tweet.id)).toEqual(["sort_zero", "sort_five", "sort_unknown"]);
+    expect(descending.data.map((tweet) => tweet.id)).toEqual(["sort_five", "sort_zero", "sort_unknown"]);
+    expect((await twitterQ.getTopTweets("view_count", 10, [accountId])).map((tweet) => tweet.id)).toEqual(["sort_five", "sort_zero", "sort_unknown"]);
+  });
+
   it("filters calendar rows by year from ISO text timestamps", async () => {
     const days = ["2024-12-31", "2025-01-01", "2025-12-31", "2026-01-01"];
     await Promise.all(days.map((day, index) => twitterQ.upsertTweet({
@@ -1937,10 +1958,17 @@ describe("independent App Store Connect foundation", () => {
       expect(await commit(first)).toBe("skipped");
       expect((await ascFacts.readAnalyticsFacts([app.id])).downloads).toHaveLength(2);
       await commit(prepared("corrected", "2026-10-02", "20", "b".repeat(32)));
-      expect(await commit(prepared("older", "2026-09-30", "99", "c".repeat(32)))).toBe("skipped");
+      const older = prepared("older", "2026-09-30", "99", "c".repeat(32));
+      // The stale 09-29 facts stay untouched, but this instance adds missing 09-28 completion evidence.
+      expect(await commit(older)).toBe("imported");
+      expect(await commit(older)).toBe("skipped");
       expect(await commit(prepared("equal-other", "2026-10-02", "98", "d".repeat(32)))).toBe("skipped");
       let facts = await ascFacts.readAnalyticsFacts([app.id]);
       expect(facts.downloads.map((r) => Number(r.counts))).toEqual([20, 2]);
+      expect(facts.partitions).toEqual(expect.arrayContaining([
+        expect.objectContaining({ date: "2026-09-29", source_instance_id: "corrected", processing_date: "2026-10-02" }),
+        expect.objectContaining({ date: "2026-09-28", source_instance_id: "older", processing_date: "2026-09-30", coverage_source: "daily_complete" }),
+      ]));
       await commit(prepared("corrected", "2026-10-02", "21", "e".repeat(32)));
       facts = await ascFacts.readAnalyticsFacts([app.id]);
       expect(facts.downloads.map((r) => Number(r.counts))).toEqual([21, 2]);
@@ -1978,8 +2006,14 @@ describe("independent App Store Connect foundation", () => {
       expect(await ascFacts.commitAnalyticsInstance(pendingContext, noSegments, mapped)).toBe("skipped");
       const snapshotPrepared = { ...prepared, instanceId: "snapshot-zero-instance" };
       const snapshotMapped = mapAnalyticsReport("downloads", snapshotPrepared.table, { appId: app.id, appleId: "123", instanceId: snapshotPrepared.instanceId, processingDate: snapshotPrepared.processingDate });
-      expect(await ascFacts.commitAnalyticsInstance({ ...context, requestId: snapshot.id, accessType: snapshot.access_type }, snapshotPrepared, snapshotMapped)).toBe("imported");
+      // A validated empty snapshot records its manifest but cannot change any business-date partition.
+      const snapshotContext = { ...context, requestId: snapshot.id, accessType: snapshot.access_type };
+      expect(await ascFacts.commitAnalyticsInstance(snapshotContext, snapshotPrepared, snapshotMapped)).toBe("skipped");
+      expect(await ascFacts.commitAnalyticsInstance(snapshotContext, snapshotPrepared, snapshotMapped)).toBe("skipped");
       expect((await ascFacts.readAnalyticsFacts([app.id])).partitions.filter((row) => row.source_instance_id === snapshotPrepared.instanceId)).toEqual([]);
+      expect(await appStoreAnalyticsRepo.importsForApps([app.id])).toEqual(expect.arrayContaining([
+        expect.objectContaining({ apple_instance_id: snapshotPrepared.instanceId, status: "imported" }),
+      ]));
 
       const insertImport = async (requestId: number, instanceId: string, processingDate: string) => getTestPool().query(
         "INSERT INTO app_store_report_imports (app_id, analytics_request_id, report_name, report_category, apple_report_id, apple_instance_id, apple_segment_id, granularity, processing_date, checksum, status, imported_at) VALUES ($1, $2, 'App Store Purchases Standard', 'COMMERCE', 'purchase-report', $3, $4, 'DAILY', $5, $6, 'imported', $7)",
