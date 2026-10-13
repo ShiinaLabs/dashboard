@@ -127,7 +127,15 @@ export default function Settings() {
       <section className="space-y-4 rounded-lg border bg-card p-5">
         <h3 className="text-sm font-semibold">{t("settings.language")}</h3>
         <div>
-          <SegmentedControl value={i18n.language} onChange={(value) => void i18n.changeLanguage(value)} data={LANG_OPTIONS} fullWidth />
+          <SegmentedControl
+            value={i18n.language}
+            onChange={(value) => {
+              void i18n.changeLanguage(value);
+              try { localStorage.setItem("i18n-lang", value); } catch { /* Browser storage can be disabled. */ }
+            }}
+            data={LANG_OPTIONS}
+            fullWidth
+          />
         </div>
       </section>
 

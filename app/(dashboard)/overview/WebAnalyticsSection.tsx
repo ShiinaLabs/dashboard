@@ -96,13 +96,13 @@ export function WebAnalyticsSection({ initialData }: { initialData: AnalyticsPor
                 <CardTitle className="text-base">{t("overview.webAnalytics.topSites")}</CardTitle>
               </CardHeader>
               <CardContent className="min-w-0 px-5 pb-5">
-                <div className="mb-2 hidden grid-cols-[minmax(0,1fr)_auto_auto] gap-4 px-2 text-xs font-medium text-muted-foreground sm:grid">
+                <div className="mb-2 hidden grid-cols-[minmax(0,1fr)_6rem_6rem] gap-4 px-2 text-xs font-medium text-muted-foreground sm:grid">
                   <span>{t("overview.webAnalytics.site")}</span>
-                  <span>{t("analytics.views")}</span>
-                  <span>{t("analytics.visits")}</span>
+                  <span className="text-right">{t("analytics.views")}</span>
+                  <span className="text-right">{t("analytics.visits")}</span>
                 </div>
-                <ul className="space-y-1">
-                  {data.sites.slice(0, 5).map((site) => <li key={site.id} className="flex min-w-0 flex-col gap-2 rounded-md px-2 py-3 sm:grid sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:gap-4">
+                <ul className="m-0 list-none space-y-1 p-0">
+                  {data.sites.slice(0, 5).map((site) => <li key={site.id} className="flex min-w-0 flex-col gap-2 rounded-md px-2 py-3 sm:grid sm:grid-cols-[minmax(0,1fr)_6rem_6rem] sm:items-center sm:gap-4">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium" title={site.name}>{site.name}</p>
                       <p className="truncate text-xs text-muted-foreground" title={site.host}>{site.host}</p>
