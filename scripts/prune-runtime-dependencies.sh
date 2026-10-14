@@ -8,7 +8,7 @@ if [ ! -d "$node_modules_dir" ]; then
 fi
 
 # These files are only useful to editors, type checkers, or debuggers.
-find "$node_modules_dir" -type f \(
+find "$node_modules_dir" -type f \( \
   -name '*.map' -o \
   -name '*.d.ts' -o \
   -name '*.d.mts' -o \
