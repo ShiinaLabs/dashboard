@@ -37,6 +37,29 @@ test("mock login keeps its session and opens the requested route", async ({ page
   });
 });
 
+test("dashboard shell uses one full-width header above the desktop sidebar", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await establishMockSession(page);
+  await page.goto("/overview");
+
+  const header = page.locator("[data-shell-header]");
+  const sidebar = page.locator('[data-slot="sidebar-container"]');
+  await expect(header).toBeVisible();
+  await expect(sidebar).toBeVisible();
+  await expect.poll(() => header.evaluate((element) => element.getBoundingClientRect().width)).toBe(1440);
+  const headerHeight = await header.evaluate((element) => element.getBoundingClientRect().height);
+  const sidebarTop = await sidebar.evaluate((element) => element.getBoundingClientRect().top);
+  expect(headerHeight).toBe(64);
+  expect(sidebarTop).toBe(headerHeight);
+  await expect(header.getByRole("link", { name: "Data Hub" })).toBeVisible();
+  await expect(header.getByRole("status", { name: /Dashboard server freshness:/ })).toBeVisible();
+
+  const expandedSidebarWidth = await sidebar.evaluate((element) => element.getBoundingClientRect().width);
+  await header.getByRole("button", { name: "Collapse sidebar" }).click();
+  await expect.poll(() => sidebar.evaluate((element) => element.getBoundingClientRect().width)).toBeLessThan(expandedSidebarWidth);
+  expect(await sidebar.evaluate((element) => element.getBoundingClientRect().top)).toBe(headerHeight);
+});
+
 test("authenticated route HTML contains the useful app shell before browser JavaScript runs", async ({ page }) => {
   await establishMockSession(page);
   const response = await page.request.get("/overview");

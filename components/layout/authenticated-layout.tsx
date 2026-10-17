@@ -48,20 +48,22 @@ export function AuthenticatedLayout({ children, user }: { children: React.ReactN
   };
 
   return (
-    <SidebarProvider open={open} onOpenChange={setSidebarOpen}>
+    <SidebarProvider open={open} onOpenChange={setSidebarOpen} className="flex min-h-svh flex-col">
       <NavigationProgress />
       <NavigatingOverlay />
-      <AppSidebar
-        isAdmin={user.role === "admin"}
-        username={user.username}
-        role={user.role}
-        loggingOut={loggingOut}
-        onLogout={handleLogout}
-      />
-      <SidebarInset className="min-h-svh overflow-x-clip md:peer-data-[variant=inset]:mt-0">
-        <Header />
-        <Main>{children}</Main>
-      </SidebarInset>
+      <Header />
+      <div className="flex min-h-[calc(100svh-4rem)] flex-1">
+        <AppSidebar
+          isAdmin={user.role === "admin"}
+          username={user.username}
+          role={user.role}
+          loggingOut={loggingOut}
+          onLogout={handleLogout}
+        />
+        <SidebarInset className="min-h-0 overflow-x-clip md:peer-data-[variant=inset]:mt-0">
+          <Main>{children}</Main>
+        </SidebarInset>
+      </div>
       {!isMobile && pathname !== "/ai" && <FloatingAiChat pathname={pathname} />}
     </SidebarProvider>
   );

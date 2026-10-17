@@ -5,7 +5,6 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarHeader,
   SidebarSeparator,
   SidebarMenuButton,
   useSidebar,
@@ -17,7 +16,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { AppTitle } from "./app-title";
 import { NavGroup, type NavEntry } from "./nav-group";
 import { GithubIcon, XIcon, GitlabIcon, RedditIcon } from "@/components/BrandIcons";
 
@@ -62,11 +60,7 @@ export function AppSidebar({ isAdmin, username, role, loggingOut, onLogout }: { 
   const userTooltip = [username || "—", role].filter(Boolean).join(" · ");
 
   return (
-    <Sidebar collapsible="icon" variant="inset" className="border-sidebar-border pt-0">
-      <SidebarHeader className="h-16 shrink-0 justify-center px-4 py-0 group-data-[collapsible=icon]:px-0">
-        <AppTitle />
-      </SidebarHeader>
-      <SidebarSeparator className="-mt-px" />
+    <Sidebar collapsible="icon" variant="inset" offsetTop className="border-sidebar-border">
       <SidebarContent className="gap-2 px-2 pb-3 pt-2">
         <NavGroup items={mainItems} />
         <SidebarSeparator />
