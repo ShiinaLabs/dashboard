@@ -37,14 +37,14 @@ export function Header() {
   const now = useNow();
   const serverChecked = freshness.lastServerCheckAt === null ? "—" : new Date(freshness.lastServerCheckAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const dataRefreshed = freshness.lastSuccessfulDataRefreshAt === null ? "—" : new Date(freshness.lastSuccessfulDataRefreshAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  const freshnessLabel = freshness.serverState === "offline" ? "Offline"
-    : freshness.serverState === "unreachable" ? "Server unavailable"
-      : freshness.serverState === "checking" ? "Checking server…"
-        : freshness.refreshState === "refreshing" ? "Refreshing…"
-          : freshness.refreshState === "failed" ? "Refresh failed"
-            : freshness.lastSuccessfulDataRefreshAt === null ? "Updated —"
-              : now - freshness.lastSuccessfulDataRefreshAt > 10 * 60_000 ? `Stale · ${Math.floor((now - freshness.lastSuccessfulDataRefreshAt) / 60_000)}m`
-                : `Updated ${dataRefreshed}`;
+  const freshnessLabel = freshness.serverState === "offline" ? t("freshness.offline")
+    : freshness.serverState === "unreachable" ? t("freshness.serverUnavailable")
+      : freshness.serverState === "checking" ? t("freshness.checking")
+        : freshness.refreshState === "refreshing" ? t("freshness.refreshing")
+          : freshness.refreshState === "failed" ? t("freshness.refreshFailed")
+            : freshness.lastSuccessfulDataRefreshAt === null ? t("freshness.updatedUnknown")
+              : now - freshness.lastSuccessfulDataRefreshAt > 10 * 60_000 ? t("freshness.stale", { minutes: Math.floor((now - freshness.lastSuccessfulDataRefreshAt) / 60_000) })
+                : t("freshness.updated", { time: dataRefreshed });
   return (
     <header data-shell-header className="sticky top-0 z-20 flex h-16 w-full shrink-0 items-center gap-3 bg-background px-4 shadow-[inset_0_-1px_0_var(--border)] md:px-6">
       <div
@@ -62,7 +62,7 @@ export function Header() {
         <span aria-hidden="true" className="hidden text-muted-foreground sm:inline">/</span>
         <span className="truncate font-medium text-foreground">{context}</span>
       </nav>
-      <span role="status" aria-label={`Dashboard server freshness: ${freshnessLabel}`} title={`Server checked ${serverChecked}; Data refreshed ${dataRefreshed}`} className="ml-auto shrink-0 text-xs text-muted-foreground">{freshnessLabel}</span>
+      <span role="status" aria-label={t("freshness.statusLabel", { state: freshnessLabel })} title={t("freshness.title", { checked: serverChecked, refreshed: dataRefreshed })} className="ml-auto shrink-0 text-xs text-muted-foreground">{freshnessLabel}</span>
     </header>
   );
 }

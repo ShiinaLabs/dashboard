@@ -9,7 +9,7 @@ import {
   updateAccount,
 } from "../db";
 import { getLogger } from "../logger";
-import { fetchWithConfig } from "../http";
+import { fetchGitlabWithSafety } from "../gitlab-http";
 import { validateUpstreamUrl } from "../ssrf-guard";
 
 function getApiBase(account: AccountRow): string {
@@ -33,7 +33,7 @@ async function glFetch<T>(apiBase: string, path: string, token: string): Promise
   const url = `${apiBase}${path}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30_000);
-  const res = await fetchWithConfig(url, {
+  const res = await fetchGitlabWithSafety(url, {
     headers: {
       "PRIVATE-TOKEN": token,
       "User-Agent": "dashboard",
@@ -109,13 +109,13 @@ export async function fetchGitlabAccount(account: AccountRow) {
     return 0;
   }
   runningGitlabAccounts.add(account.id);
-  const apiBase = getApiBase(account);
   const token = account.auth_token;
   const errorMessages: string[] = [];
   let failedReleaseProjects = 0;
   let recordedCoreData = false;
 
   try {
+    const apiBase = getApiBase(account);
     // 1. Fetch authenticated user profile
     getLogger().info("GitLab", "Fetching user profile from %s...", apiBase);
     const { data: user } = await glFetch<Record<string, unknown>>(apiBase, "/user", token);

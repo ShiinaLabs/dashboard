@@ -46,7 +46,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
     const browserLanguage = navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
     const language = savedLanguage === "zh" || savedLanguage === "en" ? savedLanguage : browserLanguage;
     if (language !== i18n.language) void i18n.changeLanguage(language);
-    return () => cancelAnimationFrame(frame);
+    const syncDocumentLanguage = (nextLanguage: string) => {
+      document.documentElement.lang = nextLanguage.startsWith("zh") ? "zh" : "en";
+    };
+    syncDocumentLanguage(i18n.language);
+    i18n.on("languageChanged", syncDocumentLanguage);
+    return () => {
+      i18n.off("languageChanged", syncDocumentLanguage);
+      cancelAnimationFrame(frame);
+    };
   }, []);
   useEffect(() => {
     if (settings.mode !== "system") return;

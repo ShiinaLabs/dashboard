@@ -41,10 +41,17 @@ export function AuthenticatedLayout({ children, user }: { children: React.ReactN
 
   const handleLogout = async () => {
     setLoggingOut(true);
-    try { await api.logout(); } catch { /* Local logout must still end the session view. */ }
-    queryClient.setQueryData(["auth", "me"], { authenticated: false });
-    setLoggingOut(false);
-    navigate("/login");
+    try {
+      await api.logout();
+    } catch {
+      // Local logout must still end the session view.
+    } finally {
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      queryClient.setQueryData(["auth", "me"], { authenticated: false });
+      setLoggingOut(false);
+      navigate("/login");
+    }
   };
 
   return (

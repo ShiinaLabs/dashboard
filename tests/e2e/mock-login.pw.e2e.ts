@@ -793,6 +793,36 @@ test("account form exposes selected platform and Reddit access mode", async ({ p
   await expect(publicButton).toHaveAttribute("aria-pressed", "false");
 });
 
+test("logout clears user queries and cancels pending requests even when the API fails", async ({ page }) => {
+  await logIn(page);
+
+  const settingsRequests: string[] = [];
+  let releaseSettings!: () => void;
+  const heldSettings = new Promise<void>((resolve) => { releaseSettings = resolve; });
+  await page.route("**/api/graphql", async (route) => {
+    const body = route.request().postData() ?? "";
+    if (!body.includes("SettingsPage")) return route.continue();
+    settingsRequests.push(body);
+    await heldSettings;
+    return route.continue();
+  });
+  await page.goto("/settings");
+  await expect.poll(() => settingsRequests.length).toBeGreaterThan(0);
+
+  await page.route("**/api/auth/logout", (route) => route.fulfill({ status: 500, body: "logout failed" }));
+  const failedRequest = page.waitForEvent("requestfailed", (request) => request.url().includes("/api/graphql"));
+  await page.getByRole("button", { name: "admin admin", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Log out" }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  expect((await failedRequest).failure()?.errorText).toContain("ERR_ABORTED");
+
+  releaseSettings();
+  const requestsBeforeSecondSession = settingsRequests.length;
+  await logIn(page);
+  await page.goto("/settings");
+  await expect.poll(() => settingsRequests.length).toBeGreaterThan(requestsBeforeSecondSession);
+});
+
 test("mobile navigation opens, closes, and logout returns to login", async ({ page }) => {
   const logoutRequests: string[] = [];
   page.on("request", (request) => {
@@ -873,6 +903,45 @@ test("password visibility can be toggled through keyboard focus", async ({ page 
   await page.getByRole("button", { name: "Hide password" }).focus();
   await page.keyboard.press("Space");
   await expect(password).toHaveAttribute("type", "password");
+});
+
+test("confirmation code loading failure blocks confirmation and offers retry", async ({ page }) => {
+  await logIn(page);
+  let attempts = 0;
+  await page.route("**/api/confirm/token**", (route) => {
+    attempts += 1;
+    return attempts === 1
+      ? route.fulfill({ status: 500, contentType: "application/json", body: "{}" })
+      : route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ token: "AB12" }) });
+  });
+  await page.goto("/accounts");
+  await page.getByRole("button", { name: "Delete", exact: true }).first().click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog.getByRole("alert")).toContainText("Could not load the confirmation code.");
+  const confirm = dialog.getByRole("button", { name: "Delete", exact: true });
+  await expect(confirm).toBeDisabled();
+  await dialog.getByRole("button", { name: "Retry" }).click();
+  await expect(dialog.getByLabel("Confirmation code: AB12")).toBeVisible();
+  await dialog.getByRole("textbox", { name: "Enter the code above" }).fill("AB12");
+  await expect(confirm).toBeEnabled();
+  expect(attempts).toBe(2);
+});
+
+test("language selection updates the document language and freshness labels", async ({ page }) => {
+  await logIn(page);
+  await page.goto("/settings");
+  await expect.poll(() => page.locator("html").getAttribute("lang")).toBe("en");
+  await page.getByRole("button", { name: "中文", exact: true }).click();
+  await expect.poll(() => page.locator("html").getAttribute("lang")).toBe("zh");
+  await expect(page.getByRole("status", { name: /仪表板服务器状态：/ })).toBeVisible();
+});
+
+test("AI settings controls are identified by their visible labels", async ({ page }) => {
+  await logIn(page);
+  await page.goto("/settings");
+  for (const name of ["Endpoint URL", "API Key", "Model"]) {
+    await expect(page.getByLabel(name, { exact: true })).toBeVisible();
+  }
 });
 
 test("theme tokens remain applied across the requested light and dark themes", async ({ page }) => {

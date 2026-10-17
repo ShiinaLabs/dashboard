@@ -1,7 +1,7 @@
 // GitLab REST client — pure data fetching with pagination/retry, mirrors GithubClient.
-import { fetchWithConfig } from "../../http";
+import { fetchGitlabWithSafety } from "../../gitlab-http";
 
-type FetchFn = typeof fetchWithConfig;
+type FetchFn = typeof fetchGitlabWithSafety;
 
 interface Page<T> { data: T; nextPage: number | null; }
 
@@ -14,7 +14,7 @@ function parseNextPage(linkHeader: string | null): number | null {
 export class GitlabClient {
   constructor(
     private apiBase: string,
-    private fetchFn: FetchFn = fetchWithConfig,
+    private fetchFn: FetchFn = fetchGitlabWithSafety,
   ) {}
 
   private async fetch<T>(path: string, token: string, page?: number): Promise<Page<T>> {

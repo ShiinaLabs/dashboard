@@ -19,6 +19,8 @@
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar",
     "save": "Save",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "copyright": "© 2026 Data Hub"
   },
   "login": {
@@ -32,7 +34,27 @@
     "mockHint": "Mock mode: any username / password works, password may be empty"
   },
   "confirm": {
-    "enterCode": "Enter the code above"
+    "enterCode": "Enter the code above",
+    "codeValue": "Confirmation code: {{code}}",
+    "loadingCode": "Loading confirmation code…",
+    "codeLoadError": "Could not load the confirmation code.",
+    "retry": "Retry"
+  },
+  "freshness": {
+    "offline": "Offline",
+    "serverUnavailable": "Server unavailable",
+    "checking": "Checking server…",
+    "refreshing": "Refreshing…",
+    "refreshFailed": "Refresh failed",
+    "updatedUnknown": "Updated —",
+    "stale": "Stale · {{minutes}}m",
+    "updated": "Updated {{time}}",
+    "statusLabel": "Dashboard server freshness: {{state}}",
+    "title": "Server checked {{checked}}; Data refreshed {{refreshed}}"
+  },
+  "notFound": {
+    "message": "Page not found",
+    "back": "Back to dashboard"
   },
   "nav": {
     "overview": "Overview",
@@ -219,6 +241,7 @@
       "quotaExceeded": "Daily token limit reached",
       "quotaUsed": "Used {{used}} / {{limit}} tokens today",
       "saved": "Settings saved",
+      "saveFailed": "Could not save AI settings. Please try again.",
       "error": "Failed to get response",
       "clear": "Clear chat"
     }
@@ -646,7 +669,12 @@
     "autoSchedule": "Auto · L0 24h / L1 90m / L2 8h",
     "connectionCount_one": "{{count}} connection",
     "connectionCount_other": "{{count}} connections",
-    "addConnection": "Add Connection"
+    "addConnection": "Add Connection",
+    "aiEndpoint": "Endpoint URL",
+    "aiHeading": "AI Analysis",
+    "aiApiKey": "API Key",
+    "aiModel": "Model",
+    "aiSaving": "Saving AI settings…"
   },
   "fetchHistory": {
     "title": "Recent fetch runs",

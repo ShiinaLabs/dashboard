@@ -5,7 +5,7 @@ import { themes, type Theme, type ThemeSettings } from "@/lib/client/themes";
 import { api } from "@/lib/api";
 import { getSettingsPage } from "@/lib/client/graphql/settings";
 import { getTimezone, setTimezone as saveTimezone } from "@/lib/client/datetime";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { validatePassword } from "@/lib/client/validatePassword";
 import { PasswordHints } from "@/components/ui/PasswordHints";
@@ -229,6 +229,14 @@ export default function Settings() {
 function AiSettingsSection() {
   const { t } = useTranslation();
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const inFlight = useRef(0);
+  const latestRequest = useRef(0);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (savedTimer.current) clearTimeout(savedTimer.current);
+  }, []);
   const { data: settings, isLoading } = useQuery({
     queryKey: ["settings"],
     queryFn: ({ signal }) => getSettingsPage(signal),
@@ -236,9 +244,27 @@ function AiSettingsSection() {
 
   const mutation = useMutation({
     mutationFn: api.updateSettings,
-    onSuccess: () => {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+    onMutate: () => {
+      const requestId = ++latestRequest.current;
+      inFlight.current += 1;
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+      setSaved(false);
+      setSaveError(false);
+      setSaving(true);
+      return { requestId };
+    },
+    onSuccess: (_data, _variables, context) => {
+      if (context.requestId === latestRequest.current) {
+        setSaved(true);
+        savedTimer.current = setTimeout(() => setSaved(false), 2000);
+      }
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.requestId === latestRequest.current) setSaveError(true);
+    },
+    onSettled: () => {
+      inFlight.current -= 1;
+      if (inFlight.current === 0) setSaving(false);
     },
   });
 
@@ -246,11 +272,12 @@ function AiSettingsSection() {
 
   return (
     <section className="max-w-3xl space-y-4 rounded-lg border bg-card p-5">
-      <h3 className="text-sm font-semibold">AI Analysis</h3>
+      <h3 className="text-sm font-semibold">{t("settings.aiHeading")}</h3>
       <div className="space-y-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium">Endpoint URL</label>
           <TextInput
+            id="settings-ai-endpoint"
+            label={t("settings.aiEndpoint")}
             type="text"
             defaultValue={settings.ai.baseUrl}
             onBlur={(e) => mutation.mutate({ baseUrl: e.target.value })}
@@ -258,8 +285,9 @@ function AiSettingsSection() {
           />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium">API Key</label>
           <PasswordInput
+            id="settings-ai-api-key"
+            label={t("settings.aiApiKey")}
             type="password"
             defaultValue={settings.ai.apiKey === "••••••••" ? "" : settings.ai.apiKey}
             onBlur={(e) => { if (e.target.value) mutation.mutate({ apiKey: e.target.value }); }}
@@ -267,14 +295,17 @@ function AiSettingsSection() {
           />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium">Model</label>
           <TextInput
+            id="settings-ai-model"
+            label={t("settings.aiModel")}
             type="text"
             defaultValue={settings.ai.model}
             onBlur={(e) => mutation.mutate({ model: e.target.value })}
           />
         </div>
-        {saved && <p className="text-sm text-[var(--success)]">{t("aiAgent.saved")}</p>}
+        {saving && <p role="status" className="text-sm text-muted-foreground">{t("settings.aiSaving")}</p>}
+        {!saving && saved && <p role="status" className="text-sm text-[var(--success)]">{t("overview.aiAgent.saved")}</p>}
+        {!saving && saveError && <p role="alert" className="text-sm text-destructive">{t("overview.aiAgent.saveFailed")}</p>}
       </div>
     </section>
   );

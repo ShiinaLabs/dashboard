@@ -1,5 +1,6 @@
 import { json } from "@/lib/api-server";
 import { Link, type MetaFunction } from "react-router";
+import { useTranslation } from "react-i18next";
 import { titleFor } from "@/lib/page-titles";
 
 // No title handle: the page body below is untranslated too, and
@@ -23,17 +24,18 @@ export async function loader() {
 }
 
 export default function NotFound() {
+  const { t } = useTranslation();
   return (
     <main className="min-h-dvh flex flex-col items-center justify-center gap-3 bg-[var(--background)] px-4 text-center">
       <p className="text-6xl font-semibold text-[var(--foreground)]">404</p>
       <p className="text-sm text-[var(--muted-foreground)]">
-        Page not found
+        {t("notFound.message")}
       </p>
       <Link
         to="/"
         className="mt-2 inline-flex min-h-11 items-center justify-center rounded-lg bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-foreground)] hover:opacity-90"
       >
-        Back to dashboard
+        {t("notFound.back")}
       </Link>
     </main>
   );

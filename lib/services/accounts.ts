@@ -118,6 +118,11 @@ export async function createAccount(data: {
   if (!isSupportedPlatform(platform)) {
     throw new Error(`Unsupported platform: ${platform}`);
   }
+  try {
+    assertSafeInstanceUrl(data.instanceUrl);
+  } catch (error) {
+    throw new InvalidAccountInputError(error instanceof Error ? error.message : String(error));
+  }
 
   const token = encToken(data.authToken);
   const account = await accountsRepo.createAccount({
@@ -134,6 +139,13 @@ export async function createAccount(data: {
 
 export async function updateAccount(id: number, updates: Partial<AccountRow>) {
   const safe = { ...updates };
+  if (safe.instance_url !== undefined) {
+    try {
+      assertSafeInstanceUrl(safe.instance_url);
+    } catch (error) {
+      throw new InvalidAccountInputError(error instanceof Error ? error.message : String(error));
+    }
+  }
   if (safe.auth_token) safe.auth_token = encToken(safe.auth_token);
   await accountsRepo.updateAccount(id, safe);
 }

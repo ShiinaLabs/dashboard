@@ -118,6 +118,7 @@ export function AiChatUI({
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.currentTarget.value)}
+            aria-label={t("overview.aiAgent.placeholder")}
             placeholder={t("overview.aiAgent.placeholder")}
             disabled={isStreaming}
             className="min-w-0 flex-1"

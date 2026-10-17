@@ -118,8 +118,8 @@ export const TextInput = Field;
 export const PasswordInput = forwardRef<HTMLInputElement, FieldProps>(function PasswordInput({ visibilityToggleIcon, rightSection, ...props }, ref) {
   const [visible, setVisible] = useState(false);
   const { t } = useTranslation();
-  const toggle = <button type="button" className="rounded p-1 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label={visible ? t("common.hidePassword", { defaultValue: "Hide password" }) : t("common.showPassword", { defaultValue: "Show password" })} onClick={() => setVisible((value) => !value)}>{visibilityToggleIcon ? visibilityToggleIcon({ reveal: visible }) : visible ? <EyeOff size={16} /> : <Eye size={16} />}</button>;
-  return <Field ref={ref} type={visible ? "text" : "password"} rightSection={rightSection ?? toggle} {...props} />;
+  const toggle = <button type="button" className="rounded p-1 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" aria-label={visible ? t("common.hidePassword") : t("common.showPassword")} aria-pressed={visible} onClick={() => setVisible((value) => !value)}>{visibilityToggleIcon ? visibilityToggleIcon({ reveal: visible }) : visible ? <EyeOff size={16} /> : <Eye size={16} />}</button>;
+  return <Field ref={ref} rightSection={rightSection ?? toggle} {...props} type={visible ? "text" : "password"} />;
 });
 
 export function Textarea(props: React.ComponentProps<typeof ShadcnTextarea> & { label?: string; error?: ReactNode }) {
