@@ -21,6 +21,22 @@ async function selectSite(page: import("@playwright/test").Page, name: string) {
   await page.getByRole("option", { name: new RegExp(name) }).click();
 }
 
+test("login uses the dashboard logo on desktop and mobile", async ({ page }) => {
+  const desktopLogo = page.locator('main aside img[src="/favicon.png"]');
+  const mobileLogo = page.locator('main section img[src="/favicon.png"]');
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/login");
+    await expect(desktopLogo).toHaveCount(1);
+    await expect(mobileLogo).toHaveCount(1);
+    const visibleLogo = width >= 768 ? desktopLogo : mobileLogo;
+    const hiddenLogo = width >= 768 ? mobileLogo : desktopLogo;
+    await expect(visibleLogo).toBeVisible();
+    await expect(hiddenLogo).toBeHidden();
+    await expect.poll(() => visibleLogo.evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  }
+});
+
 test("mock login keeps its session and opens the requested route", async ({ page }) => {
   await logIn(page);
   await expect(page.getByRole("link", { name: "Overview" })).toBeVisible();

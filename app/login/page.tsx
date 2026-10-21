@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AudioLines, LoaderCircle, LogIn } from "lucide-react";
+import { LoaderCircle, LogIn } from "lucide-react";
 import { PasswordInput } from "@/components/ui/form-controls";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -82,7 +82,7 @@ export default function Login() {
         <div className="absolute -right-24 -top-24 size-96 rounded-full border border-primary/10" aria-hidden="true" />
         <div className="absolute -right-8 -top-8 size-64 rounded-full border border-primary/10" aria-hidden="true" />
         <div className="relative flex items-center gap-3 font-semibold tracking-tight">
-          <span className="grid size-10 place-items-center rounded-xl bg-primary text-primary-foreground"><AudioLines size={20} /></span>
+          <img src="/favicon.png" alt="" width={40} height={40} className="size-10 shrink-0 rounded-md object-contain" />
           <span>{t("common.dashboard")}</span>
         </div>
         <div className="relative max-w-lg space-y-4">
@@ -96,7 +96,7 @@ export default function Login() {
       <section className="flex min-h-dvh items-center justify-center px-5 py-10 sm:px-8">
         <div className="w-full max-w-sm space-y-8">
           <div className="space-y-2 text-center md:text-left">
-            <div className="mx-auto mb-6 grid size-11 place-items-center rounded-xl bg-primary text-primary-foreground md:hidden"><AudioLines size={21} /></div>
+            <img src="/favicon.png" alt="" width={44} height={44} className="mx-auto mb-6 size-11 rounded-md object-contain md:hidden" />
             <h1 className="text-2xl font-semibold tracking-tight">{t("login.login")}</h1>
             <p className="text-sm text-muted-foreground">{t("login.tagline")}</p>
           </div>
