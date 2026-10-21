@@ -414,6 +414,26 @@ test("Analytics defaults to All Sites, issues one global query, and switches cle
   }
 });
 
+test("Analytics selected site stays inside the viewport at desktop widths", async ({ page }) => {
+  await logIn(page);
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await page.goto("/analytics");
+  await selectSite(page, "WiFi Lens");
+  await expect(page.getByRole("img", { name: "Traffic over time" })).toBeVisible();
+
+  for (const width of [1024, 1200, 1280, 1366, 1400, 1439, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    const bounds = await page.locator("main").evaluate((main) => ({
+      viewport: document.documentElement.clientWidth,
+      right: main.getBoundingClientRect().right,
+      clientWidth: main.clientWidth,
+      scrollWidth: main.scrollWidth,
+    }));
+    expect(bounds.right, `selected-site Analytics main at ${width}px`).toBeLessThanOrEqual(bounds.viewport);
+    expect(bounds.scrollWidth, `selected-site Analytics content at ${width}px`).toBeLessThanOrEqual(bounds.clientWidth);
+  }
+});
+
 test("Analytics page query includes site list and the selected dashboard", async ({ page }) => {
   await logIn(page);
   const site = { id: 12, name: "One Site", siteKey: "one-site-key", host: "one.example", createdAt: "2026-01-01", updatedAt: "2026-01-01" };

@@ -67,7 +67,7 @@ export function AuthenticatedLayout({ children, user }: { children: React.ReactN
           loggingOut={loggingOut}
           onLogout={handleLogout}
         />
-        <SidebarInset className="min-h-0 overflow-x-clip md:peer-data-[variant=inset]:mt-0">
+        <SidebarInset className="min-w-0 min-h-0 overflow-x-clip md:peer-data-[variant=inset]:mt-0">
           <Main>{children}</Main>
         </SidebarInset>
       </div>
