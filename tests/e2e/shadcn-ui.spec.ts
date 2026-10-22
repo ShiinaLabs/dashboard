@@ -24,8 +24,9 @@ describe("shadcn UI architecture contracts", () => {
   it("uses the donor sidebar shell with accessible shadcn primitives", () => {
     const sources = projectSources("components");
     const source = sources.map((path) => readFileSync(path, "utf8")).join("\n");
-    expect(source).toContain("SidebarProvider");
-    expect(source).toContain("SidebarInset");
+    expect(source).toContain("WorkspaceNavProvider");
+    expect(source).toContain("WorkspaceRail");
+    expect(source).toContain("WorkspacePanel");
     expect(source).toContain("AlertDialog");
     expect(source).toContain("SheetContent");
   });

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useSyncExternalStore } from "react";
+import { useSearchParams } from "react-router";
 import { Eye, Globe2, MousePointerClick, PanelsTopLeft, Plus, UsersRound } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -48,7 +49,18 @@ export default function WebAnalyticsPage() {
     getTimezone,
     () => null,
   );
-  const [selectedSiteId, setSelectedSiteId] = useState<"all" | number>("all");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const siteParam = searchParams.get("site");
+  const selectedSiteId: "all" | number =
+    siteParam && siteParam !== "all" && /^\d+$/.test(siteParam) ? Number(siteParam) : "all";
+  const setSelectedSiteId = (next: "all" | number) => {
+    setSearchParams((previous) => {
+      const params = new URLSearchParams(previous);
+      if (next === "all") params.delete("site");
+      else params.set("site", String(next));
+      return params;
+    }, { replace: true });
+  };
   const [selectedRange, setSelectedRange] = useState<AnalyticsRange>("DAYS_7");
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");

@@ -53,27 +53,33 @@ test("mock login keeps its session and opens the requested route", async ({ page
   });
 });
 
-test("dashboard shell uses one full-width header above the desktop sidebar", async ({ page }) => {
+test("dashboard shell uses one full-width header above the rail and a collapsible panel", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await establishMockSession(page);
   await page.goto("/overview");
 
   const header = page.locator("[data-shell-header]");
-  const sidebar = page.locator('[data-slot="sidebar-container"]');
+  const rail = page.locator('nav[aria-label="Primary"]');
+  const panel = page.locator("#workspace-panel");
   await expect(header).toBeVisible();
-  await expect(sidebar).toBeVisible();
+  await expect(rail).toBeVisible();
+  await expect(panel).toBeVisible();
   await expect.poll(() => header.evaluate((element) => element.getBoundingClientRect().width)).toBe(1440);
   const headerHeight = await header.evaluate((element) => element.getBoundingClientRect().height);
-  const sidebarTop = await sidebar.evaluate((element) => element.getBoundingClientRect().top);
-  expect(headerHeight).toBe(64);
-  expect(sidebarTop).toBe(headerHeight);
+  expect(headerHeight).toBe(56);
+  expect(await rail.evaluate((element) => element.getBoundingClientRect().top)).toBe(headerHeight);
   await expect(header.getByRole("link", { name: "Data Hub" })).toBeVisible();
   await expect(header.getByRole("status", { name: /Dashboard server freshness:/ })).toBeVisible();
 
-  const expandedSidebarWidth = await sidebar.evaluate((element) => element.getBoundingClientRect().width);
-  await header.getByRole("button", { name: "Collapse sidebar" }).click();
-  await expect.poll(() => sidebar.evaluate((element) => element.getBoundingClientRect().width)).toBeLessThan(expandedSidebarWidth);
-  expect(await sidebar.evaluate((element) => element.getBoundingClientRect().top)).toBe(headerHeight);
+  const openPanelWidth = await panel.evaluate((element) => element.getBoundingClientRect().width);
+  const toggle = header.getByRole("button", { name: /navigation/i });
+  const toggleX = await toggle.evaluate((element) => element.getBoundingClientRect().x);
+  await toggle.click();
+  await expect.poll(() => panel.evaluate((element) => element.getBoundingClientRect().width)).toBe(0);
+  // The header must not move when the panel collapses.
+  expect(await toggle.evaluate((element) => element.getBoundingClientRect().x)).toBe(toggleX);
+  await toggle.click();
+  await expect.poll(() => panel.evaluate((element) => element.getBoundingClientRect().width)).toBe(openPanelWidth);
 });
 
 test("authenticated route HTML contains the useful app shell before browser JavaScript runs", async ({ page }) => {
@@ -867,15 +873,15 @@ test("mobile navigation opens, closes, and logout returns to login", async ({ pa
   await page.setViewportSize({ width: 390, height: 844 });
   await logIn(page);
 
-  const sidebarToggle = page.getByRole("button", { name: "Expand sidebar" });
-  await expect(sidebarToggle).toBeVisible();
-  await sidebarToggle.click();
-  await expect(page.getByRole("link", { name: "Overview" })).toBeVisible();
+  const navToggle = page.getByRole("button", { name: "Open navigation" });
+  await expect(navToggle).toBeVisible();
+  await navToggle.click();
+  await expect(page.getByRole("link", { name: "Overview" }).first()).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "Expand sidebar" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Expand sidebar" }).click();
-  await page.getByRole("button", { name: "admin admin", exact: true }).click();
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.getByRole("button", { name: "admin", exact: true }).click();
   await page.getByRole("menuitem", { name: "Log out" }).click();
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
@@ -1002,7 +1008,7 @@ test("theme tokens remain applied across the requested light and dark themes", a
     await page.goto("/overview");
     const surfaces = await page.evaluate(() => {
       const card = document.querySelector<HTMLElement>("[data-slot=card]");
-      const sidebar = document.querySelector<HTMLElement>("[data-sidebar=sidebar]");
+      const sidebar = document.querySelector<HTMLElement>('nav[aria-label="Primary"]');
       return {
         cardBackground: card ? getComputedStyle(card).backgroundColor : "",
         sidebarBackground: sidebar ? getComputedStyle(sidebar).backgroundColor : "",

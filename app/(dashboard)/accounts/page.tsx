@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { FETCH_POLICY } from "@/lib/application/scheduler/fetchPolicy";
@@ -38,7 +38,20 @@ export default function AccountsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<Platform | "app-store">("twitter");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const tab: Platform | "app-store" =
+    tabParam === "app-store" || TABS.some((entry) => entry.key === tabParam)
+      ? (tabParam as Platform | "app-store")
+      : "twitter";
+  const setTab = (next: Platform | "app-store") => {
+    setSearchParams((previous) => {
+      const params = new URLSearchParams(previous);
+      if (next === "twitter") params.delete("tab");
+      else params.set("tab", next);
+      return params;
+    }, { replace: true });
+  };
   const [editing, setEditing] = useState<Account | null>(null);
   const [adding, setAdding] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);

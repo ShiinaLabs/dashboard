@@ -1,45 +1,39 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { api } from "@/lib/api";
 import type { AuthUser } from "@/lib/auth-helpers";
 import { useIsMobile } from "@/lib/client/useIsMobile";
 import { FloatingAiChat } from "@/components/FloatingAiChat";
 import { NavigationProgress } from "@/components/NavigationProgress";
 import { NavigatingOverlay } from "@/components/NavigatingOverlay";
-import { AppSidebar } from "./app-sidebar";
 import { Header } from "./header";
 import { Main } from "./main";
+import {
+  MobileWorkspaceNav,
+  WorkspaceNavProvider,
+  WorkspacePanel,
+  WorkspaceRail,
+} from "./workspace-nav";
 
-const SIDEBAR_KEY = "sidebar-state";
-
-function loadSidebarOpen() {
-  if (typeof window === "undefined") return true;
-  try { return JSON.parse(localStorage.getItem(SIDEBAR_KEY) ?? "true") as boolean; } catch { return true; }
-}
-
-export function AuthenticatedLayout({ children, user }: { children: React.ReactNode; user: AuthUser }) {
+export function AuthenticatedLayout({
+  children,
+  user,
+  initialPanelOpen,
+}: {
+  children: React.ReactNode;
+  user: AuthUser;
+  initialPanelOpen: boolean;
+}) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
-  const [open, setOpen] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const setSidebarOpen = useCallback((next: boolean) => {
-    setOpen(next);
-    if (typeof window !== "undefined") localStorage.setItem(SIDEBAR_KEY, JSON.stringify(next));
-  }, []);
+  const navUser = { username: user.username, role: user.role, isAdmin: user.role === "admin" };
 
-  // localStorage is browser-only. Read it after hydration to keep the server
-  // and first client render structurally identical.
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setOpen(loadSidebarOpen()));
-    return () => cancelAnimationFrame(frame);
-  }, []);
-
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     setLoggingOut(true);
     try {
       await api.logout();
@@ -52,26 +46,24 @@ export function AuthenticatedLayout({ children, user }: { children: React.ReactN
       setLoggingOut(false);
       navigate("/login");
     }
-  };
+  }, [navigate, queryClient]);
 
   return (
-    <SidebarProvider open={open} onOpenChange={setSidebarOpen} className="flex min-h-svh flex-col">
+    <WorkspaceNavProvider initialPanelOpen={initialPanelOpen}>
       <NavigationProgress />
       <NavigatingOverlay />
-      <Header />
-      <div className="flex min-h-[calc(100svh-4rem)] flex-1">
-        <AppSidebar
-          isAdmin={user.role === "admin"}
-          username={user.username}
-          role={user.role}
-          loggingOut={loggingOut}
-          onLogout={handleLogout}
-        />
-        <SidebarInset className="min-w-0 min-h-0 overflow-x-clip md:peer-data-[variant=inset]:mt-0">
-          <Main>{children}</Main>
-        </SidebarInset>
+      <div className="flex min-h-svh flex-col">
+        <Header />
+        <div className="flex min-h-[calc(100svh-3.5rem)] flex-1">
+          <WorkspaceRail user={navUser} onLogout={handleLogout} loggingOut={loggingOut} />
+          <WorkspacePanel />
+          <div className="min-w-0 flex-1 overflow-x-clip">
+            <Main>{children}</Main>
+          </div>
+        </div>
       </div>
+      <MobileWorkspaceNav user={navUser} onLogout={handleLogout} loggingOut={loggingOut} />
       {!isMobile && pathname !== "/ai" && <FloatingAiChat pathname={pathname} />}
-    </SidebarProvider>
+    </WorkspaceNavProvider>
   );
 }

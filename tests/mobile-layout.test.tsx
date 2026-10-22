@@ -22,20 +22,25 @@ describe("mobile layout contracts", () => {
     expect(html).toContain("flex-1");
   });
 
-  it("keeps sidebar navigation items touch-sized", () => {
-    const source = readProjectFile("components/ui/sidebar.tsx");
+  it("keeps rail navigation items touch-sized", () => {
+    const source = readProjectFile("components/layout/workspace-nav.tsx");
 
-    expect(source).toContain("min-h-11");
+    expect(source).toContain("size-11");
+    expect(source).toContain("aria-label={t(domain.labelKey)}");
   });
 
-  it("hydrates the layout from a server-stable sidebar state", () => {
-    const source = readProjectFile("components/layout/authenticated-layout.tsx");
+  it("seeds the shell from the server-read panel cookie instead of localStorage", () => {
+    const layout = readProjectFile("components/layout/authenticated-layout.tsx");
+    const nav = readProjectFile("components/layout/workspace-nav.tsx");
+    const route = readProjectFile("app/(dashboard)/layout.tsx");
 
-    // SSR must render the open sidebar deterministically; the client then
-    // reconciles via matchMedia / localStorage without a hydration flash.
-    expect(source).toContain("useState(true)");
-    expect(source).toContain('typeof window === "undefined"');
-    expect(source).toContain("requestAnimationFrame(() => setOpen(loadSidebarOpen()))");
+    // The loader reads nav_panel and passes it as the initial state, so SSR and
+    // the first client render agree and the shell never jumps after hydration.
+    expect(nav).toContain("useState(initialPanelOpen)");
+    expect(nav).not.toContain("requestAnimationFrame");
+    expect(nav).not.toContain("localStorage");
+    expect(layout).not.toContain("requestAnimationFrame");
+    expect(route).toContain("parseNavPanelPreference");
   });
 
   it("renders deterministic English on the server, then applies browser language preference", () => {

@@ -75,6 +75,20 @@
     "appStoreAnalytics": "App Store 分析",
     "revenue": "收入"
   },
+  "navPanel": {
+    "accounts": "账号",
+    "sites": "站点",
+    "allSites": "全部站点",
+    "manage": "管理",
+    "add": "添加",
+    "noAccounts": "还没有连接账号",
+    "noSites": "还没有站点",
+    "jumpTo": "快捷入口",
+    "openNav": "打开导航",
+    "closeNav": "关闭导航",
+    "services": "服务",
+    "recent": "最近"
+  },
   "badge": {
     "inactive": "未激活",
     "error": "错误",

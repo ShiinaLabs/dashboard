@@ -105,6 +105,20 @@ const analyticsPageQuery = /* GraphQL */ `
   }
 `;
 
+const analyticsSitesQuery = /* GraphQL */ `
+  query AnalyticsSites {
+    analytics { sites { id name siteKey host createdAt updatedAt } }
+  }
+`;
+
+export async function getAnalyticsSites(signal?: AbortSignal): Promise<AnalyticsPageResult["sites"]> {
+  const result = await graphqlRequest<
+    { analytics: { sites: Array<{ id: number; name: string; siteKey: string; host: string; createdAt: string; updatedAt: string }> } },
+    Record<string, never>
+  >(analyticsSitesQuery, {}, signal);
+  return result.analytics.sites.map((site) => ({ id: site.id, name: site.name, site_key: site.siteKey, host: site.host, created_at: site.createdAt, updated_at: site.updatedAt }));
+}
+
 export async function getAnalyticsPage(variables: { range: AnalyticsRange; timezone: string; siteId: number; showGlobal: boolean; showSite: boolean }, signal?: AbortSignal): Promise<AnalyticsPageResult> {
   const result = await graphqlRequest<{ analytics: Omit<AnalyticsPageResult, "sites"> & { sites: Array<{ id: number; name: string; siteKey: string; host: string; createdAt: string; updatedAt: string }> } }, typeof variables>(analyticsPageQuery, variables, signal);
   return { ...result.analytics, sites: result.analytics.sites.map((site) => ({ id: site.id, name: site.name, site_key: site.siteKey, host: site.host, created_at: site.createdAt, updated_at: site.updatedAt })) };

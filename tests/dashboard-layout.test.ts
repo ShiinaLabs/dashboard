@@ -11,11 +11,24 @@ describe("dashboard layout loader", () => {
   it.each([
     [{ id: 3, username: "member", role: "user" }, { id: 3, username: "member", role: "user" }],
     [{ id: 1, username: "admin", role: "admin" }, { id: 1, username: "admin", role: "admin" }],
-  ])("returns only the safe user projection", async (user, expected) => {
+  ])("returns the safe user projection plus the panel preference", async (user, expected) => {
     requireSession.mockResolvedValue({ session: { username: "member", role: "user", token: "secret" }, user });
     const result = await loader({ request: new Request("http://localhost/overview") } as never);
-    expect(result).toEqual(expected);
+    expect(result).toEqual({ user: expected, initialPanelOpen: true });
     expect(JSON.stringify(result)).not.toMatch(/token|secret|password|credential/i);
+  });
+
+  it("reads the panel preference from the cookie for a deterministic first paint", async () => {
+    requireSession.mockResolvedValue({ session: { username: "member", role: "user" }, user: { id: 3, username: "member", role: "user" } });
+    const closed = await loader({
+      request: new Request("http://localhost/overview", { headers: { cookie: "nav_panel=closed" } }),
+    } as never);
+    expect(closed.initialPanelOpen).toBe(false);
+
+    const open = await loader({
+      request: new Request("http://localhost/overview", { headers: { cookie: "nav_panel=open" } }),
+    } as never);
+    expect(open.initialPanelOpen).toBe(true);
   });
 
   it("redirects missing sessions to login and preserves the requested location", async () => {

@@ -24,7 +24,9 @@ describe("Web Analytics boundaries", () => {
     const client = readFileSync("lib/api.ts", "utf8");
     expect(page).toContain("getAnalyticsPage({");
     expect(page).toContain('["analytics-page", selectedSiteId, selectedRange, timezone]');
-    expect(page).toContain('useState<"all" | number>("all")');
+    expect(page).toContain("useSearchParams");
+    expect(page).toContain('searchParams.get("site")');
+    expect(page).toContain("setSearchParams");
     expect(page).not.toContain("?? sites[0]");
     expect(page).toContain('selectedSiteId === "all"');
     expect(page).toContain('value="all"');

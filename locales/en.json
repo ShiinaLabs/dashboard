@@ -75,6 +75,20 @@
     "appStoreAnalytics": "App Store Analytics",
     "revenue": "Revenue"
   },
+  "navPanel": {
+    "accounts": "Accounts",
+    "sites": "Sites",
+    "allSites": "All sites",
+    "manage": "Manage",
+    "add": "Add",
+    "noAccounts": "No accounts connected",
+    "noSites": "No sites yet",
+    "jumpTo": "Jump to",
+    "openNav": "Open navigation",
+    "closeNav": "Close navigation",
+    "services": "Services",
+    "recent": "Recent"
+  },
   "badge": {
     "inactive": "Inactive",
     "error": "Error",
