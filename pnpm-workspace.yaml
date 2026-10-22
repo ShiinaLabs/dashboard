@@ -10,5 +10,9 @@ overrides:
   # browserslist data package that publishes daily; pin an older, widely
   # distributed version so pnpm's minimumReleaseAge policy stays satisfied.
   electron-to-chromium: 1.5.394
+  # drizzle-kit still pulls the deprecated @esbuild-kit loader, which pins
+  # esbuild ^0.18. Keep the override scoped to that chain so the rest of the
+  # tree keeps the current esbuild.
+  "@esbuild-kit/core-utils>esbuild": "0.25.12"
 patchedDependencies:
   '@react-router/dev@7.18.4': patches/@react-router__dev@7.18.4.patch
