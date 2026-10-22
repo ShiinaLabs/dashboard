@@ -37,7 +37,7 @@ RUN pnpm install --prod --frozen-lockfile \
   && sh ./scripts/prune-runtime-dependencies.sh ./node_modules
 
 # ── Stage 3: Distroless runtime ─────────────────────────────────────
-FROM --platform=linux/amd64 gcr.io/distroless/nodejs24-debian13:nonroot@sha256:9eeb7f5887d0e239e78264b06f7f11d2e14be534050481803a9e4728fcdd278e AS runner
+FROM --platform=linux/amd64 reg.mikumikumi.xyz/mirror/distroless-nodejs:24 AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
